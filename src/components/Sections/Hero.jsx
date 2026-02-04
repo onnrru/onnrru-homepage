@@ -126,7 +126,7 @@ const Hero = () => {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.8, delay: 0.5 + ((index + 1) * 0.2) }}
-                            className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-white shadow-lg cursor-pointer group"
+                            className="relative h-auto min-h-[400px] md:h-full rounded-3xl overflow-hidden bg-white shadow-lg cursor-pointer group"
                         >
                             <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
