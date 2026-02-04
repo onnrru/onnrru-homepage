@@ -61,7 +61,7 @@ const Hero = () => {
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8, delay: 0.5 }}
-                        className="relative h-auto min-h-[400px] md:h-auto md:min-h-0 md:aspect-[4/3] rounded-3xl overflow-hidden bg-white shadow-lg flex flex-col p-6"
+                        className="relative h-auto min-h-[400px] md:h-full rounded-3xl overflow-hidden bg-white shadow-lg flex flex-col p-6"
                     >
                         <div className="flex justify-between items-center mb-3 flex-shrink-0">
                             <h4 className="text-lg font-bold text-ink">최신 블로그 리뷰</h4>
