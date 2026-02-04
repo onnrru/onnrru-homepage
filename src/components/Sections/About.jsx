@@ -48,7 +48,7 @@ const About = () => {
                 </motion.div>
 
                 {/* Horizontal Accordion Container */}
-                <div className="flex flex-col md:flex-row gap-4 h-auto md:h-[500px]">
+                <div className="flex flex-col md:flex-row gap-4 h-auto min-h-[500px] md:h-[500px]">
                     {features.map((feature, index) => {
                         const isHovered = hoveredIndex === index;
                         // Determine flex value:
@@ -60,6 +60,7 @@ const About = () => {
                             <motion.div
                                 key={index}
                                 layout
+                                onClick={() => setHoveredIndex(isHovered ? null : index)}
                                 onHoverStart={() => setHoveredIndex(index)}
                                 onHoverEnd={() => setHoveredIndex(null)}
                                 initial={false}
