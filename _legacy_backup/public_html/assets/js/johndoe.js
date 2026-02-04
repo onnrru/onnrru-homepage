@@ -1,0 +1,182 @@
+/*!
+=========================================================
+* JohnDoe Landing page
+=========================================================
+
+* Copyright: 2019 DevCRUD (https://devcrud.com)
+* Licensed: (https://devcrud.com/licenses)
+* Coded by www.devcrud.com
+
+=========================================================
+
+* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+*/
+
+// smooth scroll
+$(document).ready(function(){
+    $(".navbar .nav-link").on('click', function(event) {
+
+        if (this.hash !== "") {
+
+            event.preventDefault();
+
+            var hash = this.hash;
+
+            $('html, body').animate({
+                scrollTop: $(hash).offset().top
+            }, 700, function(){
+                window.location.hash = hash;
+            });
+        } 
+    });
+});
+
+// protfolio filters
+$(window).on("load", function() {
+    var t = $(".portfolio-container");
+    t.isotope({
+        filter: ".new",
+        animationOptions: {
+            duration: 750,
+            easing: "linear",
+            queue: !1
+        }
+    }), $(".filters a").click(function() {
+        $(".filters .active").removeClass("active"), $(this).addClass("active");
+        var i = $(this).attr("data-filter");
+        return t.isotope({
+            filter: i,
+            animationOptions: {
+                duration: 750,
+                easing: "linear",
+                queue: !1
+            }
+        }), !1
+    });
+});
+
+
+// google maps
+function initMap() {
+// Styles a map in night mode.
+    var map = new google.maps.Map(document.getElementById('map'), {
+        center: {lat: 37.5642135 ,lng: 127.0016985},
+        zoom: 12,
+        navigationControl: false,
+        mapTypeControl: false,
+        scaleControl: false,
+      styles: [
+        {elementType: 'geometry', stylers: [{color: '#242f3e'}]},
+        {elementType: 'labels.text.stroke', stylers: [{color: '#242f3e'}]},
+        {elementType: 'labels.text.fill', stylers: [{color: '#746855'}]},
+        {
+          featureType: 'administrative.locality',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#d59563'}]
+        },
+        {
+          featureType: 'poi',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#d59563'}]
+        },
+        {
+          featureType: 'poi.park',
+          elementType: 'geometry',
+          stylers: [{color: '#263c3f'}]
+        },
+        {
+          featureType: 'poi.park',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#6b9a76'}]
+        },
+        {
+          featureType: 'road',
+          elementType: 'geometry',
+          stylers: [{color: '#38414e'}]
+        },
+        {
+          featureType: 'road',
+          elementType: 'geometry.stroke',
+          stylers: [{color: '#212a37'}]
+        },
+        {
+          featureType: 'road',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#9ca5b3'}]
+        },
+        {
+          featureType: 'road.highway',
+          elementType: 'geometry',
+          stylers: [{color: '#746855'}]
+        },
+        {
+          featureType: 'road.highway',
+          elementType: 'geometry.stroke',
+          stylers: [{color: '#1f2835'}]
+        },
+        {
+          featureType: 'road.highway',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#f3d19c'}]
+        },
+        {
+          featureType: 'transit',
+          elementType: 'geometry',
+          stylers: [{color: '#2f3948'}]
+        },
+        {
+          featureType: 'transit.station',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#d59563'}]
+        },
+        {
+          featureType: 'water',
+          elementType: 'geometry',
+          stylers: [{color: '#17263c'}]
+        },
+        {
+          featureType: 'water',
+          elementType: 'labels.text.fill',
+          stylers: [{color: '#515c6d'}]
+        },
+        {
+          featureType: 'water',
+          elementType: 'labels.text.stroke',
+          stylers: [{color: '#17263c'}]
+        }
+      ]
+    });
+    var subMarkerPoint = { lat: 37.481182, lng: 127.123251};
+    var subMarker = new google.maps.Marker({
+        position: subMarkerPoint,
+        map: map,
+        icon: {
+          url: "/img/mk.png",
+          scaledSize: new google.maps.Size(75, 37)
+        }
+
+      });
+	// Add a click event listener to the marker
+subMarker.addListener('click', function() {
+    // Redirect the user to the desired URL when the marker is clicked
+    window.location.href = "https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%ED%8C%8C%ED%81%AC%ED%95%98%EB%B9%84%EC%98%A4%EC%A0%90";
+	});
+	
+    var subMarkerPoint = { lat: 37.5116693, lng: 127.096322};
+    var subMarker = new google.maps.Marker({
+        position: subMarkerPoint,
+        map: map,
+        icon: {
+          url: "/img/mk.png",
+          scaledSize: new google.maps.Size(75, 37)
+          }
+      
+        });
+	// Add a click event listener to the marker
+subMarker.addListener('click', function() {
+    // Redirect the user to the desired URL when the marker is clicked
+    window.location.href = "https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%EC%9E%A0%EC%8B%A4%EB%A1%AF%EB%8D%B0%EB%A7%88%ED%8A%B8%EC%A0%90";
+});
+
+ 
+}
