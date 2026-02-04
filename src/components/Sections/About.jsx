@@ -106,7 +106,7 @@ const About = () => {
                                         </h5>
                                         {/* Title: Scales with hover */}
                                         <motion.h4
-                                            className="font-bold text-ink mb-4 whitespace-nowrap lg:whitespace-normal"
+                                            className="font-bold text-ink mb-4 whitespace-normal"
                                             animate={{
                                                 fontSize: isHovered ? "1.875rem" : "1.5rem",
                                                 color: isHovered ? "#0B1019" : "rgba(11, 16, 25, 0.7)"

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 const Hero = () => {
     return (
-        <section id="home" className="relative h-screen flex flex-col justify-between pt-32 pb-10 overflow-hidden bg-paper">
+        <section id="home" className="relative min-h-screen flex flex-col justify-between pt-24 pb-10 md:pt-32 overflow-hidden bg-paper">
 
             {/* Background Elements (Ink/Water Ripples) - Kept subtle */}
             <div className="absolute inset-0 z-0 pointer-events-none">
@@ -24,7 +24,7 @@ const Hero = () => {
                         transition={{ duration: 1, ease: "easeOut" }}
                         className="max-w-3xl"
                     >
-                        <h1 className="text-5xl md:text-7xl font-bold font-serif text-ink mb-6 leading-tight">
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-serif text-ink mb-6 leading-tight">
                             Why flavor seekers<br />
                             choose <span className="text-ink-light">OnnRRu</span>
                         </h1>
