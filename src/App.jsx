@@ -1,14 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
-import MainGameLayout from './components/layout/MainGameLayout';
-import Navbar from './components/layout/Navbar';
+import MainGameLayout from './components/Layout/MainGameLayout';
+import Navbar from './components/Layout/Navbar';
 import Hero from './components/Sections/Hero';
 import About from './components/Sections/About';
 import Menu from './components/Sections/Menu';
 import Reviews from './components/Sections/Reviews';
 import Locations from './components/Sections/Locations';
-import Footer from './components/layout/Footer';
+import Footer from './components/Layout/Footer';
 import ConsultingDashboard from './components/Dashboard/ConsultingDashboard';
 import TestPage from './components/TestPage';
 
