@@ -1,0 +1,31 @@
+name: Deploy Backend to VM
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to VM via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.VM_HOST }}        # 34.50.25.171
+        username: ${{ secrets.VM_USERNAME }} # e.g., onnrr (check via 'whoami' on VM)
+        key: ${{ secrets.VM_SSH_KEY }}      # Private SSH key
+        port: 22
+        script: |
+          # Navigate to project directory (Adjust path if needed)
+          cd ~/onnrru-homepage/backend
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Install dependencies
+          npm install
+          
+          # Restart server with PM2
+          pm2 restart backend || pm2 start server.js --name "backend"

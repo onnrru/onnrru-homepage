@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar = ({ activeGroup, setActiveGroup }) => {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -18,7 +21,44 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
         { name: 'About', href: '#about' },
         { name: 'Menu', href: '#menu' },
         { name: 'Locations', href: '#locations' },
+        { name: 'Test', href: '/test' },
     ];
+
+    const handleNavigation = (e, href) => {
+        e.preventDefault();
+        setMobileOpen(false);
+
+        if (href.startsWith('#')) {
+            // Hash Navigation
+            if (location.pathname !== '/') {
+                // If not on home page, go to home
+                navigate('/');
+                // Optional: Store hash to scroll after navigation if needed
+                // For now, just going to home is good enough, usually #home is top
+                if (href !== '#home') {
+                    setTimeout(() => {
+                        const el = document.querySelector(href);
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }, 500);
+                }
+            } else {
+                // On Home Page
+                if (activeGroup === 1 && setActiveGroup) {
+                    setActiveGroup(0);
+                    setTimeout(() => {
+                        const el = document.querySelector(href);
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                } else {
+                    const el = document.querySelector(href);
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        } else {
+            // Page Navigation (e.g., /test)
+            navigate(href);
+        }
+    };
 
     return (
         <nav
@@ -27,7 +67,11 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
         >
             <div className="container mx-auto px-6 flex justify-between items-center">
                 {/* Logo */}
-                <a href="#home" className="text-2xl font-serif font-bold tracking-widest text-ink hover:text-ink-light transition-colors">
+                <a
+                    href="#home"
+                    onClick={(e) => handleNavigation(e, '#home')}
+                    className="text-2xl font-serif font-bold tracking-widest text-ink hover:text-ink-light transition-colors"
+                >
                     온 류
                 </a>
 
@@ -37,20 +81,8 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                         <a
                             key={link.name}
                             href={link.href}
-                            onClick={(e) => {
-                                if (activeGroup === 1) {
-                                    e.preventDefault();
-                                    setActiveGroup(0);
-                                    // Small delay to allow render before scrolling? 
-                                    // Actually if we switch group, the ID might not exist yet.
-                                    // Ideally we switch then scroll. 
-                                    setTimeout(() => {
-                                        const el = document.querySelector(link.href);
-                                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                                    }, 100);
-                                }
-                            }}
-                            className="text-sm uppercase tracking-wider text-ink/70 hover:text-ink font-medium transition-colors relative group"
+                            onClick={(e) => handleNavigation(e, link.href)}
+                            className="text-sm uppercase tracking-wider text-ink/70 hover:text-ink font-medium transition-colors relative group cursor-pointer"
                         >
                             {link.name}
                             <span className="absolute left-0 bottom-[-4px] w-0 h-[1px] bg-ink transition-all group-hover:w-full"></span>
@@ -67,16 +99,14 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                         </a>
                     </div>
 
-                    {/* Group Switcher Button */}
-                    <button
-                        onClick={() => setActiveGroup(activeGroup === 0 ? 1 : 0)}
-                        className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 border ${activeGroup === 1
-                            ? 'bg-ink text-white border-ink hover:bg-ink-light'
-                            : 'bg-transparent text-ink border-ink hover:bg-ink hover:text-white'
-                            }`}
+                    {/* Consulting Dashboard Link */}
+                    <a
+                        href="/consulting"
+                        onClick={(e) => handleNavigation(e, '/consulting')}
+                        className="px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 border bg-transparent text-ink border-ink hover:bg-ink hover:text-white cursor-pointer"
                     >
-                        {activeGroup === 0 ? 'Consulting Access' : 'Back to Home'}
-                    </button>
+                        Consulting Access
+                    </a>
                 </div>
 
                 {/* Mobile Toggle */}
@@ -108,8 +138,8 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                                 <a
                                     key={link.name}
                                     href={link.href}
-                                    className="text-lg font-medium text-ink/80 hover:text-ink"
-                                    onClick={() => setMobileOpen(false)}
+                                    className="text-lg font-medium text-ink/80 hover:text-ink cursor-pointer"
+                                    onClick={(e) => handleNavigation(e, link.href)}
                                 >
                                     {link.name}
                                 </a>
