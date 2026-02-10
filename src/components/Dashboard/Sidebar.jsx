@@ -143,7 +143,10 @@ const Sidebar = ({ selectedAddress }) => {
 
             } catch (err) {
                 console.error("Sidebar API Error:", err);
-                setError("토지 정보를 불러오는데 실패했습니다.");
+                const errMsg = err.response
+                    ? `Status: ${err.response.status} (${err.response.statusText})`
+                    : err.message;
+                setError(`정보 로딩 실패: ${errMsg}. 프록시/API 키를 확인해주세요.`);
             } finally {
                 setLoading(false);
             }
