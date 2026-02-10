@@ -5,14 +5,12 @@ const MapSection = ({ selectedAddress }) => {
     const mapRef = useRef(null);
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
-
-    // Default to 'sate' (Satellite) as user requested 'Like the screenshot'
     const [mapType, setMapType] = useState('sate');
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
 
-    // Initialize VWorld Map using Standard vw.ol3 Direct Initialization
+    // Initialize VWorld Map
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -20,7 +18,7 @@ const MapSection = ({ selectedAddress }) => {
         const initMap = () => {
             if (mapObj) return;
 
-            // Check for vw.ol3 presence (confirmed existing by debug)
+            // Check for vw.ol3 presence
             if (!window.vw || !window.vw.ol3) {
                 retryCount++;
                 if (retryCount > maxRetries) {
@@ -35,23 +33,26 @@ const MapSection = ({ selectedAddress }) => {
             try {
                 console.log("Initializing VWorld 2D Map via direct vw.ol3...");
 
-                // Clear container just in case
-                const container = document.getElementById("vworld_map_container");
-                if (container) container.innerHTML = '';
+                // We do NOT clear innerHTML here if possible, to avoid React conflicts.
+                // But since 'vworld_map_target' is now empty in JSX, we can ensure it's clean.
+                const container = document.getElementById("vworld_map_target");
+                if (container) {
+                    container.innerHTML = '';
+                }
 
+                // Default VWorld 2D options
                 const mapOptions = {
-                    target: 'vworld_map_container',
+                    target: 'vworld_map_target',
                     controls: window.vw.ol3.control.defaults().extend([
                         new window.vw.ol3.control.Zoom(),
                         new window.vw.ol3.control.ScaleLine(),
                     ]),
                     layers: [
-                        new window.vw.ol3.layer.Base(window.vw.ol3.BasemapType.PHOTO) // Satellite
+                        new window.vw.ol3.layer.Base(window.vw.ol3.BasemapType.PHOTO)
                     ],
                     view: new window.vw.ol3.View({
-                        center: [14151740, 4511257], // Default center (approx)
+                        center: [14151740, 4511257], // Default center
                         zoom: 17,
-                        // VWorld 2D defaults to EPSG:3857, usually auto-handled by vw.ol3.View defaults
                     })
                 };
 
@@ -67,43 +68,34 @@ const MapSection = ({ selectedAddress }) => {
             }
         };
 
+        // Start init
         initMap();
+
+        // Cleanup function to avoid memory leaks or double-init if React strictly mounts/unmounts
+        return () => {
+            // Optional: mapObj could be disposed here if needed, but usually redundant for single-page app life cycle of this component
+        };
     }, []);
 
-    // Update Map Center when selectedAddress changes
+    // Update Map Center
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
 
-                // Check if we need to transform coordinates
-                // VWorld Geocoder usually returns EPSG:4326 (Lon/Lat)
-                // OpenLayers View usually expects EPSG:3857
-
                 let center = [x, y];
-
-                // If window.ol.proj exists (it should via vw.ol3), use it
-                // Note: window.vw.ol3 might alias window.ol, or be separate. 
-                // We should check window.vw.ol3.proj too.
                 const proj = window.vw.ol3.proj || (window.ol && window.ol.proj);
 
-                if (proj) {
-                    // Start with basic 4326 check
-                    if (x < 180 && y < 90) { // Rough check for Lon/Lat
-                        center = proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-                    }
+                if (proj && x < 180 && y < 90) {
+                    center = proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
                 }
 
                 if (mapObj.getView && typeof mapObj.getView === 'function') {
                     const view = mapObj.getView();
                     view.setCenter(center);
-                    view.setZoom(19); // Close zoom for detail
+                    view.setZoom(19);
                 }
-
-                // Add Marker? 
-                // Standard OL3 marker code involves Layers/Features.
-                // Keeping it simple first: just move center.
 
             } catch (e) {
                 console.error("Map Move Error:", e);
@@ -114,22 +106,25 @@ const MapSection = ({ selectedAddress }) => {
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
-            {/* VWorld Map Container */}
-            <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0 bg-gray-200">
+            {/* Dedicated Map Container - NO REACT CHILDREN */}
+            <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200"></div>
+
+            {/* UI Overlays (Siblings) */}
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
-                    <div className="flex items-center justify-center h-full text-gray-500">
+                    <div className="bg-white/80 px-4 py-2 rounded shadow text-gray-700">
                         지도 로딩중...
                     </div>
                 )}
                 {mapError && (
-                    <div className="flex items-center justify-center h-full text-red-500 font-bold">
+                    <div className="bg-white/90 px-4 py-2 rounded shadow text-red-600 font-bold">
                         {mapError}
                     </div>
                 )}
             </div>
 
             {/* Controls / Tabs */}
-            <div className="absolute top-4 left-4 flex gap-2 z-20">
+            <div className="absolute top-4 left-4 flex gap-2 z-20 pointer-events-auto">
                 <button
                     onClick={() => setActiveTab('real')}
                     className={`px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all ${activeTab === 'real' ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
@@ -145,7 +140,7 @@ const MapSection = ({ selectedAddress }) => {
             </div>
 
             {/* Map Type Indicator */}
-            <div className="absolute top-4 right-4 flex gap-2 z-20">
+            <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
                     <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
                 </div>
