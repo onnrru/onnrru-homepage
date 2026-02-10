@@ -129,15 +129,12 @@ const MapSection = ({ selectedAddress }) => {
                         minZoom: 6,
                         maxZoom: 19
                     }),
-                    controls: [],
-                    interactions: OL.interaction.defaults({
-                        mouseWheelZoom: true,
-                        dragPan: true
-                    })
+                    controls: OL.control.defaults(), // Restore default controls (Zoom, etc.)
+                    interactions: OL.interaction.defaults() // Restore all default interactions (Zoom, Drag, Pinch)
                 };
 
                 const map = new OL.Map(mapOptions);
-                window.map = map; // Expose for debugging/user snippet compatibility
+                window.map = map;
 
                 setMapObj(map);
                 setIsMapLoading(false);

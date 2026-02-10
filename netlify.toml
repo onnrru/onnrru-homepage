@@ -6,7 +6,7 @@
 # Government Data API (Toji-Eum) - Routing via User's GC Proxy
 [[redirects]]
   from = "/api/eum/*"
-  to = "http://34.50.25.171:8080/api/eum/:splat"
+  to = "http://34.50.25.171:8080/:splat"
   status = 200
   force = true
 
