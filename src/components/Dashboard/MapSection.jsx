@@ -49,7 +49,20 @@ const MapSection = ({ selectedAddress }) => {
                 container.tabIndex = 0;
                 container.focus();
 
-                // 1. Satellite Layer
+                // 1. Base Layer (Graphic/White)
+                const vworldBaseUrl = 'https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png';
+                const baseLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: vworldBaseUrl,
+                        attributions: 'VWorld',
+                        crossOrigin: 'anonymous'
+                    }),
+                    zIndex: 0,
+                    visible: false // Default hidden (Satellite is default)
+                });
+                baseLayer.set('name', 'base');
+
+                // 2. Satellite Layer (Background)
                 const vworldSatelliteUrl = 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg';
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
@@ -57,10 +70,12 @@ const MapSection = ({ selectedAddress }) => {
                         attributions: 'VWorld',
                         crossOrigin: 'anonymous'
                     }),
-                    zIndex: 0
+                    zIndex: 0,
+                    visible: true
                 });
+                satelliteLayer.set('name', 'satellite');
 
-                // 2. Hybrid Layer (Labels) - Toggleable
+                // 3. Hybrid Layer (Labels) - Context for Satellite
                 const vworldHybridUrl = 'https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png';
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
@@ -69,21 +84,35 @@ const MapSection = ({ selectedAddress }) => {
                         crossOrigin: 'anonymous'
                     }),
                     zIndex: 1,
-                    visible: false
+                    visible: true // Default visible with Satellite
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 3. Cadastral (Jijeokdo) Layer - WMTS XYZ
-                // Using VWorld 2.0 XYZ service for continuous cadastral map
-                // URL Pattern: https://api.vworld.kr/req/wmts/1.0.0/{key}/{layer}/{z}/{y}/{x}.png
+                // 4. Cadastral (Jijeokdo) Layer - WMTS
+                // User suggested 'lp_pa_cb_nd_bu'. VWorld 2.0 docs often use 'lp_pa_cbnd_bubun' (Bubun) and 'lp_pa_cbnd_bonbun' (Bonbun).
+                // We will try to load standard Continuous Cadastral Map.
                 const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
-                const cadastralUrl = `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/lp_pa_cbnd_bubun/{z}/{y}/{x}.png`;
+
+                // Using WMS for Cadastral might be safer if WMTS XYZ path is tricky? 
+                // Let's stick to WMS as user snippet suggested WMS `addWMSLayer`.
+                const wmsSource = new OL.source.TileWMS({
+                    url: 'https://api.vworld.kr/req/wms',
+                    params: {
+                        'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
+                        'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
+                        'CRS': 'EPSG:3857',
+                        'TILED': true,
+                        'FORMAT': 'image/png',
+                        'VERSION': '1.3.0',
+                        'KEY': apiKey,
+                        'DOMAIN': 'onnrru.com'
+                    },
+                    serverType: 'geoserver',
+                    crossOrigin: 'anonymous'
+                });
 
                 const cadastralLayer = new OL.layer.Tile({
-                    source: new OL.source.XYZ({
-                        url: cadastralUrl,
-                        crossOrigin: 'anonymous'
-                    }),
+                    source: wmsSource,
                     visible: false,
                     zIndex: 2,
                     opacity: 0.8
@@ -93,7 +122,7 @@ const MapSection = ({ selectedAddress }) => {
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [satelliteLayer, hybridLayer, cadastralLayer],
+                    layers: [baseLayer, satelliteLayer, hybridLayer, cadastralLayer],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -101,19 +130,14 @@ const MapSection = ({ selectedAddress }) => {
                         maxZoom: 19
                     }),
                     controls: [],
-                    // Explicitly enable defaults including MouseWheel
                     interactions: OL.interaction.defaults({
                         mouseWheelZoom: true,
-                        dragPan: true,
-                        doubleClickZoom: true
+                        dragPan: true
                     })
                 };
 
                 const map = new OL.Map(mapOptions);
-
-                // Additional check for MouseWheelZoom via manual add if needed
-                // Usually defaults() covers it. But let's add interaction explicitly if it feels unresponsive.
-                // We'll trust defaults() first as it handles platform quirks better.
+                window.map = map; // Expose for debugging/user snippet compatibility
 
                 setMapObj(map);
                 setIsMapLoading(false);
@@ -128,19 +152,33 @@ const MapSection = ({ selectedAddress }) => {
         initMap();
     }, []);
 
-    // Toggle Visibility
+    // Effect: Handle Map Type Toggle (Satellite vs Base)
+    // We treat 'showHybrid' as the toggle for "Satellite (with Hybrid)" vs "Base (General)"
+    // Or we should add a new state for 'mapType'.
+    // Current UI has [Satellite (2D)] button. 
+    // Let's use 'mapType' state: 'satellite' | 'base'.
     useEffect(() => {
         if (!mapObj) return;
         const layers = mapObj.getLayers();
         layers.forEach(layer => {
-            if (layer.get('name') === 'cadastral') {
+            const name = layer.get('name');
+            if (name === 'satellite') {
+                layer.setVisible(mapType === 'satellite');
+            }
+            if (name === 'base') {
+                layer.setVisible(mapType === 'base');
+            }
+            // Hybrid logic linked to Satellite usually, or Independent?
+            if (name === 'hybrid') {
+                layer.setVisible(mapType === 'satellite' && showHybrid);
+                // If Base map, usually Hybrid is not needed (Base has labels). 
+                // But let's allow "Info" toggle to control it on Satellite.
+            }
+            if (name === 'cadastral') {
                 layer.setVisible(showCadastral);
             }
-            if (layer.get('name') === 'hybrid') {
-                layer.setVisible(showHybrid);
-            }
         });
-    }, [mapObj, showCadastral, showHybrid]);
+    }, [mapObj, mapType, showCadastral, showHybrid]);
 
     // Update Map Center
     useEffect(() => {
@@ -253,7 +291,12 @@ const MapSection = ({ selectedAddress }) => {
                     정보보기
                 </button>
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
-                    <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
+                    <button
+                        onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-ink text-white' : 'bg-gray-100 text-gray-800'}`}
+                    >
+                        {mapType === 'satellite' ? '위성지도 (2D)' : '일반지도'}
+                    </button>
                 </div>
             </div>
         </div>
