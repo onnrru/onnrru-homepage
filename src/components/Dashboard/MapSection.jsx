@@ -66,6 +66,7 @@ const MapSection = ({ selectedAddress }) => {
                 // Note: Using HTTPS to match site protocol
                 const vworldSatelliteUrl = 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg';
 
+                // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
                     layers: [
@@ -84,13 +85,15 @@ const MapSection = ({ selectedAddress }) => {
                         maxZoom: 19
                         // Note: If using pure OL, default projection is Web Mercator (EPSG:3857), which matches VWorld tiles.
                     }),
-                    controls: [], // Start without controls to avoid errors
+                    controls: [], // Keep controls empty for now to avoid errors, we can add Zoom control manually if needed
+                    // Explicitly enable interactions (Zoom, DragPan, MouseWheelZoom are in defaults)
+                    interactions: OL.interaction.defaults ? OL.interaction.defaults() : undefined
                 };
 
                 // Create Map
                 const map = new OL.Map(mapOptions);
 
-                // Add Zoom control if available
+                // Add Zoom control if available (Standard UI)
                 if (OL.control && OL.control.Zoom) {
                     map.addControl(new OL.control.Zoom());
                 }
@@ -100,7 +103,7 @@ const MapSection = ({ selectedAddress }) => {
 
             } catch (err) {
                 console.error("비상: Direct Init 실패, 상세 에러:", err);
-                setMapError(`지도 생성 오류: ${err.message} (ol=${!!window.ol})`);
+                setMapError(`지도 생성 오류: ${err.message}`);
                 setIsMapLoading(false);
             }
         };
@@ -151,9 +154,8 @@ const MapSection = ({ selectedAddress }) => {
             {/* UI Overlays */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
-                    <div className="flex flex-col items-center justify-center bg-white/80 px-4 py-2 rounded shadow text-gray-700 gap-1">
-                        <span>지도 로딩중...</span>
-                        <span className="text-[10px] text-gray-500 font-mono">{debugInfo}</span>
+                    <div className="bg-white/80 px-4 py-2 rounded shadow text-gray-700">
+                        지도 로딩중...
                     </div>
                 )}
                 {mapError && (
