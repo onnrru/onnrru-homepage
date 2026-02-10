@@ -9,6 +9,7 @@ const MapSection = ({ selectedAddress }) => {
     // Toggles
     const [showCadastral, setShowCadastral] = useState(false);
     const [showHybrid, setShowHybrid] = useState(false);
+    const [mapType, setMapType] = useState('satellite'); // 'satellite' or 'base'
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
