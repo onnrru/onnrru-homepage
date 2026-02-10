@@ -2,6 +2,27 @@
   command = "npm run build"
   publish = "dist"
 
+# Government Data API (Toji-Eum)
+[[redirects]]
+  from = "/api/eum/*"
+  to = "http://api.eum.go.kr/:splat"
+  status = 200
+  force = true
+
+# VWorld Search API
+[[redirects]]
+  from = "/api/vworld/*"
+  to = "http://api.vworld.kr/:splat"
+  status = 200
+  force = true
+
+# VWorld Map API (Tiles/Scripts)
+[[redirects]]
+  from = "/vworld_map/*"
+  to = "http://map.vworld.kr/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/api/*"
   to = "http://34.50.25.171:8080/api/:splat"

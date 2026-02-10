@@ -6,9 +6,22 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
+      '/api/eum': {
+        target: 'http://api.eum.go.kr',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/eum/, ''),
+        secure: false,
+      },
+      '/api/vworld': {
+        target: 'http://api.vworld.kr',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/vworld/, ''),
+        secure: false,
+      },
+      '/vworld_map': {
+        target: 'http://map.vworld.kr',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/vworld_map/, ''),
         secure: false,
       }
     }

@@ -1,34 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { API_CONFIG } from '../../config/api';
 
-const MapSection = () => {
+const MapSection = ({ selectedAddress }) => {
+    const mapRef = useRef(null);
+    const [mapObj, setMapObj] = useState(null);
+    const [activeTab, setActiveTab] = useState('real'); // 'real' or 'eum'
+
     // Mock Data for "Real Transaction" overlays
     const [markers] = useState([
         { id: 1, x: '50%', y: '40%', price: '6억 1700', unit: '만원/평', count: 3, type: 'APT' },
         { id: 2, x: '30%', y: '60%', price: '4억 1400', unit: '만원/평', count: 1, type: 'APT' },
         { id: 3, x: '70%', y: '30%', price: '5억 8000', unit: '만원/평', count: 5, type: 'APT' },
-        { id: 4, x: '60%', y: '50%', price: 'TARGET', unit: '', count: 0, type: 'TARGET' },
     ]);
 
-    const [activeTab, setActiveTab] = useState('real'); // 'real' or 'eum'
+    // Initialize VWorld Map
+    useEffect(() => {
+        const scriptId = 'vworld-map-script';
+
+        if (!document.getElementById(scriptId)) {
+            const script = document.createElement('script');
+            script.id = scriptId;
+            // Use the key provided by user
+            script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}`;
+            script.async = true;
+            script.onload = () => initMap();
+            document.body.appendChild(script);
+        } else {
+            if (window.vw) {
+                initMap();
+            }
+        }
+
+        function initMap() {
+            if (!window.vw) return;
+            if (mapObj) return; // Already initialized
+
+            const options = {
+                mapId: "vworld_map_container",
+                initPosition: new window.vw.CameraPosition(
+                    new window.vw.CoordZ(127.1235, 37.4850, 1500), // Default: Munjeong
+                    new window.vw.Direction(0, -90, 0)
+                ),
+                logo: true,
+            };
+
+            const map = new window.vw.Map();
+            map.setOption(options);
+            map.start();
+            setMapObj(map);
+        }
+
+    }, []);
+
+    // Update Map Center when selectedAddress changes
+    useEffect(() => {
+        if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
+            // VWorld uses standard coords (Lon, Lat) usually, or EPGS something.
+            // Address Search API returns EPSG:4326 (Lon, Lat) if requested.
+            // Move camera
+            const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
+            const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
+            mapObj.moveTo(mPos);
+
+            // Add/Move Marker (Simple implementation if VWorld supports it easly, otherwise skip for now)
+        }
+    }, [mapObj, selectedAddress]);
 
     return (
-        <div className="flex-1 relative bg-gray-100 overflow-hidden group">
+        <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
-            {/* Map Placeholder (Simulating Google Maps) */}
-            <div className="absolute inset-0 bg-[#e5e5e5] w-full h-full">
-                {/* Background Grid to look like a map */}
-                <div className="w-full h-full opacity-30" style={{
-                    backgroundImage: 'linear-gradient(#ccc 1px, transparent 1px), linear-gradient(90deg, #ccc 1px, transparent 1px)',
-                    backgroundSize: '100px 100px'
-                }}></div>
+            {/* VWorld Map Container */}
+            <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0"></div>
 
-                {/* Simulated Roads/Blocks */}
-                <div className="absolute top-0 left-1/4 w-20 h-full bg-white/50 transform -skew-x-12 border-l border-r border-gray-300"></div>
-                <div className="absolute top-1/3 left-0 w-full h-16 bg-white/50 transform skew-y-6 border-t border-b border-gray-300"></div>
-            </div>
-
-            {/* Overlays */}
-            <div className="absolute inset-0 pointer-events-none">
+            {/* Overlays (Keep existing UI on top) */}
+            <div className="absolute inset-0 pointer-events-none z-10">
                 {markers.map((m) => (
                     <div
                         key={m.id}
@@ -36,17 +81,12 @@ const MapSection = () => {
                         style={{ left: m.x, top: m.y }}
                     >
                         {m.type === 'TARGET' ? (
-                            // Target Pin
-                            <div className="relative">
-                                <svg className="w-12 h-12 text-red-600 drop-shadow-xl" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                                </svg>
-                                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                                    검토 대상지
-                                </div>
-                            </div>
+                            // Target (We now rely on map marker, but can keep this if needed, 
+                            // though this overlay is fixed px based which won't sync with map pan.
+                            // Hiding this overlay for now as it won't sync with real map)
+                            null
                         ) : (
-                            // Price Bubble
+                            // Price Bubble (Static for now, implies need to map to geo-coords later)
                             <div className="flex flex-col items-center">
                                 <div className="bg-white/90 backdrop-blur-sm border-2 border-ink rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-xl text-ink">
                                     <div className="text-sm font-bold">{m.price}</div>
@@ -62,7 +102,7 @@ const MapSection = () => {
             </div>
 
             {/* Controls / Tabs */}
-            <div className="absolute top-4 left-4 flex gap-2">
+            <div className="absolute top-4 left-4 flex gap-2 z-20">
                 <button
                     onClick={() => setActiveTab('real')}
                     className={`px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all ${activeTab === 'real' ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
@@ -76,22 +116,6 @@ const MapSection = () => {
                     토지이음 지도
                 </button>
             </div>
-
-            {/* Euml Map Overlay (Folder effect) */}
-            {activeTab === 'eum' && (
-                <div className="absolute inset-4 bg-yellow-100/40 border-4 border-yellow-500/50 rounded-xl backdrop-blur-sm flex items-center justify-center z-10 animate-fade-in">
-                    <div className="bg-white p-6 rounded-xl shadow-2xl text-center">
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">토지이음 도면 오버레이</h3>
-                        <p className="text-gray-500">지적편집도 및 용도지역 정보가<br />지도 위에 중첩되어 표시됩니다.</p>
-                        <div className="mt-4 flex gap-2 justify-center">
-                            <span className="w-4 h-4 rounded bg-yellow-400 border border-black/10"></span>
-                            <span className="text-xs">주거지역</span>
-                            <span className="w-4 h-4 rounded bg-pink-400 border border-black/10 ml-2"></span>
-                            <span className="text-xs">상업지역</span>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

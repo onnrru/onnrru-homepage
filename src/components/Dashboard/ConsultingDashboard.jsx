@@ -20,7 +20,7 @@ const ConsultingDashboard = () => {
                 <div className="flex-1 flex flex-col min-w-0">
                     {/* Map Area */}
                     <div className="flex-1 relative">
-                        <MapSection />
+                        <MapSection selectedAddress={selectedAddress} />
                     </div>
 
                     {/* Bottom Analysis Panel */}
