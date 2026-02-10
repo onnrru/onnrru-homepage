@@ -27,7 +27,18 @@ const MapSection = ({ selectedAddress }) => {
             script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
             script.async = true;
             script.onload = () => {
-                setTimeout(() => initMap(), 1000); // Increased delay
+                // VWorld 2.0 (OpenLayers 3) initialization pattern
+                // Use a polling checks for 'vw' and 'ol3' just in case
+                const checkVWorld = () => {
+                    if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
+                        window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
+                            initMap();
+                        });
+                    } else {
+                        setTimeout(checkVWorld, 500);
+                    }
+                };
+                checkVWorld();
             };
             script.onerror = () => {
                 setMapError("지도를 불러올 수 없습니다. (스크립트 로드 실패)");
@@ -39,23 +50,46 @@ const MapSection = ({ selectedAddress }) => {
         if (!document.getElementById(scriptId)) {
             loadScript();
         } else {
-            if (window.vw) {
-                initMap();
+            // Script already exists
+            if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
+                window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
+                    initMap();
+                });
             } else {
-                // Script exists but maybe not loaded? Retry
+                // Might be loaded but not ready, or script tag exists but not loaded
+                // Simple timeout retry or reload? 
+                // If script tag exists, we assume it's loading or loaded.
                 setTimeout(() => {
-                    if (window.vw) initMap();
-                    else loadScript();
-                }, 1000); // Increased delay
+                    if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
+                        window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
+                            initMap();
+                        });
+                    } else {
+                        // If still not available after 500ms, assume it needs help or just init directly if vw exists
+                        if (window.vw && window.vw.Map) {
+                            initMap();
+                        }
+                    }
+                }, 500);
             }
         }
 
         function initMap() {
+            if (mapObj) return;
+
+            // Double check vw existence
             if (!window.vw) {
-                console.error("VWorld 'vw' object not found");
+                // If it's still missing, it's a real failure
+                // But vworldInit callback should ensure it's ready.
+                // Retrying once more via timeout if this was called directly?
+                // No, risk of loop. Just log and fail.
+                console.error("VWorld 'vw' object not found in initMap");
+                // Don't set error immediately, maybe next render it works? 
+                // But for now let's set it.
+                // setMapError("지도 라이브러리 로드 실패"); 
+                // setIsMapLoading(false);
                 return;
             }
-            if (mapObj) return;
 
             try {
                 const options = {
@@ -74,7 +108,6 @@ const MapSection = ({ selectedAddress }) => {
                 setIsMapLoading(false);
             } catch (err) {
                 console.error("Map Init Error:", err);
-                // Show specific error message
                 setMapError(`지도 초기화 오류: ${err.message || err}`);
                 setIsMapLoading(false);
             }
