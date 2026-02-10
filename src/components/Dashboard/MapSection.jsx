@@ -106,35 +106,19 @@ const MapSection = ({ selectedAddress }) => {
                 const y = parseFloat(selectedAddress.y);
 
                 // Move Camera - Support both 3D (CoordZ) and 2D (Coord)
+                // Move Camera - Support both 3D (CoordZ) and 2D (Coord)
                 if (window.vw && window.vw.CoordZ) {
                     const movePos = new window.vw.CoordZ(x, y, 1000);
                     const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
                     mapObj.moveTo(mPos);
-                    pt.setImage("https://map.vworld.kr/images/op02/map_point.png");
-                    pt.setName(selectedAddress.address);
-                    pt.setFont("Pretendard");
-                    pt.setFontSize(14);
-
-                    // Event Handler for Popup
-                    const eventHandler = function (windowPosition, ecefPosition, cartographic, featureInfo) {
-                        // Create Title & HTML content
-                        const title = selectedAddress.address;
-                        const html = `
-                            <div style="padding:5px; font-size:12px; line-height:1.5;">
-                                <div style="font-weight:bold; color:#000;">${selectedAddress.roadAddr || selectedAddress.address}</div>
-                                <div style="color:#666;">${selectedAddress.parcelAddr || ''}</div>
-                            </div>
-                        `;
-
-                        // vw.Popup(id, container, title, html, width, height, x, y)
-                        // Note: x, y here are screen coordinates (windowPosition)
-                        const pop = new window.vw.Popup("address_popup", "vworld_map_container", title, html, 250, 100, windowPosition.x, windowPosition.y);
-                        pop.create();
-                    };
-
-                    pt.addEventListener(eventHandler);
-                    pt.create();
+                } else if (window.vw && window.vw.Coord) {
+                    const movePos = new window.vw.Coord(x, y);
+                    const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
+                    mapObj.moveTo(mPos);
                 }
+
+                // Pins removed as requested
+
 
             } catch (e) {
                 console.error("Map Marker Error:", e);
