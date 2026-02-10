@@ -9,8 +9,9 @@ const MapSection = ({ selectedAddress }) => {
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
+    const [debugInfo, setDebugInfo] = useState("Initializing...");
 
-    // Initialize VWorld Map using Standard OpenLayers (vw.ol3)
+    // Initialize VWorld Map using pure OpenLayers global (ol)
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -18,11 +19,20 @@ const MapSection = ({ selectedAddress }) => {
         const initMap = () => {
             if (mapObj) return;
 
-            // Check for vw.ol3 presence
-            if (!window.vw || !window.vw.ol3) {
+            // Debug usage of globals
+            const ol = window.ol;
+            const vw = window.vw;
+            const status = `Globals: ol=${!!ol}, vw=${!!vw}, vw.ol3=${!!(vw && vw.ol3)}`;
+            console.log(status);
+            setDebugInfo(status);
+
+            // Check if global 'ol' is available. 
+            // VWorld 2.0 init script "usually" loads 'ol' globally. 
+            // If not, we might need to rely on 'vw.ol3' carefully, provided we find where 'source' is.
+            if (!ol && (!vw || !vw.ol3)) {
                 retryCount++;
                 if (retryCount > maxRetries) {
-                    setMapError("VWorld 라이브러리 로드 실패");
+                    setMapError("지도 엔진(OpenLayers)을 찾을 수 없습니다.");
                     setIsMapLoading(false);
                     return;
                 }
@@ -31,7 +41,7 @@ const MapSection = ({ selectedAddress }) => {
             }
 
             try {
-                console.log("Initializing VWorld 2D Map via direct vw.ol3.layer.Tile...");
+                console.log("Initializing VWorld 2D Map via global 'ol'...");
 
                 // Ensure container is clean
                 const container = document.getElementById("vworld_map_target");
@@ -39,50 +49,58 @@ const MapSection = ({ selectedAddress }) => {
                     container.innerHTML = '';
                 }
 
-                // Define Source: VWorld Satellite
-                // We use direct XYZ source to avoid relying on potentially missing VWorld wrapper classes
-                const vworldSatelliteSource = new window.vw.ol3.source.XYZ({
-                    url: 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg',
-                    attributions: 'VWorld',
-                });
+                // Determine correct namespaces
+                // Use 'ol' global if available (Standard OpenLayers)
+                // Fallback to 'vw.ol3' if 'ol' is missing (VWorld wrapper)
+                // The previous error showed vw.ol3.source is undefined, so 'ol' is our best bet.
+                const OL = ol || window.vw.ol3;
 
-                // Define Source: VWorld Base (fallback or toggle)
-                const vworldBaseSource = new window.vw.ol3.source.XYZ({
-                    url: 'https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png',
-                    attributions: 'VWorld',
-                });
+                // Defensive check for required classes
+                if (!OL || !OL.Map || !OL.View || !OL.layer || !OL.source) {
+                    // If vw.ol3 exists but lacks source (as seen), we can't use it easily.
+                    // We throw to catch block.
+                    if (!OL.source) throw new Error("OpenLayers 'source' namespace is missing.");
+                }
 
-                // Map Options
+                // URL for VWorld Satellite Tiles
+                // Note: Using HTTPS to match site protocol
+                const vworldSatelliteUrl = 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg';
+
                 const mapOptions = {
                     target: 'vworld_map_target',
                     layers: [
-                        new window.vw.ol3.layer.Tile({
-                            source: vworldSatelliteSource // Default to Satellite
+                        new OL.layer.Tile({
+                            source: new OL.source.XYZ({
+                                url: vworldSatelliteUrl,
+                                attributions: 'VWorld',
+                                crossOrigin: 'anonymous' // Good practice for tiles
+                            })
                         })
                     ],
-                    view: new window.vw.ol3.View({
+                    view: new OL.View({
                         center: [14151740, 4511257], // Default center
                         zoom: 17,
                         minZoom: 6,
                         maxZoom: 19
+                        // Note: If using pure OL, default projection is Web Mercator (EPSG:3857), which matches VWorld tiles.
                     }),
-                    controls: [] // Explicitly empty controls to avoid 'defaults() is not a function' if it persists, or let OL defaults handle if we omitted this. 
-                    // Safest is empty array for now, then add Zoom manually if constructor exists.
+                    controls: [], // Start without controls to avoid errors
                 };
 
-                // Add Zoom control if available
-                if (window.vw.ol3.control && window.vw.ol3.control.Zoom) {
-                    mapOptions.controls = [new window.vw.ol3.control.Zoom()];
-                }
+                // Create Map
+                const map = new OL.Map(mapOptions);
 
-                const map = new window.vw.ol3.Map(mapOptions);
+                // Add Zoom control if available
+                if (OL.control && OL.control.Zoom) {
+                    map.addControl(new OL.control.Zoom());
+                }
 
                 setMapObj(map);
                 setIsMapLoading(false);
 
             } catch (err) {
                 console.error("비상: Direct Init 실패, 상세 에러:", err);
-                setMapError("지도 생성 오류: " + err.message);
+                setMapError(`지도 생성 오류: ${err.message} (ol=${!!window.ol})`);
                 setIsMapLoading(false);
             }
         };
@@ -92,9 +110,6 @@ const MapSection = ({ selectedAddress }) => {
 
         return () => {
             // Cleanup
-            if (mapObj && typeof mapObj.setTarget === 'function') {
-                mapObj.setTarget(undefined);
-            }
         };
     }, []);
 
@@ -106,7 +121,10 @@ const MapSection = ({ selectedAddress }) => {
                 const y = parseFloat(selectedAddress.y);
 
                 let center = [x, y];
-                const proj = window.vw.ol3.proj || (window.ol && window.ol.proj);
+
+                // Use explicit 'ol.proj' if available, or try to find it on namespace
+                const ol = window.ol || window.vw?.ol3;
+                const proj = ol?.proj;
 
                 if (proj && x < 180 && y < 90) {
                     center = proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
@@ -133,8 +151,9 @@ const MapSection = ({ selectedAddress }) => {
             {/* UI Overlays */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
-                    <div className="bg-white/80 px-4 py-2 rounded shadow text-gray-700">
-                        지도 로딩중...
+                    <div className="flex flex-col items-center justify-center bg-white/80 px-4 py-2 rounded shadow text-gray-700 gap-1">
+                        <span>지도 로딩중...</span>
+                        <span className="text-[10px] text-gray-500 font-mono">{debugInfo}</span>
                     </div>
                 )}
                 {mapError && (
