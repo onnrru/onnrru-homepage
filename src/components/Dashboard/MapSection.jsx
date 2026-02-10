@@ -23,7 +23,8 @@ const MapSection = ({ selectedAddress }) => {
         const loadScript = () => {
             const script = document.createElement('script');
             script.id = scriptId;
-            script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}`;
+            // Add domain parameter as required for authorized domain
+            script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
             script.async = true;
             script.onload = () => {
                 setTimeout(() => initMap(), 500); // Slight delay to ensure internal inits
