@@ -33,30 +33,43 @@ const MapSection = ({ selectedAddress }) => {
             if (!window.vw) return;
 
             try {
-                const options = {
-                    mapId: "vworld_map_container",
-                    logo: true,
-                    navigation: true
-                };
-
-                // Attempt to use 3D if available, else 2D
+                // Check if we are in 3D mode (CoordZ available)
                 if (window.vw.CoordZ && window.vw.CameraPosition) {
-                    options.initPosition = new window.vw.CameraPosition(
-                        new window.vw.CoordZ(127.1235, 37.4850, 1000),
-                        new window.vw.Direction(0, -90, 0)
-                    );
-                } else if (window.vw.Coord && window.vw.CameraPosition) {
-                    // 2D initialization
-                    options.initPosition = new window.vw.CameraPosition(
-                        new window.vw.Coord(127.1235, 37.4850),
-                        new window.vw.Direction(0, -90, 0)
-                    );
+                    // --- 3D Initialization ---
+                    console.log("Initializing VWorld 3D Map...");
+                    const options = {
+                        mapId: "vworld_map_container",
+                        initPosition: new window.vw.CameraPosition(
+                            new window.vw.CoordZ(127.1235, 37.4850, 1000),
+                            new window.vw.Direction(0, -90, 0)
+                        ),
+                        logo: true,
+                        navigation: true
+                    };
+                    const map = new window.vw.Map();
+                    if (typeof map.setOption === 'function') {
+                        map.setOption(options);
+                    }
+                    map.start();
+                    setMapObj(map);
+                } else if (window.vw.Map) {
+                    // --- 2D Initialization (Fallback) ---
+                    console.log("Initializing VWorld 2D Map...");
+                    // For 2D, pass container ID and options to constructor
+                    const options = {
+                        controls: [], // Default controls
+                        center: [14151740, 4511257], // EPSG:3857 approx for Seoul? Or user-defined
+                        zoom: 14
+                    };
+                    // Use standard VWorld/OL3 wrapper constructor: new vw.Map(containerId, options)
+                    const map = new window.vw.Map("vworld_map_container", options);
+
+                    // 2D map usually doesn't need .start() but check
+                    if (typeof map.start === 'function') map.start();
+
+                    setMapObj(map);
                 }
 
-                const map = new window.vw.Map();
-                map.setOption(options);
-                map.start();
-                setMapObj(map);
                 setIsMapLoading(false);
             } catch (err) {
                 console.error("Map Init Error:", err);
@@ -71,28 +84,43 @@ const MapSection = ({ selectedAddress }) => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
                 // Clear existing markers/popups
-                mapObj.clear();
+                if (typeof mapObj.clear === 'function') mapObj.clear();
 
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
 
-                // Move Camera - Support both 3D (CoordZ) and 2D (Coord)
-                // Move Camera - Support both 3D (CoordZ) and 2D (Coord)
-                if (window.vw && window.vw.CoordZ) {
+                if (window.vw.CoordZ && typeof mapObj.moveTo === 'function') {
+                    // 3D Movement
                     const movePos = new window.vw.CoordZ(x, y, 1000);
                     const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
                     mapObj.moveTo(mPos);
-                } else if (window.vw && window.vw.Coord) {
-                    const movePos = new window.vw.Coord(x, y);
-                    const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
-                    mapObj.moveTo(mPos);
+                } else {
+                    // 2D Movement
+                    // VWorld 2D often uses EPSG:3857. We might need to transform or use provided API functions.
+                    // If mapObj is OpenLayers based:
+                    if (typeof mapObj.getView === 'function') {
+                        // It's likely an OL3 map object
+                        const view = mapObj.getView();
+                        // Transform standard coords if needed, or assume VWorld handles it?
+                        // VWorld 2.0 uses EPSG:3857 internally usually.
+                        // But let's try calling dedicated move function if wrapper exists.
+                        // For now, let's try direct view.setCenter if we can transform.
+                        // Or blindly use moveTo if it exists.
+                        // Safest: Use window.vw.ol3.CameraPosition if available?
+                        // Let's rely on basic OL methods if exposed.
+                        if (window.ol && window.ol.proj) {
+                            const center = window.ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
+                            view.setCenter(center);
+                            view.setZoom(17);
+                        } else {
+                            // Try implicit handling
+                            // mapObj.getView().setCenter([x, y]);
+                            // If 'vw.Coord' exists, maybe use it?
+                        }
+                    }
                 }
-
-                // Pins removed as requested
-
-
             } catch (e) {
-                console.error("Map Marker Error:", e);
+                console.error("Map Move Error:", e);
             }
         }
     }, [mapObj, selectedAddress]);
