@@ -255,23 +255,7 @@ const MapSection = ({ selectedAddress }) => {
                 </button>
             </div>
 
-            {/* Custom Zoom Controls (Left Middle) */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 pointer-events-auto">
-                <button
-                    onClick={handleZoomIn}
-                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl border border-gray-200"
-                    aria-label="Zoom In"
-                >
-                    +
-                </button>
-                <button
-                    onClick={handleZoomOut}
-                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl border border-gray-200"
-                    aria-label="Zoom Out"
-                >
-                    -
-                </button>
-            </div>
+
 
             {/* Right Controls (Map Toggles) */}
             <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
