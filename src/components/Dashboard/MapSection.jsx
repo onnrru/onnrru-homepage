@@ -27,7 +27,7 @@ const MapSection = ({ selectedAddress }) => {
             script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
             script.async = true;
             script.onload = () => {
-                setTimeout(() => initMap(), 500); // Slight delay to ensure internal inits
+                setTimeout(() => initMap(), 1000); // Increased delay
             };
             script.onerror = () => {
                 setMapError("지도를 불러올 수 없습니다. (스크립트 로드 실패)");
@@ -45,8 +45,8 @@ const MapSection = ({ selectedAddress }) => {
                 // Script exists but maybe not loaded? Retry
                 setTimeout(() => {
                     if (window.vw) initMap();
-                    else loadScript(); // Force reload if super stuck? No, just wait.
-                }, 1000);
+                    else loadScript();
+                }, 1000); // Increased delay
             }
         }
 
@@ -74,7 +74,8 @@ const MapSection = ({ selectedAddress }) => {
                 setIsMapLoading(false);
             } catch (err) {
                 console.error("Map Init Error:", err);
-                setMapError("지도 초기화 중 오류가 발생했습니다.");
+                // Show specific error message
+                setMapError(`지도 초기화 오류: ${err.message || err}`);
                 setIsMapLoading(false);
             }
         }
