@@ -27,10 +27,9 @@ const MapSection = ({ selectedAddress }) => {
             script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
             script.async = true;
             script.onload = () => {
-                // Poll for VWorld 3D classes availability
+                // Poll for VWorld classes - relax check to allow 2D
                 const checkVWorld = () => {
-                    // Check for 'vw' namespace AND 'CoordZ' (3D) AND 'Map'
-                    if (window.vw && window.vw.CoordZ && window.vw.Map) {
+                    if (window.vw && window.vw.Map) {
                         initMap();
                     } else {
                         setTimeout(checkVWorld, 500);
@@ -48,9 +47,8 @@ const MapSection = ({ selectedAddress }) => {
         if (!document.getElementById(scriptId)) {
             loadScript();
         } else {
-            // Script exists, check if ready
             const checkVWorld = () => {
-                if (window.vw && window.vw.CoordZ && window.vw.Map) {
+                if (window.vw && window.vw.Map) {
                     initMap();
                 } else {
                     setTimeout(checkVWorld, 500);
@@ -61,27 +59,28 @@ const MapSection = ({ selectedAddress }) => {
 
         function initMap() {
             if (mapObj) return;
-
-            // Strict check for CoordZ (3D support)
-            if (!window.vw || !window.vw.CoordZ) {
-                // Should be handled by polling, but guard just in case
-                return;
-            }
+            if (!window.vw) return;
 
             try {
-                // User snippet pattern:
-                // let options = { ... initPosition: new vw.CameraPosition(...) ... }
-                // let map = new vw.Map(); map.setOption(options); map.start();
-
                 const options = {
                     mapId: "vworld_map_container",
-                    initPosition: new window.vw.CameraPosition(
+                    logo: true,
+                    navigation: true
+                };
+
+                // Attempt to use 3D if available, else 2D
+                if (window.vw.CoordZ && window.vw.CameraPosition) {
+                    options.initPosition = new window.vw.CameraPosition(
                         new window.vw.CoordZ(127.1235, 37.4850, 1000),
                         new window.vw.Direction(0, -90, 0)
-                    ),
-                    logo: true,
-                    navigation: true // Added per snippet
-                };
+                    );
+                } else if (window.vw.Coord && window.vw.CameraPosition) {
+                    // 2D initialization
+                    options.initPosition = new window.vw.CameraPosition(
+                        new window.vw.Coord(127.1235, 37.4850),
+                        new window.vw.Direction(0, -90, 0)
+                    );
+                }
 
                 const map = new window.vw.Map();
                 map.setOption(options);
@@ -94,10 +93,9 @@ const MapSection = ({ selectedAddress }) => {
                 setIsMapLoading(false);
             }
         }
-
     }, []);
 
-    // Update Map Center & Add Marker when selectedAddress changes
+    // Update Map Center when selectedAddress changes
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
@@ -106,19 +104,12 @@ const MapSection = ({ selectedAddress }) => {
 
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
-                const z = 200; // Altitude for marker
 
-                // Move Camera
+                // Move Camera - Support both 3D (CoordZ) and 2D (Coord)
                 if (window.vw && window.vw.CoordZ) {
                     const movePos = new window.vw.CoordZ(x, y, 1000);
                     const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
                     mapObj.moveTo(mPos);
-
-                    // Create Marker (Point)
-                    // Reference: pt = new vw.geom.Point(new vw.Coord(mx,my));
-                    // User snippet used Coord for Point, but CoordZ for Camera. 
-                    // Let's use CoordZ if in 3D mode.
-                    const pt = new window.vw.geom.Point(new window.vw.CoordZ(x, y, z));
                     pt.setImage("https://map.vworld.kr/images/op02/map_point.png");
                     pt.setName(selectedAddress.address);
                     pt.setFont("Pretendard");
