@@ -61,7 +61,7 @@ const MapSection = ({ selectedAddress }) => {
                 const options = {
                     mapId: "vworld_map_container",
                     initPosition: new window.vw.CameraPosition(
-                        new window.vw.CoordZ(127.1235, 37.4850, 1500),
+                        new window.vw.Coord(127.1235, 37.4850),
                         new window.vw.Direction(0, -90, 0)
                     ),
                     logo: true,
@@ -86,7 +86,8 @@ const MapSection = ({ selectedAddress }) => {
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
-                const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
+                // Use 2D Coord
+                const movePos = new window.vw.Coord(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y));
                 const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
                 mapObj.moveTo(mPos);
             } catch (e) {
