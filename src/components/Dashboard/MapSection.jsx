@@ -18,44 +18,15 @@ const MapSection = ({ selectedAddress }) => {
 
     // Initialize VWorld Map
     useEffect(() => {
-        const scriptId = 'vworld-map-script';
-
-        const loadScript = () => {
-            const script = document.createElement('script');
-            script.id = scriptId;
-            // Add domain parameter as required for authorized domain
-            script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
-            script.async = true;
-            script.onload = () => {
-                // Poll for VWorld classes - relax check to allow 2D
-                const checkVWorld = () => {
-                    if (window.vw && window.vw.Map) {
-                        initMap();
-                    } else {
-                        setTimeout(checkVWorld, 500);
-                    }
-                };
-                checkVWorld();
-            };
-            script.onerror = () => {
-                setMapError("지도를 불러올 수 없습니다. (스크립트 로드 실패)");
-                setIsMapLoading(false);
-            };
-            document.body.appendChild(script);
+        // Poll for VWorld classes - Global script loaded in index.html
+        const checkVWorld = () => {
+            if (window.vw && window.vw.Map) {
+                initMap();
+            } else {
+                setTimeout(checkVWorld, 500);
+            }
         };
-
-        if (!document.getElementById(scriptId)) {
-            loadScript();
-        } else {
-            const checkVWorld = () => {
-                if (window.vw && window.vw.Map) {
-                    initMap();
-                } else {
-                    setTimeout(checkVWorld, 500);
-                }
-            };
-            checkVWorld();
-        }
+        checkVWorld();
 
         function initMap() {
             if (mapObj) return;
