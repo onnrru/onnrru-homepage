@@ -51,12 +51,23 @@ const AddressSearch = ({ onSelect }) => {
                 })
             );
 
-            const responses = await Promise.all(requests);
+            // Use Promise.allSettled to ensure one failure doesn't break everything
+            const responses = await Promise.allSettled(requests);
 
             let allItems = [];
-            responses.forEach(response => {
-                if (response.data.response.status === 'OK') {
-                    allItems = [...allItems, ...response.data.response.result.items];
+            responses.forEach(result => {
+                if (result.status === 'fulfilled') {
+                    const response = result.value;
+                    // Safely check for nested properties
+                    if (
+                        response.data &&
+                        response.data.response &&
+                        response.data.response.status === 'OK' &&
+                        response.data.response.result &&
+                        response.data.response.result.items
+                    ) {
+                        allItems = [...allItems, ...response.data.response.result.items];
+                    }
                 }
             });
 
@@ -174,7 +185,7 @@ const AddressSearch = ({ onSelect }) => {
                                     className="w-full text-left px-5 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 group transition-colors"
                                 >
                                     <div className="text-sm font-bold text-gray-800">{item.roadAddr || item.address}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{item.parcelAddr}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{item.parcelAddr || item.address}</div>
                                 </button>
                             ))}
                         </div>
