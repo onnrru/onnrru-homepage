@@ -14,6 +14,25 @@ const MapSection = ({ selectedAddress }) => {
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
 
+    // Additional WMS Layers Configuration
+    const ADDITIONAL_LAYERS = [
+        { id: 'LT_C_LANDINFOBASEMAP', label: '지적기반' },
+        { id: 'LT_C_UQ111', label: '도시지역' },
+        { id: 'LT_C_UQ129', label: '지구단위' },
+        { id: 'LT_C_UQ141', label: '정비구역' },
+        { id: 'PMAP_PLAN', label: '도시계획' }
+    ];
+
+    const [activeLayers, setActiveLayers] = useState([]);
+
+    const toggleLayer = (layerId) => {
+        setActiveLayers(prev =>
+            prev.includes(layerId)
+                ? prev.filter(id => id !== layerId)
+                : [...prev, layerId]
+        );
+    };
+
     // Initialize VWorld Map
     useEffect(() => {
         let retryCount = 0;
@@ -89,14 +108,11 @@ const MapSection = ({ selectedAddress }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 4. Cadastral (Jijeokdo) Layer - WMTS
-                // Using Proxy to avoid CORS Issues with VWorld API
                 const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
 
-                // Using WMS for Cadastral might be safer if WMTS XYZ path is tricky? 
-                // Let's stick to WMS as user snippet suggested WMS `addWMSLayer`.
+                // 4. Cadastral (Jijeokdo) Layer - WMTS
                 const wmsSource = new OL.source.TileWMS({
-                    url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`, // Use Proxy: /api/vworld/req/wms
+                    url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
                     params: {
                         'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
                         'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
@@ -119,10 +135,38 @@ const MapSection = ({ selectedAddress }) => {
                 });
                 cadastralLayer.set('name', 'cadastral');
 
+                // 5. Additional WMS Layers
+                const extraLayers = ADDITIONAL_LAYERS.map(layer => {
+                    const source = new OL.source.TileWMS({
+                        url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
+                        params: {
+                            'LAYERS': layer.id,
+                            'STYLES': layer.id,
+                            'CRS': 'EPSG:3857',
+                            'TILED': true,
+                            'FORMAT': 'image/png',
+                            'VERSION': '1.3.0',
+                            'KEY': apiKey,
+                            'DOMAIN': 'onnrru.com'
+                        },
+                        serverType: 'geoserver',
+                        crossOrigin: 'anonymous'
+                    });
+
+                    const olLayer = new OL.layer.Tile({
+                        source: source,
+                        visible: false, // Default hidden
+                        zIndex: 3, // Above cadastral
+                        opacity: 0.7
+                    });
+                    olLayer.set('name', layer.id);
+                    return olLayer;
+                });
+
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [baseLayer, satelliteLayer, hybridLayer, cadastralLayer],
+                    layers: [baseLayer, satelliteLayer, hybridLayer, cadastralLayer, ...extraLayers],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -159,23 +203,29 @@ const MapSection = ({ selectedAddress }) => {
         const layers = mapObj.getLayers();
         layers.forEach(layer => {
             const name = layer.get('name');
+
+            // Base Maps
             if (name === 'satellite') {
                 layer.setVisible(mapType === 'satellite');
             }
             if (name === 'base') {
                 layer.setVisible(mapType === 'base');
             }
-            // Hybrid logic linked to Satellite usually, or Independent?
             if (name === 'hybrid') {
                 layer.setVisible(mapType === 'satellite' && showHybrid);
-                // If Base map, usually Hybrid is not needed (Base has labels). 
-                // But let's allow "Info" toggle to control it on Satellite.
             }
+
+            // Jijeokdo
             if (name === 'cadastral') {
                 layer.setVisible(showCadastral);
             }
+
+            // Additional Layers
+            if (ADDITIONAL_LAYERS.some(l => l.id === name)) {
+                layer.setVisible(activeLayers.includes(name));
+            }
         });
-    }, [mapObj, mapType, showCadastral, showHybrid]);
+    }, [mapObj, mapType, showCadastral, showHybrid, activeLayers]);
 
     // Update Map Center
     useEffect(() => {
@@ -201,19 +251,6 @@ const MapSection = ({ selectedAddress }) => {
             }
         }
     }, [mapObj, selectedAddress]);
-
-    // Custom Zoom Handlers
-    const handleZoomIn = () => {
-        if (!mapObj) return;
-        const view = mapObj.getView();
-        if (view) view.setZoom(view.getZoom() + 1);
-    };
-
-    const handleZoomOut = () => {
-        if (!mapObj) return;
-        const view = mapObj.getView();
-        if (view) view.setZoom(view.getZoom() - 1);
-    };
 
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
@@ -256,28 +293,49 @@ const MapSection = ({ selectedAddress }) => {
             </div>
 
 
-
             {/* Right Controls (Map Toggles) */}
-            <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
-                <button
-                    onClick={() => setShowCadastral(!showCadastral)}
-                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                >
-                    지적도
-                </button>
-                <button
-                    onClick={() => setShowHybrid(!showHybrid)}
-                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showHybrid ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                >
-                    정보보기
-                </button>
-                <div className="bg-white rounded-lg shadow-md p-1 flex">
+            <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
+                {/* Standard Map Toggles */}
+                <div className="flex gap-2">
                     <button
-                        onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
-                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-white text-gray-800' : 'bg-ink text-white'}`}
+                        onClick={() => setShowCadastral(!showCadastral)}
+                        className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                     >
-                        {mapType === 'satellite' ? '일반지도' : '위성지도 (2D)'}
+                        연속지적도
                     </button>
+                    <button
+                        onClick={() => setShowHybrid(!showHybrid)}
+                        className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showHybrid ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    >
+                        명칭표시 (Hybrid)
+                    </button>
+                    <div className="bg-white rounded-lg shadow-md p-1 flex">
+                        <button
+                            onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
+                            className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-white text-gray-800' : 'bg-ink text-white'}`}
+                        >
+                            {mapType === 'satellite' ? '일반지도' : '위성지도 (2D)'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Additional Layer Toggles (Grouped) */}
+                <div className="bg-white/90 p-2 rounded-lg shadow-md flex flex-col gap-1.5 backdrop-blur-sm border border-gray-100">
+                    <span className="text-[10px] text-gray-400 font-bold px-1 mb-0.5">주제도 (Overlay)</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {ADDITIONAL_LAYERS.map(layer => (
+                            <button
+                                key={layer.id}
+                                onClick={() => toggleLayer(layer.id)}
+                                className={`px-2 py-1.5 text-[11px] font-medium rounded border transition-all text-center
+                                    ${activeLayers.includes(layer.id)
+                                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                            >
+                                {layer.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
