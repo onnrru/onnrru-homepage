@@ -97,18 +97,56 @@ const MapSection = ({ selectedAddress }) => {
 
     }, []);
 
-    // Update Map Center when selectedAddress changes
+    // Update Map Center & Add Marker when selectedAddress changes
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
-                // Use CoordZ for 3D map movement if available
+                // Clear existing markers/popups
+                mapObj.clear();
+
+                const x = parseFloat(selectedAddress.x);
+                const y = parseFloat(selectedAddress.y);
+                const z = 200; // Altitude for marker
+
+                // Move Camera
                 if (window.vw && window.vw.CoordZ) {
-                    const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
+                    const movePos = new window.vw.CoordZ(x, y, 1000);
                     const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
                     mapObj.moveTo(mPos);
+
+                    // Create Marker (Point)
+                    // Reference: pt = new vw.geom.Point(new vw.Coord(mx,my));
+                    // User snippet used Coord for Point, but CoordZ for Camera. 
+                    // Let's use CoordZ if in 3D mode.
+                    const pt = new window.vw.geom.Point(new window.vw.CoordZ(x, y, z));
+                    pt.setImage("https://map.vworld.kr/images/op02/map_point.png");
+                    pt.setName(selectedAddress.address);
+                    pt.setFont("Pretendard");
+                    pt.setFontSize(14);
+
+                    // Event Handler for Popup
+                    const eventHandler = function (windowPosition, ecefPosition, cartographic, featureInfo) {
+                        // Create Title & HTML content
+                        const title = selectedAddress.address;
+                        const html = `
+                            <div style="padding:5px; font-size:12px; line-height:1.5;">
+                                <div style="font-weight:bold; color:#000;">${selectedAddress.roadAddr || selectedAddress.address}</div>
+                                <div style="color:#666;">${selectedAddress.parcelAddr || ''}</div>
+                            </div>
+                        `;
+
+                        // vw.Popup(id, container, title, html, width, height, x, y)
+                        // Note: x, y here are screen coordinates (windowPosition)
+                        const pop = new window.vw.Popup("address_popup", "vworld_map_container", title, html, 250, 100, windowPosition.x, windowPosition.y);
+                        pop.create();
+                    };
+
+                    pt.addEventListener(eventHandler);
+                    pt.create();
                 }
+
             } catch (e) {
-                console.error("Map Move Error:", e);
+                console.error("Map Marker Error:", e);
             }
         }
     }, [mapObj, selectedAddress]);
@@ -128,35 +166,6 @@ const MapSection = ({ selectedAddress }) => {
                         {mapError}
                     </div>
                 )}
-            </div>
-
-            {/* Overlays (Keep existing UI on top) */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-                {markers.map((m) => (
-                    <div
-                        key={m.id}
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer pointer-events-auto transition-transform hover:scale-110"
-                        style={{ left: m.x, top: m.y }}
-                    >
-                        {m.type === 'TARGET' ? (
-                            // Target (We now rely on map marker, but can keep this if needed, 
-                            // though this overlay is fixed px based which won't sync with map pan.
-                            // Hiding this overlay for now as it won't sync with real map)
-                            null
-                        ) : (
-                            // Price Bubble (Static for now, implies need to map to geo-coords later)
-                            <div className="flex flex-col items-center">
-                                <div className="bg-white/90 backdrop-blur-sm border-2 border-ink rounded-full w-24 h-24 flex flex-col items-center justify-center shadow-xl text-ink">
-                                    <div className="text-sm font-bold">{m.price}</div>
-                                    <div className="text-[10px] text-gray-500">{m.unit}</div>
-                                    <div className="mt-1 text-xs bg-gray-100 px-1.5 rounded text-gray-600">({m.count}건)</div>
-                                </div>
-                                <div className="w-0.5 h-4 bg-ink"></div>
-                                <div className="w-2 h-2 rounded-full bg-ink"></div>
-                            </div>
-                        )}
-                    </div>
-                ))}
             </div>
 
             {/* Controls / Tabs */}
