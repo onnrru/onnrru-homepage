@@ -17,6 +17,9 @@ const Sidebar = ({ selectedAddress }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // State for image
+    const [mapImageUrl, setMapImageUrl] = useState(null);
+
     // Fetch Data Effect
     useEffect(() => {
         const fetchData = async () => {
@@ -25,7 +28,6 @@ const Sidebar = ({ selectedAddress }) => {
             // Only proceed if PNU is available
             const pnu = selectedAddress.pnu;
             if (!pnu) {
-                // If no PNU (e.g. road address without parcel mapping), we clear data or show warning
                 setError("토지 정보를 조회하려면 '지번 주소'를 선택해주세요.");
                 setData({
                     basic: null,
@@ -34,11 +36,37 @@ const Sidebar = ({ selectedAddress }) => {
                     guide: [],
                     devlist: []
                 });
+                setMapImageUrl(null);
                 return;
             }
 
             setLoading(true);
             setError(null);
+
+            // Construct Static Map Image URL (Zoning Plan)
+            // Center is from selectedAddress (x, y are usually EPSG:4326 from search)
+            if (selectedAddress.x && selectedAddress.y) {
+                const apiKey = API_CONFIG.VWORLD_KEY;
+                const layers = 'lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun'; // Zoning + Cadastral
+                // VWorld Static Image API
+                // https://api.vworld.kr/req/image?service=image&request=getmap&key=[KEY]&format=png&bbox=[BBOX]&crs=[CRS]&width=[WIDTH]&height=[HEIGHT]&layers=[LAYERS]&styles=[STYLES]
+                // Or better: Use WMS GetMap with CENTER if available? No, standard WMS needs BBOX.
+                // We need to calculate BBOX from X,Y for a small area (e.g. +/- 0.002 degrees ~ 200m)
+
+                const x = parseFloat(selectedAddress.x);
+                const y = parseFloat(selectedAddress.y);
+                const delta = 0.002; // Approx 200m
+                const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
+
+                const imgUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=400&height=300&layers=${layers}&styles=lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun`;
+                // Note: Styles might need to be empty or specific. 'default' usually works.
+                // VWorld WMS for 'lt_c_aisryc' usually has style 'lt_c_aisryc'.
+                const finalImgUrl = `https://api.vworld.kr/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=500&height=400&layers=${layers}`;
+
+                setMapImageUrl(finalImgUrl);
+            } else {
+                setMapImageUrl(null);
+            }
 
             try {
                 // 1. Basic Info / Regulations (luLawInfo)
@@ -213,20 +241,71 @@ const Sidebar = ({ selectedAddress }) => {
                     ) : (
                         <>
                             {activeTab === 'regulation' && (
-                                <div className="space-y-4">
-                                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                        <h4 className="text-sm font-bold text-blue-800 mb-2">지역/지구 지정현황</h4>
+                                <div className="space-y-6">
+                                    {/* 1. Basic Table */}
+                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <tbody>
+                                                <tr className="border-b border-gray-100">
+                                                    <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600 w-1/3">지목</th>
+                                                    <td className="py-3 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
+                                                </tr>
+                                                <tr className="border-b border-gray-100">
+                                                    <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">면적</th>
+                                                    <td className="py-3 px-4 text-gray-800">{data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">개별공시지가</th>
+                                                    <td className="py-3 px-4 text-gray-800">{data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* 2. Zoning / Regulations List */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                            <span className="w-1 h-4 bg-ink rounded-full"></span>
+                                            국토계획법 및 타법령에 따른 지역·지구 등
+                                        </h4>
                                         <div className="flex flex-wrap gap-2">
                                             {data.regulation?.uses && data.regulation.uses.length > 0 ? (
                                                 data.regulation.uses.map((use, i) => (
-                                                    <span key={i} className="px-2 py-1 bg-white text-blue-600 text-xs rounded border border-blue-200">
+                                                    <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
                                                         {use}
                                                     </span>
                                                 ))
                                             ) : (
-                                                <span className="text-xs text-blue-400">-</span>
+                                                <div className="text-gray-400 text-xs">해당 정보 없음</div>
                                             )}
                                         </div>
+                                    </div>
+
+                                    {/* 3. Confirmation Drawing (Map) */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                            <span className="w-1 h-4 bg-ink rounded-full"></span>
+                                            토지이용규제 확인도면 (용도지역)
+                                        </h4>
+                                        <div className="w-full aspect-video bg-gray-100 rounded overflow-hidden relative border border-gray-300">
+                                            {mapImageUrl ? (
+                                                <img
+                                                    src={mapImageUrl}
+                                                    alt="토지이용계획확인도"
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패 (VWorld API)</div>';
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">
+                                                    도면 정보 없음
+                                                </div>
+                                            )}
+                                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded">VWorld</div>
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-500 text-right">* VWorld 연속주제도 기반 (실제와 다를 수 있음)</p>
                                     </div>
                                 </div>
                             )}
