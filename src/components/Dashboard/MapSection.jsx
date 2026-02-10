@@ -41,12 +41,9 @@ const MapSection = ({ selectedAddress }) => {
                 }
 
                 // Default VWorld 2D options
+                // REMOVED 'controls' to rely on default behavior or avoid 'defaults is not a function' error
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    controls: window.vw.ol3.control.defaults().extend([
-                        new window.vw.ol3.control.Zoom(),
-                        new window.vw.ol3.control.ScaleLine(),
-                    ]),
                     layers: [
                         new window.vw.ol3.layer.Base(window.vw.ol3.BasemapType.PHOTO)
                     ],
