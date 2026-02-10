@@ -27,13 +27,11 @@ const MapSection = ({ selectedAddress }) => {
             script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}&domain=https://onnrru.com`;
             script.async = true;
             script.onload = () => {
-                // VWorld 2.0 (OpenLayers 3) initialization pattern
-                // Use a polling checks for 'vw' and 'ol3' just in case
+                // Poll for VWorld 3D classes availability
                 const checkVWorld = () => {
-                    if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
-                        window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
-                            initMap();
-                        });
+                    // Check for 'vw' namespace AND 'CoordZ' (3D) AND 'Map'
+                    if (window.vw && window.vw.CoordZ && window.vw.Map) {
+                        initMap();
                     } else {
                         setTimeout(checkVWorld, 500);
                     }
@@ -50,55 +48,39 @@ const MapSection = ({ selectedAddress }) => {
         if (!document.getElementById(scriptId)) {
             loadScript();
         } else {
-            // Script already exists
-            if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
-                window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
+            // Script exists, check if ready
+            const checkVWorld = () => {
+                if (window.vw && window.vw.CoordZ && window.vw.Map) {
                     initMap();
-                });
-            } else {
-                // Might be loaded but not ready, or script tag exists but not loaded
-                // Simple timeout retry or reload? 
-                // If script tag exists, we assume it's loading or loaded.
-                setTimeout(() => {
-                    if (window.vw && window.vw.ol3 && window.vw.ol3.MapUtil) {
-                        window.vw.ol3.MapUtil.vworldInit("vworld_map_container", function () {
-                            initMap();
-                        });
-                    } else {
-                        // If still not available after 500ms, assume it needs help or just init directly if vw exists
-                        if (window.vw && window.vw.Map) {
-                            initMap();
-                        }
-                    }
-                }, 500);
-            }
+                } else {
+                    setTimeout(checkVWorld, 500);
+                }
+            };
+            checkVWorld();
         }
 
         function initMap() {
             if (mapObj) return;
 
-            // Double check vw existence
-            if (!window.vw) {
-                // If it's still missing, it's a real failure
-                // But vworldInit callback should ensure it's ready.
-                // Retrying once more via timeout if this was called directly?
-                // No, risk of loop. Just log and fail.
-                console.error("VWorld 'vw' object not found in initMap");
-                // Don't set error immediately, maybe next render it works? 
-                // But for now let's set it.
-                // setMapError("지도 라이브러리 로드 실패"); 
-                // setIsMapLoading(false);
+            // Strict check for CoordZ (3D support)
+            if (!window.vw || !window.vw.CoordZ) {
+                // Should be handled by polling, but guard just in case
                 return;
             }
 
             try {
+                // User snippet pattern:
+                // let options = { ... initPosition: new vw.CameraPosition(...) ... }
+                // let map = new vw.Map(); map.setOption(options); map.start();
+
                 const options = {
                     mapId: "vworld_map_container",
                     initPosition: new window.vw.CameraPosition(
-                        new window.vw.Coord(127.1235, 37.4850),
+                        new window.vw.CoordZ(127.1235, 37.4850, 1000),
                         new window.vw.Direction(0, -90, 0)
                     ),
                     logo: true,
+                    navigation: true // Added per snippet
                 };
 
                 const map = new window.vw.Map();
@@ -119,10 +101,12 @@ const MapSection = ({ selectedAddress }) => {
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
             try {
-                // Use 2D Coord
-                const movePos = new window.vw.Coord(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y));
-                const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
-                mapObj.moveTo(mPos);
+                // Use CoordZ for 3D map movement if available
+                if (window.vw && window.vw.CoordZ) {
+                    const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
+                    const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
+                    mapObj.moveTo(mPos);
+                }
             } catch (e) {
                 console.error("Map Move Error:", e);
             }
