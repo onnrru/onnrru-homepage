@@ -46,7 +46,8 @@ const AddressSearch = ({ onSelect }) => {
                         category: type,
                         format: 'json',
                         errorformat: 'json',
-                        key: API_CONFIG.VWORLD_KEY
+                        key: API_CONFIG.VWORLD_KEY,
+                        domain: 'https://onnrru.com' // Domain required for authorized keys
                     }
                 })
             );
