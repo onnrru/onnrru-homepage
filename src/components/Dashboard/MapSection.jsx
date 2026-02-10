@@ -45,7 +45,7 @@ const MapSection = ({ selectedAddress }) => {
                 const container = document.getElementById("vworld_map_target");
                 if (container) container.innerHTML = '';
 
-                // Force focus for keyboard interactions
+                // Force focus
                 container.tabIndex = 0;
                 container.focus();
 
@@ -73,41 +73,22 @@ const MapSection = ({ selectedAddress }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 3. Cadastral (Jijeokdo) Layer - WMS
-                // "Continuous Cadastral Map" -> lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun
-                const wmsSource = new OL.source.TileWMS({
-                    url: 'https://api.vworld.kr/req/wms',
-                    params: {
-                        'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
-                        'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
-                        'CRS': 'EPSG:3857',
-                        'TILED': true,
-                        'FORMAT': 'image/png',
-                        'VERSION': '1.3.0',
-                        'KEY': 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
-                        'DOMAIN': 'onnrru.com'
-                    },
-                    serverType: 'geoserver',
-                    crossOrigin: 'anonymous' // Important for canvas export if needed, but sometimes causes issues with VWorld WMS? Usually fine.
-                });
+                // 3. Cadastral (Jijeokdo) Layer - WMTS XYZ
+                // Using VWorld 2.0 XYZ service for continuous cadastral map
+                // URL Pattern: https://api.vworld.kr/req/wmts/1.0.0/{key}/{layer}/{z}/{y}/{x}.png
+                const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
+                const cadastralUrl = `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/lp_pa_cbnd_bubun/{z}/{y}/{x}.png`;
+
                 const cadastralLayer = new OL.layer.Tile({
-                    source: wmsSource,
+                    source: new OL.source.XYZ({
+                        url: cadastralUrl,
+                        crossOrigin: 'anonymous'
+                    }),
                     visible: false,
                     zIndex: 2,
-                    opacity: 0.8 // Slightly more opaque
+                    opacity: 0.8
                 });
                 cadastralLayer.set('name', 'cadastral');
-
-                // Interactions: Force Add
-                const interactions = [
-                    new OL.interaction.DragPan(),
-                    new OL.interaction.MouseWheelZoom({
-                        constrainResolution: false, // Smooth zoom
-                        duration: 250
-                    })
-                ];
-
-                if (OL.interaction.DoubleClickZoom) interactions.push(new OL.interaction.DoubleClickZoom());
 
                 // Map Options
                 const mapOptions = {
@@ -119,11 +100,20 @@ const MapSection = ({ selectedAddress }) => {
                         minZoom: 6,
                         maxZoom: 19
                     }),
-                    controls: [], // No default controls, we will add custom React buttons
-                    interactions: interactions
+                    controls: [],
+                    // Explicitly enable defaults including MouseWheel
+                    interactions: OL.interaction.defaults({
+                        mouseWheelZoom: true,
+                        dragPan: true,
+                        doubleClickZoom: true
+                    })
                 };
 
                 const map = new OL.Map(mapOptions);
+
+                // Additional check for MouseWheelZoom via manual add if needed
+                // Usually defaults() covers it. But let's add interaction explicitly if it feels unresponsive.
+                // We'll trust defaults() first as it handles platform quirks better.
 
                 setMapObj(map);
                 setIsMapLoading(false);
@@ -145,7 +135,6 @@ const MapSection = ({ selectedAddress }) => {
         layers.forEach(layer => {
             if (layer.get('name') === 'cadastral') {
                 layer.setVisible(showCadastral);
-                // Force refresh slightly to ensure render? usually setVisible is enough.
             }
             if (layer.get('name') === 'hybrid') {
                 layer.setVisible(showHybrid);
@@ -195,7 +184,11 @@ const MapSection = ({ selectedAddress }) => {
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
             {/* Dedicated Map Container */}
-            <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none"></div>
+            <div
+                id="vworld_map_target"
+                className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none"
+                tabIndex="0"
+            ></div>
 
             {/* Loading/Error Overlays */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -231,14 +224,14 @@ const MapSection = ({ selectedAddress }) => {
             <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 pointer-events-auto">
                 <button
                     onClick={handleZoomIn}
-                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl"
+                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl border border-gray-200"
                     aria-label="Zoom In"
                 >
                     +
                 </button>
                 <button
                     onClick={handleZoomOut}
-                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl"
+                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl border border-gray-200"
                     aria-label="Zoom Out"
                 >
                     -

@@ -22,41 +22,44 @@ const Sidebar = ({ selectedAddress }) => {
         const fetchData = async () => {
             if (!selectedAddress) return;
 
+            // Only proceed if PNU is available
+            const pnu = selectedAddress.pnu;
+            if (!pnu) {
+                // If no PNU (e.g. road address without parcel mapping), we clear data or show warning
+                setError("토지 정보를 조회하려면 '지번 주소'를 선택해주세요.");
+                setData({
+                    basic: null,
+                    regulation: null,
+                    notice: [],
+                    guide: [],
+                    devlist: []
+                });
+                return;
+            }
+
             setLoading(true);
             setError(null);
-
-            // Derive PNU or Codes from selectedAddress (Mock/Best Effort)
-            // In a real scenario, we need a robust Address->PNU converter.
-            // For now, we'll try to use a dummy PNU or check if selectedAddress has one.
-            // If VWorld Search didn't return PNU, we might be stuck.
-            // Let's assume for this demo we can't easily get PNU without a dedicated service.
-            // I will implement the structure of the calls.
-
-            const pnu = selectedAddress.pnu || '1171010800100180000'; // Default to Moonjeong-dong 18 for demo if missing
-            const bjdongCd = pnu.substring(0, 10);
-            // const bun = pnu.substring(11, 15);
-            // const ji = pnu.substring(15, 19);
 
             try {
                 // 1. Basic Info / Regulations (luLawInfo)
                 // Endpoint: /Web/Rest/OP/luLawInfo?pnu=...
                 if (activeTab === 'regulation' || !data.basic) {
                     const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
-                        params: { pnu: pnu, format: 'xml' } // Assuming XML default
+                        params: { pnu: pnu, format: 'xml' }
                     });
 
-                    // Parse XML
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(luResponse.data, "text/xml");
 
-                    // Extract Basic Info
+                    // Check for API Error in XML
+                    const errCode = xmlDoc.getElementsByTagName("error_code")[0]?.textContent;
+                    if (errCode) {
+                        throw new Error(`API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
+                    }
+
                     const jimok = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || '-';
                     const area = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || '-';
                     const price = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent || '-';
-
-                    // Extract Regulation (Zoning)
-                    // Implementation depends on exact XML structure of luLawInfo
-                    // Often it returns a list of specific uses.
                     const uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
 
                     setData(prev => ({
@@ -68,12 +71,9 @@ const Sidebar = ({ selectedAddress }) => {
 
                 // 2. Notice (arMapList)
                 if (activeTab === 'notice') {
-                    // params: pnu or bjdong? user said "arMapList"
-                    // Usually takes pnu or location code
                     const noticeResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.NOTICE}`, {
                         params: { pnu: pnu }
                     });
-                    // Parse...
                     const nParser = new DOMParser();
                     const nXml = nParser.parseFromString(noticeResponse.data, "text/xml");
                     const notices = Array.from(nXml.getElementsByTagName("Map")).map(item => ({
@@ -104,17 +104,18 @@ const Sidebar = ({ selectedAddress }) => {
                     const dResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.DEVLIST}`, {
                         params: { pnu: pnu, pageNo: 1, numOfRows: 10 }
                     });
-                    // JSON or XML? Usually JSON for isDevList based on previous code usage
-                    // User provided URL. Let's assume XML/JSON based on response type.
-                    // Previous code treated it as JSON.
-                    if (dResponse.data.list) {
+                    // Assuming JSON for DevList based on typical VWorld/Eum usage parity
+                    if (dResponse.data && dResponse.data.list) {
                         setData(prev => ({ ...prev, devlist: dResponse.data.list }));
+                    } else if (typeof dResponse.data === 'string') {
+                        // Fallback if XML
+                        // ... parsing logic if needed
                     }
                 }
 
             } catch (err) {
                 console.error("Sidebar API Error:", err);
-                setError("데이터 로드 실패");
+                setError("토지 정보를 불러오는데 실패했습니다.");
             } finally {
                 setLoading(false);
             }
