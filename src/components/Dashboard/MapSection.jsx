@@ -5,11 +5,10 @@ const MapSection = ({ selectedAddress }) => {
     const mapRef = useRef(null);
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
-    const [mapType, setMapType] = useState('sate');
+    const [showCadastral, setShowCadastral] = useState(false);
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
-    const [debugInfo, setDebugInfo] = useState("Initializing...");
 
     // Initialize VWorld Map using pure OpenLayers global (ol)
     useEffect(() => {
@@ -19,20 +18,13 @@ const MapSection = ({ selectedAddress }) => {
         const initMap = () => {
             if (mapObj) return;
 
-            // Debug usage of globals
             const ol = window.ol;
             const vw = window.vw;
-            const status = `Globals: ol=${!!ol}, vw=${!!vw}, vw.ol3=${!!(vw && vw.ol3)}`;
-            console.log(status);
-            setDebugInfo(status);
 
-            // Check if global 'ol' is available. 
-            // VWorld 2.0 init script "usually" loads 'ol' globally. 
-            // If not, we might need to rely on 'vw.ol3' carefully, provided we find where 'source' is.
             if (!ol && (!vw || !vw.ol3)) {
                 retryCount++;
                 if (retryCount > maxRetries) {
-                    setMapError("지도 엔진(OpenLayers)을 찾을 수 없습니다.");
+                    setMapError("지도 엔진 로드 실패");
                     setIsMapLoading(false);
                     return;
                 }
@@ -41,59 +33,98 @@ const MapSection = ({ selectedAddress }) => {
             }
 
             try {
-                console.log("Initializing VWorld 2D Map via global 'ol'...");
-
-                // Ensure container is clean
-                const container = document.getElementById("vworld_map_target");
-                if (container) {
-                    container.innerHTML = '';
-                }
-
-                // Determine correct namespaces
-                // Use 'ol' global if available (Standard OpenLayers)
-                // Fallback to 'vw.ol3' if 'ol' is missing (VWorld wrapper)
-                // The previous error showed vw.ol3.source is undefined, so 'ol' is our best bet.
                 const OL = ol || window.vw.ol3;
-
-                // Defensive check for required classes
                 if (!OL || !OL.Map || !OL.View || !OL.layer || !OL.source) {
-                    // If vw.ol3 exists but lacks source (as seen), we can't use it easily.
-                    // We throw to catch block.
-                    if (!OL.source) throw new Error("OpenLayers 'source' namespace is missing.");
+                    if (!OL.source) throw new Error("OpenLayers source namespace missing");
                 }
 
-                // URL for VWorld Satellite Tiles
-                // Note: Using HTTPS to match site protocol
+                // Clear container
+                const container = document.getElementById("vworld_map_target");
+                if (container) container.innerHTML = '';
+
+                // 1. Satellite Layer (Background)
                 const vworldSatelliteUrl = 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg';
+                const satelliteLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: vworldSatelliteUrl,
+                        attributions: 'VWorld',
+                        crossOrigin: 'anonymous'
+                    }),
+                    zIndex: 0
+                });
+
+                // 2. Hybrid Layer (Labels/Roads) - Context for Satellite
+                const vworldHybridUrl = 'https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png';
+                const hybridLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: vworldHybridUrl,
+                        attributions: 'VWorld',
+                        crossOrigin: 'anonymous'
+                    }),
+                    zIndex: 1
+                });
+
+                // 3. Cadastral (Jijeokdo) Layer - WMS Overlay
+                const wmsSource = new OL.source.TileWMS({
+                    url: 'https://api.vworld.kr/req/wms',
+                    params: {
+                        'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
+                        'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
+                        'CRS': 'EPSG:3857',
+                        'TILED': true,
+                        'FORMAT': 'image/png',
+                        'VERSION': '1.3.0',
+                        'KEY': 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
+                        'DOMAIN': 'onnrru.com'
+                    },
+                    serverType: 'geoserver',
+                    crossOrigin: 'anonymous'
+                });
+                const cadastralLayer = new OL.layer.Tile({
+                    source: wmsSource,
+                    visible: false, // Initially hidden
+                    zIndex: 2,
+                    opacity: 0.7
+                });
+                cadastralLayer.set('name', 'cadastral');
 
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [
-                        new OL.layer.Tile({
-                            source: new OL.source.XYZ({
-                                url: vworldSatelliteUrl,
-                                attributions: 'VWorld',
-                                crossOrigin: 'anonymous' // Good practice for tiles
-                            })
-                        })
-                    ],
+                    layers: [satelliteLayer, hybridLayer, cadastralLayer],
                     view: new OL.View({
                         center: [14151740, 4511257], // Default center
                         zoom: 17,
                         minZoom: 6,
                         maxZoom: 19
-                        // Note: If using pure OL, default projection is Web Mercator (EPSG:3857), which matches VWorld tiles.
                     }),
-                    controls: [], // Keep controls empty for now to avoid errors, we can add Zoom control manually if needed
-                    // Explicitly enable interactions (Zoom, DragPan, MouseWheelZoom are in defaults)
-                    interactions: OL.interaction.defaults ? OL.interaction.defaults() : undefined
+                    controls: [],
+                    // Explicit interactions to ensure Zoom/Pan work
+                    interactions: OL.interaction.defaults ? OL.interaction.defaults() : [
+                        new OL.interaction.DragPan(),
+                        new OL.interaction.MouseWheelZoom()
+                    ]
                 };
 
-                // Create Map
                 const map = new OL.Map(mapOptions);
 
-                // Add Zoom control if available (Standard UI)
+                // Manual Interaction Check
+                if (OL.interaction && OL.interaction.MouseWheelZoom) {
+                    const interactions = map.getInteractions();
+                    let hasZoom = false;
+                    interactions.forEach(i => {
+                        if (i instanceof OL.interaction.MouseWheelZoom) hasZoom = true;
+                    });
+
+                    if (!hasZoom) {
+                        try {
+                            map.addInteraction(new OL.interaction.DragPan());
+                            map.addInteraction(new OL.interaction.MouseWheelZoom());
+                        } catch (e) { console.warn("Could not add manual interactions", e); }
+                    }
+                }
+
+                // Add Zoom Control for UI
                 if (OL.control && OL.control.Zoom) {
                     map.addControl(new OL.control.Zoom());
                 }
@@ -108,13 +139,23 @@ const MapSection = ({ selectedAddress }) => {
             }
         };
 
-        // Start init
         initMap();
 
         return () => {
-            // Cleanup
+            // Cleanup if needed
         };
     }, []);
+
+    // Toggle Cadastral Visibility
+    useEffect(() => {
+        if (!mapObj) return;
+        const layers = mapObj.getLayers();
+        layers.forEach(layer => {
+            if (layer.get('name') === 'cadastral') {
+                layer.setVisible(showCadastral);
+            }
+        });
+    }, [mapObj, showCadastral]);
 
     // Update Map Center
     useEffect(() => {
@@ -124,8 +165,6 @@ const MapSection = ({ selectedAddress }) => {
                 const y = parseFloat(selectedAddress.y);
 
                 let center = [x, y];
-
-                // Use explicit 'ol.proj' if available, or try to find it on namespace
                 const ol = window.ol || window.vw?.ol3;
                 const proj = ol?.proj;
 
@@ -181,8 +220,14 @@ const MapSection = ({ selectedAddress }) => {
                 </button>
             </div>
 
-            {/* Map Type Indicator */}
+            {/* Map Type & Jijeokdo Toggle */}
             <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
+                <button
+                    onClick={() => setShowCadastral(!showCadastral)}
+                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all mr-2 ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    지적도
+                </button>
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
                     <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
                 </div>
