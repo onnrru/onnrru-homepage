@@ -10,7 +10,7 @@ const MapSection = ({ selectedAddress }) => {
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
 
-    // Initialize VWorld Map
+    // Initialize VWorld Map using Standard OpenLayers (vw.ol3)
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -31,27 +31,49 @@ const MapSection = ({ selectedAddress }) => {
             }
 
             try {
-                console.log("Initializing VWorld 2D Map via direct vw.ol3...");
+                console.log("Initializing VWorld 2D Map via direct vw.ol3.layer.Tile...");
 
-                // We do NOT clear innerHTML here if possible, to avoid React conflicts.
-                // But since 'vworld_map_target' is now empty in JSX, we can ensure it's clean.
+                // Ensure container is clean
                 const container = document.getElementById("vworld_map_target");
                 if (container) {
                     container.innerHTML = '';
                 }
 
-                // Default VWorld 2D options
-                // REMOVED 'controls' to rely on default behavior or avoid 'defaults is not a function' error
+                // Define Source: VWorld Satellite
+                // We use direct XYZ source to avoid relying on potentially missing VWorld wrapper classes
+                const vworldSatelliteSource = new window.vw.ol3.source.XYZ({
+                    url: 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg',
+                    attributions: 'VWorld',
+                });
+
+                // Define Source: VWorld Base (fallback or toggle)
+                const vworldBaseSource = new window.vw.ol3.source.XYZ({
+                    url: 'https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png',
+                    attributions: 'VWorld',
+                });
+
+                // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
                     layers: [
-                        new window.vw.ol3.layer.Base(window.vw.ol3.BasemapType.PHOTO)
+                        new window.vw.ol3.layer.Tile({
+                            source: vworldSatelliteSource // Default to Satellite
+                        })
                     ],
                     view: new window.vw.ol3.View({
                         center: [14151740, 4511257], // Default center
                         zoom: 17,
-                    })
+                        minZoom: 6,
+                        maxZoom: 19
+                    }),
+                    controls: [] // Explicitly empty controls to avoid 'defaults() is not a function' if it persists, or let OL defaults handle if we omitted this. 
+                    // Safest is empty array for now, then add Zoom manually if constructor exists.
                 };
+
+                // Add Zoom control if available
+                if (window.vw.ol3.control && window.vw.ol3.control.Zoom) {
+                    mapOptions.controls = [new window.vw.ol3.control.Zoom()];
+                }
 
                 const map = new window.vw.ol3.Map(mapOptions);
 
@@ -68,9 +90,11 @@ const MapSection = ({ selectedAddress }) => {
         // Start init
         initMap();
 
-        // Cleanup function to avoid memory leaks or double-init if React strictly mounts/unmounts
         return () => {
-            // Optional: mapObj could be disposed here if needed, but usually redundant for single-page app life cycle of this component
+            // Cleanup
+            if (mapObj && typeof mapObj.setTarget === 'function') {
+                mapObj.setTarget(undefined);
+            }
         };
     }, []);
 
@@ -103,10 +127,10 @@ const MapSection = ({ selectedAddress }) => {
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
-            {/* Dedicated Map Container - NO REACT CHILDREN */}
+            {/* Dedicated Map Container */}
             <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200"></div>
 
-            {/* UI Overlays (Siblings) */}
+            {/* UI Overlays */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
                     <div className="bg-white/80 px-4 py-2 rounded shadow text-gray-700">
