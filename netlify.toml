@@ -12,14 +12,14 @@
 # VWorld Search API
 [[redirects]]
   from = "/api/vworld/*"
-  to = "http://api.vworld.kr/:splat"
+  to = "https://api.vworld.kr/:splat"
   status = 200
   force = true
 
 # VWorld Map API (Tiles/Scripts)
 [[redirects]]
   from = "/vworld_map/*"
-  to = "http://map.vworld.kr/:splat"
+  to = "https://map.vworld.kr/:splat"
   status = 200
   force = true
 

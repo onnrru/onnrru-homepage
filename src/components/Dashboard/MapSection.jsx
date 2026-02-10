@@ -50,6 +50,11 @@ const MapSection = ({ selectedAddress }) => {
             setMapObj(map);
         }
 
+        return () => {
+            // potential cleanup if vworld supports it, but usually just let it be.
+            // Clearing the container might be needed if re-mounting
+        };
+
     }, []);
 
     // Update Map Center when selectedAddress changes
