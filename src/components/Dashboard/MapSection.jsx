@@ -6,6 +6,7 @@ const MapSection = ({ selectedAddress }) => {
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
     const [showCadastral, setShowCadastral] = useState(false);
+    const [showHybrid, setShowHybrid] = useState(false); // Default: Satellite Only
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
@@ -53,7 +54,7 @@ const MapSection = ({ selectedAddress }) => {
                     zIndex: 0
                 });
 
-                // 2. Hybrid Layer (Labels/Roads) - Context for Satellite
+                // 2. Hybrid Layer (Labels/Roads) - Toggleable
                 const vworldHybridUrl = 'https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png';
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
@@ -61,8 +62,10 @@ const MapSection = ({ selectedAddress }) => {
                         attributions: 'VWorld',
                         crossOrigin: 'anonymous'
                     }),
-                    zIndex: 1
+                    zIndex: 1,
+                    visible: false // Initially hidden
                 });
+                hybridLayer.set('name', 'hybrid');
 
                 // 3. Cadastral (Jijeokdo) Layer - WMS Overlay
                 const wmsSource = new OL.source.TileWMS({
@@ -88,6 +91,17 @@ const MapSection = ({ selectedAddress }) => {
                 });
                 cadastralLayer.set('name', 'cadastral');
 
+                // Define Interactions Manually (Force Enable)
+                // We avoid .defaults() as it might be broken in VWorld's build
+                const interactions = [];
+                if (OL.interaction) {
+                    if (OL.interaction.DragPan) interactions.push(new OL.interaction.DragPan());
+                    if (OL.interaction.MouseWheelZoom) interactions.push(new OL.interaction.MouseWheelZoom({
+                        constrainResolution: true // Snap to zoom levels
+                    }));
+                    if (OL.interaction.DoubleClickZoom) interactions.push(new OL.interaction.DoubleClickZoom());
+                }
+
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
@@ -99,30 +113,10 @@ const MapSection = ({ selectedAddress }) => {
                         maxZoom: 19
                     }),
                     controls: [],
-                    // Explicit interactions to ensure Zoom/Pan work
-                    interactions: OL.interaction.defaults ? OL.interaction.defaults() : [
-                        new OL.interaction.DragPan(),
-                        new OL.interaction.MouseWheelZoom()
-                    ]
+                    interactions: interactions // Use manual interactions
                 };
 
                 const map = new OL.Map(mapOptions);
-
-                // Manual Interaction Check
-                if (OL.interaction && OL.interaction.MouseWheelZoom) {
-                    const interactions = map.getInteractions();
-                    let hasZoom = false;
-                    interactions.forEach(i => {
-                        if (i instanceof OL.interaction.MouseWheelZoom) hasZoom = true;
-                    });
-
-                    if (!hasZoom) {
-                        try {
-                            map.addInteraction(new OL.interaction.DragPan());
-                            map.addInteraction(new OL.interaction.MouseWheelZoom());
-                        } catch (e) { console.warn("Could not add manual interactions", e); }
-                    }
-                }
 
                 // Add Zoom Control for UI
                 if (OL.control && OL.control.Zoom) {
@@ -146,7 +140,7 @@ const MapSection = ({ selectedAddress }) => {
         };
     }, []);
 
-    // Toggle Cadastral Visibility
+    // Toggle Layer Visibility
     useEffect(() => {
         if (!mapObj) return;
         const layers = mapObj.getLayers();
@@ -154,8 +148,11 @@ const MapSection = ({ selectedAddress }) => {
             if (layer.get('name') === 'cadastral') {
                 layer.setVisible(showCadastral);
             }
+            if (layer.get('name') === 'hybrid') {
+                layer.setVisible(showHybrid);
+            }
         });
-    }, [mapObj, showCadastral]);
+    }, [mapObj, showCadastral, showHybrid]);
 
     // Update Map Center
     useEffect(() => {
@@ -224,9 +221,15 @@ const MapSection = ({ selectedAddress }) => {
             <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
                 <button
                     onClick={() => setShowCadastral(!showCadastral)}
-                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all mr-2 ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
                 >
                     지적도
+                </button>
+                <button
+                    onClick={() => setShowHybrid(!showHybrid)}
+                    className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showHybrid ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                    정보보기
                 </button>
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
                     <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
