@@ -90,14 +90,13 @@ const MapSection = ({ selectedAddress }) => {
                 hybridLayer.set('name', 'hybrid');
 
                 // 4. Cadastral (Jijeokdo) Layer - WMTS
-                // User suggested 'lp_pa_cb_nd_bu'. VWorld 2.0 docs often use 'lp_pa_cbnd_bubun' (Bubun) and 'lp_pa_cbnd_bonbun' (Bonbun).
-                // We will try to load standard Continuous Cadastral Map.
+                // Using Proxy to avoid CORS Issues with VWorld API
                 const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
 
                 // Using WMS for Cadastral might be safer if WMTS XYZ path is tricky? 
                 // Let's stick to WMS as user snippet suggested WMS `addWMSLayer`.
                 const wmsSource = new OL.source.TileWMS({
-                    url: 'https://api.vworld.kr/req/wms',
+                    url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`, // Use Proxy: /api/vworld/req/wms
                     params: {
                         'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
                         'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
@@ -210,13 +209,13 @@ const MapSection = ({ selectedAddress }) => {
     const handleZoomIn = () => {
         if (!mapObj) return;
         const view = mapObj.getView();
-        view.setZoom(view.getZoom() + 1);
+        if (view) view.setZoom(view.getZoom() + 1);
     };
 
     const handleZoomOut = () => {
         if (!mapObj) return;
         const view = mapObj.getView();
-        view.setZoom(view.getZoom() - 1);
+        if (view) view.setZoom(view.getZoom() - 1);
     };
 
     return (
@@ -294,9 +293,9 @@ const MapSection = ({ selectedAddress }) => {
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
                     <button
                         onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
-                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-ink text-white' : 'bg-gray-100 text-gray-800'}`}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-white text-gray-800' : 'bg-ink text-white'}`}
                     >
-                        {mapType === 'satellite' ? '위성지도 (2D)' : '일반지도'}
+                        {mapType === 'satellite' ? '일반지도' : '위성지도 (2D)'}
                     </button>
                 </div>
             </div>
