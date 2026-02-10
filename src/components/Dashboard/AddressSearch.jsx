@@ -179,14 +179,20 @@ const AddressSearch = ({ onSelect }) => {
                     ) : results.length > 0 ? (
                         <div className="max-h-60 overflow-y-auto">
                             {results.map((item, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => handleSelect(item)}
-                                    className="w-full text-left px-5 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 group transition-colors"
-                                >
-                                    <div className="text-sm font-bold text-gray-800">{item.roadAddr || item.address}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{item.parcelAddr || item.address}</div>
-                                </button>
+                                item.type === 'error' ? (
+                                    <div key={index} className="p-4 text-center text-red-500 text-sm font-bold">
+                                        {item.message}
+                                    </div>
+                                ) : (
+                                    <button
+                                        key={index}
+                                        onClick={() => handleSelect(item)}
+                                        className="w-full text-left px-5 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 group transition-colors"
+                                    >
+                                        <div className="text-sm font-bold text-gray-800">{item.roadAddr || item.address}</div>
+                                        <div className="text-xs text-gray-500 mt-0.5">{item.parcelAddr || item.address}</div>
+                                    </button>
+                                )
                             ))}
                         </div>
                     ) : (
