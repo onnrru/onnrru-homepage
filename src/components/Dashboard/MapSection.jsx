@@ -6,21 +6,39 @@ const MapSection = ({ selectedAddress }) => {
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
 
-    // Default to 'sate' (Satellite) as per previous context, though user snippet had 'base'.
-    // User requested "Like this map" (Satellite) previously. 
-    // Allowing toggle effectively requires clearing/re-init if using this specific utility, or access to map layer.
-    const [mapType, setMapType] = useState('sate');
+    // Default to 'base' for stability as requested in debug step
+    const [mapType, setMapType] = useState('base');
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
+    const [debugInfo, setDebugInfo] = useState("Initializing...");
 
     // Initialize VWorld Map using vw.ol3.MapUtil.create2DMap
     useEffect(() => {
+        let retryCount = 0;
+        const maxRetries = 20; // 10 seconds
+
         const initMap = () => {
             if (mapObj) return;
-            // Check if vw.ol3.MapUtil exists (loaded by global script)
-            if (!window.vw || !window.vw.ol3 || !window.vw.ol3.MapUtil) {
-                // Poll/Retry if not ready
+
+            // Debug status for user visibility
+            const vwExists = !!window.vw;
+            const ol3Exists = !!(window.vw && window.vw.ol3);
+            const utilExists = !!(window.vw && window.vw.ol3 && window.vw.ol3.MapUtil);
+
+            const status = `Check ${retryCount}: vw=${vwExists}, ol3=${ol3Exists}, MapUtil=${utilExists}`;
+            console.log(status);
+            setDebugInfo(status);
+
+            // Check if vw.ol3.MapUtil exists
+            if (!utilExists) {
+                retryCount++;
+                if (retryCount > maxRetries) {
+                    console.error("Map Load Timeout");
+                    setMapError("지도 라이브러리 로드 실패 (Timeout). 새로고침 해주세요.");
+                    setIsMapLoading(false);
+                    return;
+                }
                 setTimeout(initMap, 500);
                 return;
             }
@@ -28,38 +46,28 @@ const MapSection = ({ selectedAddress }) => {
             try {
                 console.log("Initializing VWorld 2D Map via MapUtil...");
 
-                // User provided code structure:
                 const mapDivId = "vworld_map_container";
-                // Using 'sate' (Satellite) instead of 'base' to match visual requirements, 
-                // but following the requested function call structure.
-                const mapStyle = "sate";
+                const mapStyle = "base";
                 const layerTitle = "부동산 분석 지도";
                 const tilt = 0;
                 const key = "F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04";
 
                 // Execute user's requested function
-                // Note: create2DMap might not return the map object directly. 
-                // We need to capture it to support movement.
-                // Usually VWorld 2.0 assigns the map using the mapUtil.
-                // We will try to capture the return value just in case.
-                const mapInstance = window.vw.ol3.MapUtil.create2DMap(mapDivId, mapStyle, layerTitle, tilt, key);
+                window.vw.ol3.MapUtil.create2DMap(mapDivId, mapStyle, layerTitle, tilt, key);
 
-                // Use the returned instance if available, otherwise check standard global locations
-                // or just mark loading as done.
-                if (mapInstance) {
-                    setMapObj(mapInstance);
-                } else if (window.vmap) {
-                    setMapObj(window.vmap);
-                } else {
-                    // Fallback: If we can't find the object, we can't move it programmatically easily.
-                    // But at least it initializes.
-                    // We'll trust that create2DMap works.
-                    // To enable movement, we might need to find the OpenLayers map attached to the div.
-                    // Let's postpone movement logic fix until we see init work.
-                    setMapObj({ initialized: true });
-                }
-
-                setIsMapLoading(false);
+                // Allow some time for the map to render into the DOM
+                setTimeout(() => {
+                    // Start checking for the map object to enable movement
+                    if (window.vmap) {
+                        setMapObj(window.vmap);
+                    } else {
+                        // Fallback: If vmap global isn't set, we assume it loaded visually but we can't control it easily.
+                        // We mark initialization as done so the loading spinner goes away.
+                        console.warn("window.vmap not found, but create2DMap executed.");
+                        setMapObj({ initialized: true });
+                    }
+                    setIsMapLoading(false);
+                }, 1000);
 
             } catch (err) {
                 console.error("지도 로딩 중 오류 발생:", err);
@@ -79,20 +87,20 @@ const MapSection = ({ selectedAddress }) => {
                 const y = parseFloat(selectedAddress.y);
 
                 // Movement Logic
-                // If mapObj is a real OL map instance
                 if (mapObj.getView && typeof mapObj.getView === 'function') {
                     const view = mapObj.getView();
-                    // VWorld 2D usually uses EPSG:3857 (Web Mercator)
-                    // We need to transform EPSG:4326 (Lon/Lat) to EPSG:3857 if needed.
-                    // Assuming input is Lon/Lat (127..., 37...).
                     if (window.ol && window.ol.proj) {
                         const center = window.ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
                         view.setCenter(center);
                         view.setZoom(17);
-                        console.log("Moved map to:", x, y);
                     }
-                } else {
-                    console.warn("Map object not capable of movement or not found.");
+                } else if (window.vmap && window.vmap.getView) {
+                    const view = window.vmap.getView();
+                    if (window.ol && window.ol.proj) {
+                        const center = window.ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
+                        view.setCenter(center);
+                        view.setZoom(17);
+                    }
                 }
 
             } catch (e) {
@@ -107,12 +115,13 @@ const MapSection = ({ selectedAddress }) => {
             {/* VWorld Map Container */}
             <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0 bg-gray-200">
                 {isMapLoading && (
-                    <div className="flex items-center justify-center h-full text-gray-500">
-                        지도 로딩중...
+                    <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                        <span>지도 로딩중...</span>
+                        <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">{debugInfo}</span>
                     </div>
                 )}
                 {mapError && (
-                    <div className="flex items-center justify-center h-full text-red-500">
+                    <div className="flex items-center justify-center h-full text-red-500 font-bold">
                         {mapError}
                     </div>
                 )}
@@ -137,7 +146,7 @@ const MapSection = ({ selectedAddress }) => {
             {/* Map Type Indicator */}
             <div className="absolute top-4 right-4 flex gap-2 z-20">
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
-                    <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
+                    <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">기본지도 (2D)</button>
                 </div>
             </div>
         </div>
