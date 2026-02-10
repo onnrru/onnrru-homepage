@@ -110,32 +110,7 @@ const MapSection = ({ selectedAddress }) => {
 
                 const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
 
-                // 4. Cadastral (Jijeokdo) Layer - WMTS
-                const wmsSource = new OL.source.TileWMS({
-                    url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
-                    params: {
-                        'LAYERS': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
-                        'STYLES': 'lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun',
-                        'CRS': 'EPSG:3857',
-                        'TILED': true,
-                        'FORMAT': 'image/png',
-                        'VERSION': '1.3.0',
-                        'KEY': apiKey,
-                        'DOMAIN': 'onnrru.com'
-                    },
-                    serverType: 'geoserver',
-                    crossOrigin: 'anonymous'
-                });
-
-                const cadastralLayer = new OL.layer.Tile({
-                    source: wmsSource,
-                    visible: false,
-                    zIndex: 2,
-                    opacity: 0.8
-                });
-                cadastralLayer.set('name', 'cadastral');
-
-                // 5. Additional WMS Layers
+                // 4. Additional WMS Layers (Including Cadastral Base)
                 const extraLayers = ADDITIONAL_LAYERS.map(layer => {
                     const source = new OL.source.TileWMS({
                         url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
@@ -156,7 +131,7 @@ const MapSection = ({ selectedAddress }) => {
                     const olLayer = new OL.layer.Tile({
                         source: source,
                         visible: false, // Default hidden
-                        zIndex: 3, // Above cadastral
+                        zIndex: 3, // Above base/satellite
                         opacity: 0.7
                     });
                     olLayer.set('name', layer.id);
@@ -166,7 +141,7 @@ const MapSection = ({ selectedAddress }) => {
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [baseLayer, satelliteLayer, hybridLayer, cadastralLayer, ...extraLayers],
+                    layers: [baseLayer, satelliteLayer, hybridLayer, ...extraLayers],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -193,7 +168,7 @@ const MapSection = ({ selectedAddress }) => {
         initMap();
     }, []);
 
-    // Effect: Handle Map Type Toggle (Satellite vs Base)
+    // Effect: Handle Map Type Toggle (Satellite vs Base) & Layers
     // We treat 'showHybrid' as the toggle for "Satellite (with Hybrid)" vs "Base (General)"
     // Or we should add a new state for 'mapType'.
     // Current UI has [Satellite (2D)] button. 
@@ -215,17 +190,12 @@ const MapSection = ({ selectedAddress }) => {
                 layer.setVisible(mapType === 'satellite' && showHybrid);
             }
 
-            // Jijeokdo
-            if (name === 'cadastral') {
-                layer.setVisible(showCadastral);
-            }
-
             // Additional Layers
             if (ADDITIONAL_LAYERS.some(l => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
-    }, [mapObj, mapType, showCadastral, showHybrid, activeLayers]);
+    }, [mapObj, mapType, showHybrid, activeLayers]);
 
     // Update Map Center
     useEffect(() => {
@@ -276,33 +246,10 @@ const MapSection = ({ selectedAddress }) => {
                 )}
             </div>
 
-            {/* Left Controls (Analysis Tabs) */}
-            <div className="absolute top-4 left-4 flex gap-2 z-20 pointer-events-auto">
-                <button
-                    onClick={() => setActiveTab('real')}
-                    className={`px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all ${activeTab === 'real' ? 'bg-ink text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
-                    실거래가 분석
-                </button>
-                <button
-                    onClick={() => setActiveTab('eum')}
-                    className={`px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all ${activeTab === 'eum' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
-                    토지이음 지도
-                </button>
-            </div>
-
-
             {/* Right Controls (Map Toggles) */}
             <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
                 {/* Standard Map Toggles */}
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowCadastral(!showCadastral)}
-                        className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                        연속지적도
-                    </button>
                     <button
                         onClick={() => setShowHybrid(!showHybrid)}
                         className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showHybrid ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
