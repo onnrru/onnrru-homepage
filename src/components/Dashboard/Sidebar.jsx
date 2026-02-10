@@ -169,30 +169,7 @@ const Sidebar = ({ selectedAddress }) => {
                 </div>
             </div>
 
-            {/* Section: Basic Info Table */}
-            <div className={`p-6 border-b border-gray-100 flex-shrink-0 ${isExpanded ? 'hidden' : 'block'}`}>
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">기본 정보 (API)</h3>
-                <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">지목</span>
-                        <span className="text-sm font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
-                            {data.basic?.jimok || '-'}
-                        </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">면적</span>
-                        <span className="text-sm font-medium text-gray-900">
-                            {data.basic?.area ? `${data.basic.area} m²` : '-'}
-                        </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">공시지가</span>
-                        <span className="text-sm font-medium text-gray-900">
-                            {data.basic?.price ? `${parseInt(data.basic.price).toLocaleString()} 원` : '-'}
-                        </span>
-                    </div>
-                </div>
-            </div>
+
 
             {/* Section: Specific Info (Expandable) */}
             <div className="flex-1 flex flex-col min-h-0">
@@ -281,7 +258,7 @@ const Sidebar = ({ selectedAddress }) => {
                                         </div>
                                     </div>
 
-                                    {/* 3. Confirmation Drawing (Map) */}
+                                    {/* 2. Confirmation Drawing (Map) */}
                                     <div className="bg-white rounded-lg border border-gray-200 p-4">
                                         <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                             <span className="w-1 h-4 bg-ink rounded-full"></span>
