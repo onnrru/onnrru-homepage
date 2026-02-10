@@ -13,61 +13,83 @@ const MapSection = ({ selectedAddress }) => {
         { id: 3, x: '70%', y: '30%', price: '5억 8000', unit: '만원/평', count: 5, type: 'APT' },
     ]);
 
+    const [isMapLoading, setIsMapLoading] = useState(true);
+    const [mapError, setMapError] = useState(null);
+
     // Initialize VWorld Map
     useEffect(() => {
         const scriptId = 'vworld-map-script';
 
-        if (!document.getElementById(scriptId)) {
+        const loadScript = () => {
             const script = document.createElement('script');
             script.id = scriptId;
-            // Use the key provided by user
             script.src = `https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=${API_CONFIG.VWORLD_KEY}`;
             script.async = true;
-            script.onload = () => initMap();
+            script.onload = () => {
+                setTimeout(() => initMap(), 500); // Slight delay to ensure internal inits
+            };
+            script.onerror = () => {
+                setMapError("지도를 불러올 수 없습니다. (스크립트 로드 실패)");
+                setIsMapLoading(false);
+            };
             document.body.appendChild(script);
+        };
+
+        if (!document.getElementById(scriptId)) {
+            loadScript();
         } else {
             if (window.vw) {
                 initMap();
+            } else {
+                // Script exists but maybe not loaded? Retry
+                setTimeout(() => {
+                    if (window.vw) initMap();
+                    else loadScript(); // Force reload if super stuck? No, just wait.
+                }, 1000);
             }
         }
 
         function initMap() {
-            if (!window.vw) return;
-            if (mapObj) return; // Already initialized
+            if (!window.vw) {
+                console.error("VWorld 'vw' object not found");
+                return;
+            }
+            if (mapObj) return;
 
-            const options = {
-                mapId: "vworld_map_container",
-                initPosition: new window.vw.CameraPosition(
-                    new window.vw.CoordZ(127.1235, 37.4850, 1500), // Default: Munjeong
-                    new window.vw.Direction(0, -90, 0)
-                ),
-                logo: true,
-            };
+            try {
+                const options = {
+                    mapId: "vworld_map_container",
+                    initPosition: new window.vw.CameraPosition(
+                        new window.vw.CoordZ(127.1235, 37.4850, 1500),
+                        new window.vw.Direction(0, -90, 0)
+                    ),
+                    logo: true,
+                };
 
-            const map = new window.vw.Map();
-            map.setOption(options);
-            map.start();
-            setMapObj(map);
+                const map = new window.vw.Map();
+                map.setOption(options);
+                map.start();
+                setMapObj(map);
+                setIsMapLoading(false);
+            } catch (err) {
+                console.error("Map Init Error:", err);
+                setMapError("지도 초기화 중 오류가 발생했습니다.");
+                setIsMapLoading(false);
+            }
         }
-
-        return () => {
-            // potential cleanup if vworld supports it, but usually just let it be.
-            // Clearing the container might be needed if re-mounting
-        };
 
     }, []);
 
     // Update Map Center when selectedAddress changes
     useEffect(() => {
         if (mapObj && selectedAddress && selectedAddress.x && selectedAddress.y) {
-            // VWorld uses standard coords (Lon, Lat) usually, or EPGS something.
-            // Address Search API returns EPSG:4326 (Lon, Lat) if requested.
-            // Move camera
-            const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
-            const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
-            mapObj.moveTo(mPos);
-
-            // Add/Move Marker (Simple implementation if VWorld supports it easly, otherwise skip for now)
+            try {
+                const movePos = new window.vw.CoordZ(parseFloat(selectedAddress.x), parseFloat(selectedAddress.y), 1000);
+                const mPos = new window.vw.CameraPosition(movePos, new window.vw.Direction(0, -90, 0));
+                mapObj.moveTo(mPos);
+            } catch (e) {
+                console.error("Map Move Error:", e);
+            }
         }
     }, [mapObj, selectedAddress]);
 
@@ -75,7 +97,18 @@ const MapSection = ({ selectedAddress }) => {
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
             {/* VWorld Map Container */}
-            <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0"></div>
+            <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0 bg-gray-200">
+                {isMapLoading && (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                        지도 로딩중...
+                    </div>
+                )}
+                {mapError && (
+                    <div className="flex items-center justify-center h-full text-red-500">
+                        {mapError}
+                    </div>
+                )}
+            </div>
 
             {/* Overlays (Keep existing UI on top) */}
             <div className="absolute inset-0 pointer-events-none z-10">

@@ -30,58 +30,63 @@ const AddressSearch = ({ onSelect }) => {
         setResults([]);
 
         try {
-            // VWorld Search API (via Proxy)
-            const response = await axios.get(`${API_CONFIG.VWORLD_BASE_URL}/req/search`, {
-                params: {
-                    service: 'search',
-                    request: 'search',
-                    version: '2.0',
-                    crs: 'EPSG:4326',
-                    size: '10',
-                    page: '1',
-                    query: searchTerm,
-                    type: 'ADDRESS',
-                    category: 'ROAD',
-                    format: 'json',
-                    errorformat: 'json',
-                    key: API_CONFIG.VWORLD_KEY
+            // Perform parallel search for both ROAD and PARCEL address types
+            const searchTypes = ['ROAD', 'PARCEL'];
+            const requests = searchTypes.map(type =>
+                axios.get(`${API_CONFIG.VWORLD_BASE_URL}/req/search`, {
+                    params: {
+                        service: 'search',
+                        request: 'search',
+                        version: '2.0',
+                        crs: 'EPSG:4326',
+                        size: '10',
+                        page: '1',
+                        query: searchTerm,
+                        type: 'ADDRESS',
+                        category: type,
+                        format: 'json',
+                        errorformat: 'json',
+                        key: API_CONFIG.VWORLD_KEY
+                    }
+                })
+            );
+
+            const responses = await Promise.all(requests);
+
+            let allItems = [];
+            responses.forEach(response => {
+                if (response.data.response.status === 'OK') {
+                    allItems = [...allItems, ...response.data.response.result.items];
                 }
             });
 
-            if (response.data.response.status === 'OK') {
-                const items = response.data.response.result.items;
-                const formattedItems = items.map(item => {
+            // Deduplicate items based on ID
+            const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
+
+            if (uniqueItems.length > 0) {
+                const formattedItems = uniqueItems.map(item => {
                     let pnu = null;
                     let code = null;
+                    let sigunguCode = null;
 
-                    // 1. Try to get PNU from ID (if category is parcel)
-                    if (item.category === 'parcel' && item.id) {
-                        pnu = item.id;
-                    }
-
-                    // 2. Try to get Code from Structure
                     if (item.address.structure) {
-                        const { level1, level2, level4AC } = item.address.structure;
+                        const { level2, level4AC } = item.address.structure;
 
                         // Try to match Sigungu Code
                         if (level2) {
-                            import('../../data/sigunguData').then(module => {
-                                // Dynamic import or just import at top? 
-                                // Let's assume we import at top for simplicity. 
-                                // But I can't easily change top imports in this block.
-                                // I will just use the structure if available or rely on what I have.
-                            });
-                            // Actually, let's just pass the structure names, Sidebar can map them if needed.
-                            // But better to do it here if I can import sigunguData.
+                            const found = sigunguData.find(s => s.sigungu === level2 || (level2 && s.sigungu.includes(level2)));
+                            if (found) {
+                                sigunguCode = found.code;
+                                code = found.code;
+                            }
                         }
 
-                        // level4AC is often the legal dong code (minus sigungu part?) or full?
-                        // VWorld documentation says level4AC is "Administrative Code".
                         if (level4AC) code = level4AC;
                     }
 
-                    // Fallback to ID for code if nothing else
-                    if (!code && item.id) code = item.id;
+                    if (item.category === 'parcel' && item.id) {
+                        pnu = item.id;
+                    }
 
                     return {
                         address: item.address.road || item.address.parcel,
