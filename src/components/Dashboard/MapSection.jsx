@@ -6,36 +6,25 @@ const MapSection = ({ selectedAddress }) => {
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
 
-    // Default to 'base' for stability as requested in debug step
-    const [mapType, setMapType] = useState('base');
+    // Default to 'sate' (Satellite) as user requested 'Like the screenshot'
+    const [mapType, setMapType] = useState('sate');
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
-    const [debugInfo, setDebugInfo] = useState("Initializing...");
 
-    // Initialize VWorld Map using vw.ol3.MapUtil.create2DMap
+    // Initialize VWorld Map using Standard vw.ol3 Direct Initialization
     useEffect(() => {
         let retryCount = 0;
-        const maxRetries = 20; // 10 seconds
+        const maxRetries = 20;
 
         const initMap = () => {
             if (mapObj) return;
 
-            // Debug status for user visibility
-            const vwExists = !!window.vw;
-            const ol3Exists = !!(window.vw && window.vw.ol3);
-            const utilExists = !!(window.vw && window.vw.ol3 && window.vw.ol3.MapUtil);
-
-            const status = `Check ${retryCount}: vw=${vwExists}, ol3=${ol3Exists}, MapUtil=${utilExists}`;
-            console.log(status);
-            setDebugInfo(status);
-
-            // Check if vw.ol3.MapUtil exists
-            if (!utilExists) {
+            // Check for vw.ol3 presence (confirmed existing by debug)
+            if (!window.vw || !window.vw.ol3) {
                 retryCount++;
                 if (retryCount > maxRetries) {
-                    console.error("Map Load Timeout");
-                    setMapError("지도 라이브러리 로드 실패 (Timeout). 새로고침 해주세요.");
+                    setMapError("VWorld 라이브러리 로드 실패");
                     setIsMapLoading(false);
                     return;
                 }
@@ -44,34 +33,36 @@ const MapSection = ({ selectedAddress }) => {
             }
 
             try {
-                console.log("Initializing VWorld 2D Map via MapUtil...");
+                console.log("Initializing VWorld 2D Map via direct vw.ol3...");
 
-                const mapDivId = "vworld_map_container";
-                const mapStyle = "base";
-                const layerTitle = "부동산 분석 지도";
-                const tilt = 0;
-                const key = "F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04";
+                // Clear container just in case
+                const container = document.getElementById("vworld_map_container");
+                if (container) container.innerHTML = '';
 
-                // Execute user's requested function
-                window.vw.ol3.MapUtil.create2DMap(mapDivId, mapStyle, layerTitle, tilt, key);
+                const mapOptions = {
+                    target: 'vworld_map_container',
+                    controls: window.vw.ol3.control.defaults().extend([
+                        new window.vw.ol3.control.Zoom(),
+                        new window.vw.ol3.control.ScaleLine(),
+                    ]),
+                    layers: [
+                        new window.vw.ol3.layer.Base(window.vw.ol3.BasemapType.PHOTO) // Satellite
+                    ],
+                    view: new window.vw.ol3.View({
+                        center: [14151740, 4511257], // Default center (approx)
+                        zoom: 17,
+                        // VWorld 2D defaults to EPSG:3857, usually auto-handled by vw.ol3.View defaults
+                    })
+                };
 
-                // Allow some time for the map to render into the DOM
-                setTimeout(() => {
-                    // Start checking for the map object to enable movement
-                    if (window.vmap) {
-                        setMapObj(window.vmap);
-                    } else {
-                        // Fallback: If vmap global isn't set, we assume it loaded visually but we can't control it easily.
-                        // We mark initialization as done so the loading spinner goes away.
-                        console.warn("window.vmap not found, but create2DMap executed.");
-                        setMapObj({ initialized: true });
-                    }
-                    setIsMapLoading(false);
-                }, 1000);
+                const map = new window.vw.ol3.Map(mapOptions);
+
+                setMapObj(map);
+                setIsMapLoading(false);
 
             } catch (err) {
-                console.error("지도 로딩 중 오류 발생:", err);
-                setMapError("지도 초기화 오류: " + err.message);
+                console.error("비상: Direct Init 실패, 상세 에러:", err);
+                setMapError("지도 생성 오류: " + err.message);
                 setIsMapLoading(false);
             }
         };
@@ -86,22 +77,33 @@ const MapSection = ({ selectedAddress }) => {
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
 
-                // Movement Logic
-                if (mapObj.getView && typeof mapObj.getView === 'function') {
-                    const view = mapObj.getView();
-                    if (window.ol && window.ol.proj) {
-                        const center = window.ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-                        view.setCenter(center);
-                        view.setZoom(17);
-                    }
-                } else if (window.vmap && window.vmap.getView) {
-                    const view = window.vmap.getView();
-                    if (window.ol && window.ol.proj) {
-                        const center = window.ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-                        view.setCenter(center);
-                        view.setZoom(17);
+                // Check if we need to transform coordinates
+                // VWorld Geocoder usually returns EPSG:4326 (Lon/Lat)
+                // OpenLayers View usually expects EPSG:3857
+
+                let center = [x, y];
+
+                // If window.ol.proj exists (it should via vw.ol3), use it
+                // Note: window.vw.ol3 might alias window.ol, or be separate. 
+                // We should check window.vw.ol3.proj too.
+                const proj = window.vw.ol3.proj || (window.ol && window.ol.proj);
+
+                if (proj) {
+                    // Start with basic 4326 check
+                    if (x < 180 && y < 90) { // Rough check for Lon/Lat
+                        center = proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
                     }
                 }
+
+                if (mapObj.getView && typeof mapObj.getView === 'function') {
+                    const view = mapObj.getView();
+                    view.setCenter(center);
+                    view.setZoom(19); // Close zoom for detail
+                }
+
+                // Add Marker? 
+                // Standard OL3 marker code involves Layers/Features.
+                // Keeping it simple first: just move center.
 
             } catch (e) {
                 console.error("Map Move Error:", e);
@@ -115,9 +117,8 @@ const MapSection = ({ selectedAddress }) => {
             {/* VWorld Map Container */}
             <div id="vworld_map_container" className="w-full h-full absolute inset-0 z-0 bg-gray-200">
                 {isMapLoading && (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
-                        <span>지도 로딩중...</span>
-                        <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">{debugInfo}</span>
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                        지도 로딩중...
                     </div>
                 )}
                 {mapError && (
@@ -146,7 +147,7 @@ const MapSection = ({ selectedAddress }) => {
             {/* Map Type Indicator */}
             <div className="absolute top-4 right-4 flex gap-2 z-20">
                 <div className="bg-white rounded-lg shadow-md p-1 flex">
-                    <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">기본지도 (2D)</button>
+                    <button className="px-3 py-1 text-xs font-bold bg-ink text-white rounded">위성지도 (2D)</button>
                 </div>
             </div>
         </div>
