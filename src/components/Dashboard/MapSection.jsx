@@ -5,13 +5,15 @@ const MapSection = ({ selectedAddress }) => {
     const mapRef = useRef(null);
     const [mapObj, setMapObj] = useState(null);
     const [activeTab, setActiveTab] = useState('real');
+
+    // Toggles
     const [showCadastral, setShowCadastral] = useState(false);
-    const [showHybrid, setShowHybrid] = useState(false); // Default: Satellite Only
+    const [showHybrid, setShowHybrid] = useState(false);
 
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
 
-    // Initialize VWorld Map using pure OpenLayers global (ol)
+    // Initialize VWorld Map
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -43,7 +45,11 @@ const MapSection = ({ selectedAddress }) => {
                 const container = document.getElementById("vworld_map_target");
                 if (container) container.innerHTML = '';
 
-                // 1. Satellite Layer (Background)
+                // Force focus for keyboard interactions
+                container.tabIndex = 0;
+                container.focus();
+
+                // 1. Satellite Layer
                 const vworldSatelliteUrl = 'https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg';
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
@@ -54,7 +60,7 @@ const MapSection = ({ selectedAddress }) => {
                     zIndex: 0
                 });
 
-                // 2. Hybrid Layer (Labels/Roads) - Toggleable
+                // 2. Hybrid Layer (Labels) - Toggleable
                 const vworldHybridUrl = 'https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png';
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
@@ -63,11 +69,12 @@ const MapSection = ({ selectedAddress }) => {
                         crossOrigin: 'anonymous'
                     }),
                     zIndex: 1,
-                    visible: false // Initially hidden
+                    visible: false
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 3. Cadastral (Jijeokdo) Layer - WMS Overlay
+                // 3. Cadastral (Jijeokdo) Layer - WMS
+                // "Continuous Cadastral Map" -> lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun
                 const wmsSource = new OL.source.TileWMS({
                     url: 'https://api.vworld.kr/req/wms',
                     params: {
@@ -81,47 +88,42 @@ const MapSection = ({ selectedAddress }) => {
                         'DOMAIN': 'onnrru.com'
                     },
                     serverType: 'geoserver',
-                    crossOrigin: 'anonymous'
+                    crossOrigin: 'anonymous' // Important for canvas export if needed, but sometimes causes issues with VWorld WMS? Usually fine.
                 });
                 const cadastralLayer = new OL.layer.Tile({
                     source: wmsSource,
-                    visible: false, // Initially hidden
+                    visible: false,
                     zIndex: 2,
-                    opacity: 0.7
+                    opacity: 0.8 // Slightly more opaque
                 });
                 cadastralLayer.set('name', 'cadastral');
 
-                // Define Interactions Manually (Force Enable)
-                // We avoid .defaults() as it might be broken in VWorld's build
-                const interactions = [];
-                if (OL.interaction) {
-                    if (OL.interaction.DragPan) interactions.push(new OL.interaction.DragPan());
-                    if (OL.interaction.MouseWheelZoom) interactions.push(new OL.interaction.MouseWheelZoom({
-                        constrainResolution: true // Snap to zoom levels
-                    }));
-                    if (OL.interaction.DoubleClickZoom) interactions.push(new OL.interaction.DoubleClickZoom());
-                }
+                // Interactions: Force Add
+                const interactions = [
+                    new OL.interaction.DragPan(),
+                    new OL.interaction.MouseWheelZoom({
+                        constrainResolution: false, // Smooth zoom
+                        duration: 250
+                    })
+                ];
+
+                if (OL.interaction.DoubleClickZoom) interactions.push(new OL.interaction.DoubleClickZoom());
 
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
                     layers: [satelliteLayer, hybridLayer, cadastralLayer],
                     view: new OL.View({
-                        center: [14151740, 4511257], // Default center
+                        center: [14151740, 4511257],
                         zoom: 17,
                         minZoom: 6,
                         maxZoom: 19
                     }),
-                    controls: [],
-                    interactions: interactions // Use manual interactions
+                    controls: [], // No default controls, we will add custom React buttons
+                    interactions: interactions
                 };
 
                 const map = new OL.Map(mapOptions);
-
-                // Add Zoom Control for UI
-                if (OL.control && OL.control.Zoom) {
-                    map.addControl(new OL.control.Zoom());
-                }
 
                 setMapObj(map);
                 setIsMapLoading(false);
@@ -134,19 +136,16 @@ const MapSection = ({ selectedAddress }) => {
         };
 
         initMap();
-
-        return () => {
-            // Cleanup if needed
-        };
     }, []);
 
-    // Toggle Layer Visibility
+    // Toggle Visibility
     useEffect(() => {
         if (!mapObj) return;
         const layers = mapObj.getLayers();
         layers.forEach(layer => {
             if (layer.get('name') === 'cadastral') {
                 layer.setVisible(showCadastral);
+                // Force refresh slightly to ensure render? usually setVisible is enough.
             }
             if (layer.get('name') === 'hybrid') {
                 layer.setVisible(showHybrid);
@@ -160,7 +159,6 @@ const MapSection = ({ selectedAddress }) => {
             try {
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
-
                 let center = [x, y];
                 const ol = window.ol || window.vw?.ol3;
                 const proj = ol?.proj;
@@ -174,20 +172,32 @@ const MapSection = ({ selectedAddress }) => {
                     view.setCenter(center);
                     view.setZoom(19);
                 }
-
             } catch (e) {
                 console.error("Map Move Error:", e);
             }
         }
     }, [mapObj, selectedAddress]);
 
+    // Custom Zoom Handlers
+    const handleZoomIn = () => {
+        if (!mapObj) return;
+        const view = mapObj.getView();
+        view.setZoom(view.getZoom() + 1);
+    };
+
+    const handleZoomOut = () => {
+        if (!mapObj) return;
+        const view = mapObj.getView();
+        view.setZoom(view.getZoom() - 1);
+    };
+
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
 
             {/* Dedicated Map Container */}
-            <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200"></div>
+            <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none"></div>
 
-            {/* UI Overlays */}
+            {/* Loading/Error Overlays */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
                     <div className="bg-white/80 px-4 py-2 rounded shadow text-gray-700">
@@ -201,7 +211,7 @@ const MapSection = ({ selectedAddress }) => {
                 )}
             </div>
 
-            {/* Controls / Tabs */}
+            {/* Left Controls (Analysis Tabs) */}
             <div className="absolute top-4 left-4 flex gap-2 z-20 pointer-events-auto">
                 <button
                     onClick={() => setActiveTab('real')}
@@ -217,7 +227,25 @@ const MapSection = ({ selectedAddress }) => {
                 </button>
             </div>
 
-            {/* Map Type & Jijeokdo Toggle */}
+            {/* Custom Zoom Controls (Left Middle) */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 pointer-events-auto">
+                <button
+                    onClick={handleZoomIn}
+                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl"
+                    aria-label="Zoom In"
+                >
+                    +
+                </button>
+                <button
+                    onClick={handleZoomOut}
+                    className="w-10 h-10 bg-white rounded-lg shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-bold text-xl"
+                    aria-label="Zoom Out"
+                >
+                    -
+                </button>
+            </div>
+
+            {/* Right Controls (Map Toggles) */}
             <div className="absolute top-4 right-4 flex gap-2 z-20 pointer-events-auto">
                 <button
                     onClick={() => setShowCadastral(!showCadastral)}
