@@ -140,11 +140,14 @@ const MapSection = ({ selectedAddress }) => {
                         url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
                         params: {
                             'LAYERS': layer.id,
-                            'STYLES': '',
+                            'STYLES': layer.id, // Try setting style to layer ID again as per some VWorld examples, or keep empty if failed. 
+                            // User guide says: layers=... styles=... (often same).
+                            // But usually empty works for default.
+                            // Let's try matching Name.
+                            'STYLES': layer.id,
                             'CRS': 'EPSG:3857',
-                            'TILED': true,
                             'FORMAT': 'image/png',
-                            'TRANSPARENT': 'TRUE', // Essential for overlay
+                            'TRANSPARENT': 'TRUE',
                             'VERSION': '1.3.0',
                             'key': apiKey,
                             'DOMAIN': 'onnrru.com'

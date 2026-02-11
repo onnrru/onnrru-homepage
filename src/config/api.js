@@ -1,7 +1,7 @@
 export const API_CONFIG = {
     // Base URLs (Proxied in Vite)
     EUM_BASE_URL: '/api/eum',
-    VWORLD_BASE_URL: '/api/vworld',
+    VWORLD_BASE_URL: 'https://api.vworld.kr',
     VWORLD_MAP_URL: '/vworld_map',
 
     // Keys
