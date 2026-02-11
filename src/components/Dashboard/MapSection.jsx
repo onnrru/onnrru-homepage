@@ -144,11 +144,8 @@ const MapSection = ({ selectedAddress }) => {
                         zoom: 17,
                         minZoom: 6,
                         maxZoom: 19
-                    }),
-                    // Default interactions in standard OL include MouseWheelZoom which works fine.
-                    // We can explicitly add controls if needed, but defaults are usually Zoom, Rotate, Attribution.
-                    controls: OL.control.defaults(),
-                    interactions: OL.interaction.defaults()
+                    })
+                    // controls and interactions are added by default by OpenLayers
                 };
 
                 const map = new OL.Map(mapOptions);
