@@ -148,17 +148,30 @@ const MapSection = ({ selectedAddress }) => {
                         minZoom: 6,
                         maxZoom: 19
                     }),
-                    controls: OL.control.defaults(), // Restore default controls (Zoom, etc.)
-                    interactions: OL.interaction.defaults().extend([
+                    interactions: OL.interaction.defaults({ mouseWheelZoom: false }).extend([
                         new OL.interaction.MouseWheelZoom({
-                            constrainResolution: true, // Force zooming to integer zoom levels (smoother for tiled maps)
-                            duration: 250 // Zoom animation duration
-                        })
+                            constrainResolution: false, // Resolve potential jerky zooming
+                            duration: 250,
+                            useAnchor: true
+                        }),
+                        new OL.interaction.DragPan(), // Ensure pan is explicitly there too
                     ])
                 };
 
+                // Debug: Log interactions
+                console.log("Map Interactions:", mapOptions.interactions.getArray().map(i => i.constructor.name));
+
                 const map = new OL.Map(mapOptions);
                 window.map = map;
+
+                // Debug: Check if wheel event reaches container
+                // The 'container' variable is already declared earlier in initMap
+                if (container) {
+                    container.addEventListener('wheel', (e) => {
+                        console.log("Map Container Wheel Event:", e.deltaY);
+                    }, { passive: true });
+                }
+
 
                 setMapObj(map);
                 setIsMapLoading(false);
