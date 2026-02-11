@@ -101,7 +101,7 @@ const MapSection = ({ selectedAddress }) => {
                         attributions: 'VWorld',
                         crossOrigin: 'anonymous'
                     }),
-                    zIndex: 1,
+                    zIndex: 5, // Labels on top
                     visible: true // Default visible with Satellite
                 });
                 hybridLayer.set('name', 'hybrid');
@@ -117,8 +117,9 @@ const MapSection = ({ selectedAddress }) => {
                         'CRS': 'EPSG:3857',
                         'TILED': true,
                         'FORMAT': 'image/png',
+                        'TRANSPARENT': 'TRUE', // Essential for overlay
                         'VERSION': '1.3.0',
-                        'key': apiKey,
+                        'key': apiKey, // Lowercase key!
                         'DOMAIN': 'onnrru.com'
                     },
                     serverType: 'geoserver',
@@ -127,7 +128,7 @@ const MapSection = ({ selectedAddress }) => {
                 const cadastralLayer = new OL.layer.Tile({
                     source: cadastralSource,
                     visible: false,
-                    zIndex: 2,
+                    zIndex: 4, // High priority overlay
                     opacity: 0.8
                 });
                 cadastralLayer.set('name', 'cadastral');
@@ -143,6 +144,7 @@ const MapSection = ({ selectedAddress }) => {
                             'CRS': 'EPSG:3857',
                             'TILED': true,
                             'FORMAT': 'image/png',
+                            'TRANSPARENT': 'TRUE', // Essential for overlay
                             'VERSION': '1.3.0',
                             'key': apiKey,
                             'DOMAIN': 'onnrru.com'
@@ -154,7 +156,7 @@ const MapSection = ({ selectedAddress }) => {
                     const olLayer = new OL.layer.Tile({
                         source: source,
                         visible: false, // Default hidden
-                        zIndex: 3, // Above base/satellite
+                        zIndex: 3, // Above base/satellite, below cadastral
                         opacity: 0.7
                     });
                     olLayer.set('name', layer.id);
