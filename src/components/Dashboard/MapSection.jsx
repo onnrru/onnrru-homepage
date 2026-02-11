@@ -21,8 +21,7 @@ const MapSection = ({ selectedAddress }) => {
         { id: 'LT_C_UQ141', label: '국토계획구역' },
         { id: 'LT_C_UQ111', label: '도시지역' },
         { id: 'LT_C_UQ112', label: '관리지역' },
-        { id: 'LT_C_UQ113', label: '농림지역' },
-        { id: 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN', label: '연속지적도' }
+        { id: 'LT_C_UQ113', label: '농림지역' }
     ];
 
     const [activeLayers, setActiveLayers] = useState([]);
@@ -109,18 +108,43 @@ const MapSection = ({ selectedAddress }) => {
 
                 const apiKey = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
 
-                // 4. Additional WMS Layers (Including Cadastral Base)
+                // 4. Continuous Cadastral Map (Dedicated Layer)
+                const cadastralSource = new OL.source.TileWMS({
+                    url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
+                    params: {
+                        'LAYERS': 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN',
+                        'STYLES': '',
+                        'CRS': 'EPSG:3857',
+                        'TILED': true,
+                        'FORMAT': 'image/png',
+                        'VERSION': '1.3.0',
+                        'key': apiKey,
+                        'DOMAIN': 'onnrru.com'
+                    },
+                    serverType: 'geoserver',
+                    crossOrigin: 'anonymous'
+                });
+                const cadastralLayer = new OL.layer.Tile({
+                    source: cadastralSource,
+                    visible: false,
+                    zIndex: 2,
+                    opacity: 0.8
+                });
+                cadastralLayer.set('name', 'cadastral');
+
+
+                // 5. Additional WMS Layers (Including Cadastral Base)
                 const extraLayers = ADDITIONAL_LAYERS.map(layer => {
                     const source = new OL.source.TileWMS({
                         url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
                         params: {
                             'LAYERS': layer.id,
-                            'STYLES': layer.id,
+                            'STYLES': '',
                             'CRS': 'EPSG:3857',
                             'TILED': true,
                             'FORMAT': 'image/png',
                             'VERSION': '1.3.0',
-                            'KEY': apiKey,
+                            'key': apiKey,
                             'DOMAIN': 'onnrru.com'
                         },
                         serverType: 'geoserver',
@@ -140,7 +164,7 @@ const MapSection = ({ selectedAddress }) => {
                 // Map Options - Use standard interactions!
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [baseLayer, satelliteLayer, hybridLayer, ...extraLayers],
+                    layers: [baseLayer, satelliteLayer, hybridLayer, cadastralLayer, ...extraLayers],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -187,13 +211,16 @@ const MapSection = ({ selectedAddress }) => {
             if (name === 'hybrid') {
                 layer.setVisible(mapType === 'satellite' && showHybrid);
             }
+            if (name === 'cadastral') {
+                layer.setVisible(showCadastral);
+            }
 
             // Additional Layers
             if (ADDITIONAL_LAYERS.some(l => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
-    }, [mapObj, mapType, showHybrid, activeLayers]);
+    }, [mapObj, mapType, showHybrid, showCadastral, activeLayers]);
 
     // Update Map Center
     useEffect(() => {
@@ -254,12 +281,19 @@ const MapSection = ({ selectedAddress }) => {
                     >
                         명칭표시 (Hybrid)
                     </button>
+                    {/* Cadastral Button Moved Here */}
+                    <button
+                        onClick={() => setShowCadastral(!showCadastral)}
+                        className={`px-3 py-1 text-xs font-bold rounded shadow-md transition-all ${showCadastral ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    >
+                        지적도
+                    </button>
                     <div className="bg-white rounded-lg shadow-md p-1 flex">
                         <button
                             onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
                             className={`px-3 py-1 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-white text-gray-800' : 'bg-ink text-white'}`}
                         >
-                            {mapType === 'satellite' ? '일반지도' : '위성지도 (2D)'}
+                            {mapType === 'satellite' ? '일반지도' : '위성지도'}
                         </button>
                     </div>
                 </div>
@@ -267,7 +301,7 @@ const MapSection = ({ selectedAddress }) => {
                 {/* Additional Layer Toggles (Grouped) */}
                 <div className="bg-white/90 p-2 rounded-lg shadow-md flex flex-col gap-1.5 backdrop-blur-sm border border-gray-100">
                     <span className="text-[10px] text-gray-400 font-bold px-1 mb-0.5">주제도 (Overlay)</span>
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5 min-w-[140px]">
                         {ADDITIONAL_LAYERS.map(layer => (
                             <button
                                 key={layer.id}
