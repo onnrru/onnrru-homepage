@@ -16,12 +16,12 @@ const MapSection = ({ selectedAddress }) => {
 
     // Additional WMS Layers Configuration
     const ADDITIONAL_LAYERS = [
-        { id: 'LT_C_AISRYC', label: '토지이용계획' },
-        { id: 'LT_C_UQ123', label: '개발진흥지구' },
+        { id: 'PMAP_PLAN', label: '토지이용계획도' },
+        { id: 'LT_C_UQ129', label: '개발진흥지구' },
         { id: 'LT_C_UQ141', label: '국토계획구역' },
         { id: 'LT_C_UQ111', label: '도시지역' },
         { id: 'LT_C_UQ112', label: '관리지역' },
-        { id: 'LT_C_UD801', label: '개발제한구역' },
+        { id: 'LT_C_UQ113', label: '농림지역' },
         { id: 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN', label: '연속지적도' }
     ];
 
