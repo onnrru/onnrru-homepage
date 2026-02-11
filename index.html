@@ -14,9 +14,11 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/img/favi/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/img/favi/favicon-16x16.png">
 
-  <!-- VWorld Map API (Must be loaded synchronously for document.write support) -->
-  <script type="text/javascript"
-    src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04&domain=onnrru.com"></script>
+  <!-- VWorld Map API (Replaced with standard OpenLayers to fix zoom crash) -->
+  <!-- <script type="text/javascript"
+    src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04&domain=onnrru.com"></script> -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.5.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v7.5.0/dist/ol.js"></script>
 </head>
 
 <body>

@@ -41,13 +41,11 @@ const MapSection = ({ selectedAddress }) => {
         const initMap = () => {
             if (mapObj) return;
 
-            const ol = window.ol;
-            const vw = window.vw;
-
-            if (!ol && (!vw || !vw.ol3)) {
+            // Wait for OpenLayers to load
+            if (!window.ol) {
                 retryCount++;
                 if (retryCount > maxRetries) {
-                    setMapError("지도 엔진 로드 실패");
+                    setMapError("OpenLayers 로드 실패");
                     setIsMapLoading(false);
                     return;
                 }
@@ -56,18 +54,17 @@ const MapSection = ({ selectedAddress }) => {
             }
 
             try {
-                const OL = ol || window.vw.ol3;
-                if (!OL || !OL.Map || !OL.View || !OL.layer || !OL.source) {
-                    if (!OL.source) throw new Error("OpenLayers source namespace missing");
-                }
+                const OL = window.ol;
 
                 // Clear container
                 const container = document.getElementById("vworld_map_target");
                 if (container) container.innerHTML = '';
 
                 // Force focus
-                container.tabIndex = 0;
-                container.focus();
+                if (container) {
+                    container.tabIndex = 0;
+                    container.focus();
+                }
 
                 // 1. Base Layer (Graphic/White)
                 const vworldBaseUrl = 'https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png';
@@ -138,7 +135,7 @@ const MapSection = ({ selectedAddress }) => {
                     return olLayer;
                 });
 
-                // Map Options
+                // Map Options - Use standard interactions!
                 const mapOptions = {
                     target: 'vworld_map_target',
                     layers: [baseLayer, satelliteLayer, hybridLayer, ...extraLayers],
@@ -148,41 +145,20 @@ const MapSection = ({ selectedAddress }) => {
                         minZoom: 6,
                         maxZoom: 19
                     }),
-                    interactions: OL.interaction.defaults({ mouseWheelZoom: false }).extend([
-                        new OL.interaction.MouseWheelZoom({
-                            constrainResolution: false, // Resolve potential jerky zooming
-                            duration: 250,
-                            useAnchor: true
-                        }),
-                        new OL.interaction.DragPan(), // Ensure pan is explicitly there too
-                    ])
+                    // Default interactions in standard OL include MouseWheelZoom which works fine.
+                    // We can explicitly add controls if needed, but defaults are usually Zoom, Rotate, Attribution.
+                    controls: OL.control.defaults(),
+                    interactions: OL.interaction.defaults()
                 };
 
-                // Debug: Log interactions
-                console.log("Map Interactions:", mapOptions.interactions.getArray().map(i => i.constructor.name));
-
                 const map = new OL.Map(mapOptions);
-
-                // Patch: VWorld 2.0 internal interactions expectation
-                map.basemapType = 'graphic'; // Default to graphic or whatever logic expects
-                map.getBasemapType = () => map.basemapType;
-                map.setBasemapType = (type) => { map.basemapType = type; };
-
                 window.map = map;
-
-                // Debug: Check if wheel event reaches container
-                if (container) {
-                    container.addEventListener('wheel', (e) => {
-                        console.log("Map Container Wheel Event:", e.deltaY);
-                    }, { passive: true });
-                }
-
 
                 setMapObj(map);
                 setIsMapLoading(false);
 
             } catch (err) {
-                console.error("비상: Direct Init 실패, 상세 에러:", err);
+                console.error("OpenLayers Init Failed:", err);
                 setMapError(`지도 생성 오류: ${err.message}`);
                 setIsMapLoading(false);
             }
@@ -227,7 +203,7 @@ const MapSection = ({ selectedAddress }) => {
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
                 let center = [x, y];
-                const ol = window.ol || window.vw?.ol3;
+                const ol = window.ol;
                 const proj = ol?.proj;
 
                 if (proj && x < 180 && y < 90) {
