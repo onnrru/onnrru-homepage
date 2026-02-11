@@ -140,11 +140,7 @@ const MapSection = ({ selectedAddress }) => {
                         url: `${API_CONFIG.VWORLD_BASE_URL}/req/wms`,
                         params: {
                             'LAYERS': layer.id,
-                            'STYLES': layer.id, // Try setting style to layer ID again as per some VWorld examples, or keep empty if failed. 
-                            // User guide says: layers=... styles=... (often same).
-                            // But usually empty works for default.
-                            // Let's try matching Name.
-                            'STYLES': layer.id,
+                            'STYLES': '',
                             'CRS': 'EPSG:3857',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
