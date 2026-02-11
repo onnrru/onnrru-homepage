@@ -149,7 +149,12 @@ const MapSection = ({ selectedAddress }) => {
                         maxZoom: 19
                     }),
                     controls: OL.control.defaults(), // Restore default controls (Zoom, etc.)
-                    interactions: OL.interaction.defaults() // Restore all default interactions (Zoom, Drag, Pinch)
+                    interactions: OL.interaction.defaults().extend([
+                        new OL.interaction.MouseWheelZoom({
+                            constrainResolution: true, // Force zooming to integer zoom levels (smoother for tiled maps)
+                            duration: 250 // Zoom animation duration
+                        })
+                    ])
                 };
 
                 const map = new OL.Map(mapOptions);
