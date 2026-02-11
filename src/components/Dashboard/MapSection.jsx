@@ -162,10 +162,15 @@ const MapSection = ({ selectedAddress }) => {
                 console.log("Map Interactions:", mapOptions.interactions.getArray().map(i => i.constructor.name));
 
                 const map = new OL.Map(mapOptions);
+
+                // Patch: VWorld 2.0 internal interactions expectation
+                map.basemapType = 'graphic'; // Default to graphic or whatever logic expects
+                map.getBasemapType = () => map.basemapType;
+                map.setBasemapType = (type) => { map.basemapType = type; };
+
                 window.map = map;
 
                 // Debug: Check if wheel event reaches container
-                // The 'container' variable is already declared earlier in initMap
                 if (container) {
                     container.addEventListener('wheel', (e) => {
                         console.log("Map Container Wheel Event:", e.deltaY);
