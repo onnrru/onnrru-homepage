@@ -441,19 +441,19 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             {/* Main Controls (Top Right) */}
             <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
 
-                {/* 1. Map Types + Cadastral (Top Row) */}
-                <div className="flex gap-2">
-                    <div className="bg-white rounded shadow-sm p-1 flex border border-gray-200">
+                {/* 1. Map Types + Hybrid Group */}
+                <div className="flex gap-2 h-[34px]">
+                    <div className="bg-white rounded shadow-sm p-1 flex items-center border border-gray-200 h-full">
                         {[
-                            { id: 'base', label: '2D지도' },
-                            { id: 'gray', label: '2D백지도' },
-                            { id: 'midnight', label: '2D야간' },
-                            { id: 'satellite', label: '2D영상' }
+                            { id: 'base', label: '일반지도' },
+                            { id: 'gray', label: '백지도' },
+                            { id: 'midnight', label: '야간' },
+                            { id: 'satellite', label: '위성지도' }
                         ].map(type => (
                             <button
                                 key={type.id}
                                 onClick={() => setMapType(type.id)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded transition-colors
+                                className={`px-3 h-full text-xs font-bold rounded transition-colors 
                                     ${mapType === type.id
                                         ? 'bg-gray-800 text-white shadow-sm'
                                         : 'bg-white text-gray-600 hover:bg-gray-100'}`}
@@ -461,26 +461,31 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                 {type.label}
                             </button>
                         ))}
+
+                        {/* Separator */}
+                        <div className="w-[1px] h-3 bg-gray-200 mx-1"></div>
+
+                        {/* Hybrid Toggle (Inside Group) */}
+                        <button
+                            onClick={() => setShowHybrid(!showHybrid)}
+                            className={`px-3 h-full text-xs font-bold rounded transition-colors 
+                                ${showHybrid
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            명칭
+                        </button>
                     </div>
 
-                    {/* Cadastral Map (Separate but same line) */}
+                    {/* Cadastral Map (Separate) */}
                     <button
                         onClick={() => toggleLayer('lp_pa_cb_nd_bu')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded shadow-sm border transition-all
+                        className={`px-3 text-xs font-bold rounded shadow-sm border transition-all h-full
                             ${activeLayers.includes('lp_pa_cb_nd_bu')
                                 ? 'bg-indigo-600 text-white border-indigo-600'
                                 : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                     >
                         지적도
-                    </button>
-
-                    {/* Hybrid Toggle (Overlay for Satellite/Etc) */}
-                    <button
-                        onClick={() => setShowHybrid(!showHybrid)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded shadow-sm transition-all border
-                            ${showHybrid ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                    >
-                        명칭
                     </button>
                 </div>
 
