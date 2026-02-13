@@ -173,9 +173,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // 1. Base Layer
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png`,
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Base/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
-                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -185,9 +184,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // 2. Gray Layer (2D백지도)
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://xdworld.vworld.kr/2d/gray/service/{z}/{x}/{y}.png`,
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
-                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -197,9 +195,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // 3. Midnight Layer (2D야간)
                 const midnightLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://xdworld.vworld.kr/2d/midnight/service/{z}/{x}/{y}.png`,
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/midnight/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
-                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -209,9 +206,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // 4. Satellite Layer
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg`,
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Satellite/{z}/{y}/{x}.jpeg`,
                         attributions: 'VWorld',
-                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: true
@@ -221,9 +217,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // 5. Hybrid Layer
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png`,
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
-                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 10, // Above everything
                     visible: true
