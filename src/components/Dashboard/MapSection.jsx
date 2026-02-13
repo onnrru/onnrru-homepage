@@ -212,6 +212,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         url: `https://api.vworld.kr/req/wms`,
                         params: {
                             'LAYERS': layer.id.toLowerCase(),
+                            'STYLES': '',
                             'CRS': 'EPSG:3857',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
