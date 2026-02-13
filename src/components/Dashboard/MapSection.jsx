@@ -214,15 +214,14 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             'LAYERS': layer.id,
                             'STYLES': '',
                             'CRS': 'EPSG:3857',
-                            'API': 'VWORLD',
-                            'BOX': '1.3.0',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
                             'VERSION': '1.3.0',
                             'key': API_CONFIG.VWORLD_KEY,
                             'DOMAIN': window.location.hostname
                         },
-                        crossOrigin: 'anonymous' // Restore for canvas operations
+                        // serverType: 'geoserver'  // Removed as suggested
+                        // crossOrigin: 'anonymous' // REMOVED: Causing CORS errors on production domain
                     });
 
                     // Error Handling
