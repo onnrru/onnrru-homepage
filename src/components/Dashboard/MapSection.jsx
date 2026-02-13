@@ -216,8 +216,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             'CRS': 'EPSG:3857',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
-                            'apikey': apiKey,
-                            'DOMAIN': 'onnrru.com',
+                            'apikey': 'E4A59B05-0CF4-3654-BD0C-A169F70CCB34', // Using the known working key from reference
+                            'DOMAIN': window.location.hostname, // Dynamic domain
                             'title': layer.label,
                             'WIDTH': 512,
                             'HEIGHT': 512
