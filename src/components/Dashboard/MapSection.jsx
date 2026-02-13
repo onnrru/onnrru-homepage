@@ -211,8 +211,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const source = new OL.source.TileWMS({
                         url: `https://api.vworld.kr/req/wms`,
                         params: {
-                            'LAYERS': layer.id,
-                            'STYLES': '',
+                            'LAYERS': layer.id.toLowerCase(),
                             'CRS': 'EPSG:3857',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
