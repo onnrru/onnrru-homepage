@@ -462,10 +462,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             </button>
                         ))}
 
-                        {/* Separator */}
-                        <div className="w-[1px] h-3 bg-gray-200 mx-1"></div>
-
-                        {/* Hybrid Toggle (Inside Group) */}
+                        {/* Hybrid Toggle (Inside Group, No Separator) */}
                         <button
                             onClick={() => setShowHybrid(!showHybrid)}
                             className={`px-3 h-full text-xs font-bold rounded transition-colors 
