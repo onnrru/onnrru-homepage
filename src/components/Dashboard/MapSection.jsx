@@ -214,19 +214,23 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             'LAYERS': layer.id,
                             'STYLES': layer.id,
                             'CRS': 'EPSG:3857',
-                            'TILED': true,
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
-                            'VERSION': '1.3.0',
-                            'key': apiKey,
-                            'DOMAIN': 'onnrru.com'
+                            'apikey': apiKey,
+                            'DOMAIN': 'onnrru.com',
+                            'title': layer.label,
+                            'WIDTH': 512,
+                            'HEIGHT': 512
                         },
                         serverType: 'geoserver'
+                        // removed crossOrigin to prevent CORS issues with VWorld
                     });
 
                     // Error Handling
                     source.on('tileloaderror', (event) => {
-                        console.warn(`Layer Load Warning: ${layer.label} (${layer.id}) - Check API permissions or Zoom level.`);
+                        // Log the actual URL that failed to help debugging
+                        const tileUrl = event.tile ? event.tile.src_ : 'unknown';
+                        console.warn(`Layer Load Warning: ${layer.label} (${layer.id})`, tileUrl);
                     });
 
                     const olLayer = new OL.layer.Tile({
