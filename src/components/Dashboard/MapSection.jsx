@@ -216,7 +216,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             'CRS': 'EPSG:3857',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
-                            'apikey': API_CONFIG.VWORLD_KEY, // Use centralized config
+                            'key': API_CONFIG.VWORLD_KEY, // Changed back to 'key' for standard VWorld 2.0 API
                             'DOMAIN': window.location.hostname, // Dynamic domain
                             'title': layer.label,
                             'WIDTH': 512,
