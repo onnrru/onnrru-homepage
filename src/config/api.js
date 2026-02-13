@@ -5,7 +5,7 @@ export const API_CONFIG = {
     VWORLD_MAP_URL: '/vworld_map',
 
     // Keys
-    VWORLD_KEY: 'E4A59B05-0CF4-3654-BD0C-A169F70CCB34',
+    VWORLD_KEY: 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
 
     // Eum Endpoints
     ENDPOINTS: {
