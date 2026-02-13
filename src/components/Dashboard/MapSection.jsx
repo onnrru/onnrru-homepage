@@ -175,7 +175,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png`,
                         attributions: 'VWorld',
-                        crossOrigin: 'anonymous'
+                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -187,7 +187,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/gray/service/{z}/{x}/{y}.png`,
                         attributions: 'VWorld',
-                        crossOrigin: 'anonymous'
+                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -199,7 +199,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/midnight/service/{z}/{x}/{y}.png`,
                         attributions: 'VWorld',
-                        crossOrigin: 'anonymous'
+                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: false
@@ -211,7 +211,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg`,
                         attributions: 'VWorld',
-                        crossOrigin: 'anonymous'
+                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 0,
                     visible: true
@@ -223,7 +223,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png`,
                         attributions: 'VWorld',
-                        crossOrigin: 'anonymous'
+                        // crossOrigin: 'anonymous' // Removed to avoid CORS issues
                     }),
                     zIndex: 10, // Above everything
                     visible: true
