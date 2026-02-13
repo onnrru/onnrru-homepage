@@ -258,7 +258,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const olLayer = new OL.layer.Tile({
                         source: source,
                         visible: false,
-                        zIndex: 5, // Between Satellite and Hybrid
+                        zIndex: layer.id === 'lp_pa_cb_nd_bu' ? 8 : 5, // Cadastral above zoning (5), below Hybrid (10)
                         opacity: 0.8
                     });
                     olLayer.set('name', layer.id);
@@ -373,8 +373,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
             if (name === 'satellite') layer.setVisible(mapType === 'satellite');
             if (name === 'base') layer.setVisible(mapType === 'base');
-            if (name === 'satellite') layer.setVisible(mapType === 'satellite');
-            if (name === 'base') layer.setVisible(mapType === 'base');
             if (name === 'gray') layer.setVisible(mapType === 'gray');
             if (name === 'midnight') layer.setVisible(mapType === 'midnight');
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
@@ -455,7 +453,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             <button
                                 key={type.id}
                                 onClick={() => setMapType(type.id)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded transition-colors 
+                                className={`px-3 py-1.5 text-xs font-bold rounded transition-colors
                                     ${mapType === type.id
                                         ? 'bg-gray-800 text-white shadow-sm'
                                         : 'bg-white text-gray-600 hover:bg-gray-100'}`}
@@ -553,7 +551,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                 </div>
                                 <div className="bg-gray-50 rounded p-1 flex justify-center">
                                     <img
-                                        src={`https://api.vworld.kr/req/image?key=${API_CONFIG.VWORLD_KEY}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id}&style=${layer.id}`}
+                                        src={`https://api.vworld.kr/req/image?key=${API_CONFIG.VWORLD_KEY}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id}`}
                                         alt="범례"
                                         className="max-w-full h-auto object-contain min-h-[20px]"
                                         onError={(e) => e.target.style.display = 'none'}
