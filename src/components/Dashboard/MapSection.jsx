@@ -182,7 +182,31 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 baseLayer.set('name', 'base');
 
-                // 2. Satellite Layer
+                // 2. Gray Layer (2D백지도)
+                const grayLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: `https://xdworld.vworld.kr/2d/gray/service/{z}/{x}/{y}.png`,
+                        attributions: 'VWorld',
+                        crossOrigin: 'anonymous'
+                    }),
+                    zIndex: 0,
+                    visible: false
+                });
+                grayLayer.set('name', 'gray');
+
+                // 3. Midnight Layer (2D야간)
+                const midnightLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: `https://xdworld.vworld.kr/2d/midnight/service/{z}/{x}/{y}.png`,
+                        attributions: 'VWorld',
+                        crossOrigin: 'anonymous'
+                    }),
+                    zIndex: 0,
+                    visible: false
+                });
+                midnightLayer.set('name', 'midnight');
+
+                // 4. Satellite Layer
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg`,
@@ -194,7 +218,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 satelliteLayer.set('name', 'satellite');
 
-                // 3. Hybrid Layer
+                // 5. Hybrid Layer
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png`,
@@ -252,7 +276,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [baseLayer, satelliteLayer, hybridLayer, ...wmsLayers, markerLayer],
+                    layers: [baseLayer, grayLayer, midnightLayer, satelliteLayer, hybridLayer, ...wmsLayers, markerLayer],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -270,7 +294,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=onnrru.com`;
+                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
                         const response = await fetch(dataUrl);
                         const data = await response.json();
 
@@ -349,6 +373,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
             if (name === 'satellite') layer.setVisible(mapType === 'satellite');
             if (name === 'base') layer.setVisible(mapType === 'base');
+            if (name === 'satellite') layer.setVisible(mapType === 'satellite');
+            if (name === 'base') layer.setVisible(mapType === 'base');
+            if (name === 'gray') layer.setVisible(mapType === 'gray');
+            if (name === 'midnight') layer.setVisible(mapType === 'midnight');
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
             // WMS Layers
@@ -392,7 +420,15 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     }, [mapObj, selectedAddress, markerSource]);
 
     // Categories for Filter
-    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !QUICK_LAYER_IDS.includes(l.id)).map(l => l.category))];
+    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !['lp_pa_cb_nd_bu', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].includes(l.id)).map(l => l.category))];
+
+    // Basic Exposed Layers (Quick Access)
+    const BASIC_LAYERS = [
+        'LT_C_UQ111', // Urban
+        'LT_C_UQ112', // Management
+        'LT_C_UQ113', // Agriculture
+        'LT_C_UQ114'  // Nature Preservation
+    ];
 
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
@@ -404,67 +440,104 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 {mapError && <div className="bg-white/90 px-4 py-2 rounded shadow text-red-600 font-bold">{mapError}</div>}
             </div>
 
-            {/* Main Controls (Right Side) */}
+            {/* Main Controls (Top Right) */}
             <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
 
-                {/* 1. Map Mode Toggles */}
+                {/* 1. Map Types + Cadastral (Top Row) */}
                 <div className="flex gap-2">
+                    <div className="bg-white rounded shadow-sm p-1 flex border border-gray-200">
+                        {[
+                            { id: 'base', label: '2D지도' },
+                            { id: 'gray', label: '2D백지도' },
+                            { id: 'midnight', label: '2D야간' },
+                            { id: 'satellite', label: '2D영상' }
+                        ].map(type => (
+                            <button
+                                key={type.id}
+                                onClick={() => setMapType(type.id)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded transition-colors 
+                                    ${mapType === type.id
+                                        ? 'bg-gray-800 text-white shadow-sm'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                            >
+                                {type.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Cadastral Map (Separate but same line) */}
+                    <button
+                        onClick={() => toggleLayer('lp_pa_cb_nd_bu')}
+                        className={`px-3 py-1.5 text-xs font-bold rounded shadow-sm border transition-all
+                            ${activeLayers.includes('lp_pa_cb_nd_bu')
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                    >
+                        지적도
+                    </button>
+
+                    {/* Hybrid Toggle (Overlay for Satellite/Etc) */}
                     <button
                         onClick={() => setShowHybrid(!showHybrid)}
                         className={`px-3 py-1.5 text-xs font-bold rounded shadow-sm transition-all border
                             ${showHybrid ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                     >
-                        명칭 (Hybrid)
+                        명칭
                     </button>
-                    <div className="bg-white rounded-lg shadow-sm p-1 flex border border-gray-200">
-                        <button
-                            onClick={() => setMapType(mapType === 'satellite' ? 'base' : 'satellite')}
-                            className={`px-3 py-0.5 text-xs font-bold rounded transition-colors ${mapType === 'satellite' ? 'bg-white text-gray-800 shadow-sm' : 'bg-gray-800 text-white'}`}
-                        >
-                            {mapType === 'satellite' ? '일반지도' : '위성지도'}
-                        </button>
-                    </div>
                 </div>
 
-                {/* 2. Quick Layers (6 Major) */}
-                <div className="bg-white/95 p-3 rounded-xl shadow-lg border border-gray-100 backdrop-blur-sm min-w-[200px]">
-                    <div className="text-[11px] font-bold text-gray-500 px-1 mb-2 flex justify-between items-center">
-                        <span>주요 레이어</span>
-                        <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">Quick</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {QUICK_LAYER_IDS.map(id => {
+                {/* 2. Basic Exposed Layers (Zoning) */}
+                <div className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-100 backdrop-blur-sm flex gap-2">
+                    {BASIC_LAYERS.map(id => {
+                        const layer = ALL_LAYERS.find(l => l.id === id);
+                        if (!layer) return null;
+                        const isActive = activeLayers.includes(id);
+                        return (
+                            <button
+                                key={id}
+                                onClick={() => toggleLayer(id)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded border transition-all
+                                    ${isActive
+                                        ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                            >
+                                {layer.label}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* 3. Active "Other" Layers (Dynamic Chips) */}
+                {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'lp_pa_cb_nd_bu').length > 0 && (
+                    <div className="flex flex-wrap gap-2 justify-end max-w-[400px]">
+                        {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'lp_pa_cb_nd_bu').map(id => {
                             const layer = ALL_LAYERS.find(l => l.id === id);
                             if (!layer) return null;
-                            const isActive = activeLayers.includes(id);
                             return (
                                 <button
                                     key={id}
                                     onClick={() => toggleLayer(id)}
-                                    className={`px-2 py-2 text-[11px] font-bold rounded-lg border transition-all text-center relative overflow-hidden
-                                        ${isActive
-                                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                                    className="px-3 py-1.5 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 flex items-center gap-1 shadow-sm"
                                 >
-                                    {isActive && <span className="absolute inset-0 bg-white/10 animate-pulse"></span>}
-                                    {layer.label}
+                                    <span>{layer.label}</span>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             );
                         })}
                     </div>
-                </div>
+                )}
 
-                {/* 3. More Layers Button */}
+                {/* 4. More Layers Button */}
                 <button
                     onClick={() => setShowLayerMenu(true)}
-                    className="px-4 py-2.5 text-xs font-bold rounded-full shadow-lg transition-all flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 hover:ring-2 hover:ring-gray-200 ring-offset-1"
+                    className="px-4 py-2 text-xs font-bold rounded-full shadow-md transition-all flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    <span>전체 레이어 ({ALL_LAYERS.length})</span>
+                    <span>전체 레이어</span>
                 </button>
             </div>
 
-            {/* 4. Active Layer Legends (Bottom Left/Right) */}
+            {/* ... Legends ... */}
             {activeLayers.length > 0 && (
                 <div className="absolute bottom-6 left-6 z-20 pointer-events-auto max-w-[300px] flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-1">
                     {activeLayers.map(id => {
@@ -492,10 +565,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 </div>
             )}
 
-            {/* 5. Full Layer Modal */}
+            {/* ... Full Layer Modal ... */}
             {showLayerMenu && (
-                <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-[1px] flex justify-end">
-                    <div className="w-[320px] h-full bg-white shadow-2xl flex flex-col animate-slide-left">
+                <div className="absolute inset-0 z-50 bg-black/20 backdrop-blur-[1px] flex justify-end" onClick={() => setShowLayerMenu(false)}>
+                    <div
+                        className="w-[320px] h-full bg-white shadow-2xl flex flex-col animate-slide-left pointer-events-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Header */}
                         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <h3 className="font-bold text-gray-800 text-sm">전체 레이어 목록</h3>
@@ -522,7 +598,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         <div className="flex-1 overflow-y-auto p-3 space-y-6">
                             {['용도지역', '용도지구', '용도구역', '도시계획', '환경/산림', '재해/안전', '수자원/해양', '행정/기타'].map(category => {
                                 if (selectedCategory !== '전체' && selectedCategory !== category) return null;
-                                const categoryLayers = ALL_LAYERS.filter(l => l.category === category && !QUICK_LAYER_IDS.includes(l.id));
+                                // Filter out BASIC LAYERS and Cadastral Map from the list if desired, OR keep them but mark as active.
+                                // User said "Basic exposure... and others are as is".
+                                // Let's show ALL layers in the list for completeness, but maybe group them?
+                                // Actually, Quick Layers were filtered out in previous logic. Let's filter out Basic here too if we want them exclusive, 
+                                // BUT usually "Full Layer List" means FULL.
+                                // Let's use the same filter logic as before but updated for BASIC_LAYERS.
+                                const categoryLayers = ALL_LAYERS.filter(l => l.category === category && !['lp_pa_cb_nd_bu', ...BASIC_LAYERS].includes(l.id));
                                 if (categoryLayers.length === 0) return null;
 
                                 return (
