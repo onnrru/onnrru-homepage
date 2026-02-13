@@ -174,34 +174,36 @@ const AddressSearch = ({ onSelect }) => {
     };
 
     const processItems = (items) => {
-        return items.map(item => {
-            let pnu = null;
-            let code = null;
+        return items
+            .filter(item => item.point && item.point.x && item.point.y)
+            .map(item => {
+                let pnu = null;
+                let code = null;
 
-            if (item.address.structure) {
-                const { level2, level4AC } = item.address.structure;
-                if (level2) {
-                    const found = sigunguData.find(s => s.sigungu === level2 || (level2 && s.sigungu.includes(level2)));
-                    if (found) code = found.code;
+                if (item.address.structure) {
+                    const { level2, level4AC } = item.address.structure;
+                    if (level2) {
+                        const found = sigunguData.find(s => s.sigungu === level2 || (level2 && s.sigungu.includes(level2)));
+                        if (found) code = found.code;
+                    }
+                    if (level4AC) code = level4AC;
                 }
-                if (level4AC) code = level4AC;
-            }
 
-            if (item.category === 'parcel' && item.id) {
-                pnu = item.id;
-            }
+                if (item.category === 'parcel' && item.id) {
+                    pnu = item.id;
+                }
 
-            return {
-                address: item.address.road || item.address.parcel,
-                roadAddr: item.address.road,
-                parcelAddr: item.address.parcel,
-                x: item.point.x,
-                y: item.point.y,
-                pnu: pnu,
-                code: code,
-                structure: item.address.structure
-            };
-        });
+                return {
+                    address: item.address.road || item.address.parcel,
+                    roadAddr: item.address.road,
+                    parcelAddr: item.address.parcel,
+                    x: item.point.x,
+                    y: item.point.y,
+                    pnu: pnu,
+                    code: code,
+                    structure: item.address.structure
+                };
+            });
     }
 
     const handleKeyDown = (e) => {

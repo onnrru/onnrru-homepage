@@ -69,9 +69,21 @@ const Sidebar = ({ selectedAddress }) => {
             }
 
             try {
+                // Pre-fill basic info if available in selectedAddress (from Map Click or specialized Search)
+                if (selectedAddress.jimok || selectedAddress.area || selectedAddress.price) {
+                    setData(prev => ({
+                        ...prev,
+                        basic: {
+                            jimok: selectedAddress.jimok || '-',
+                            area: selectedAddress.area || '-',
+                            price: selectedAddress.price || '-'
+                        }
+                    }));
+                }
+
                 // 1. Basic Info / Regulations (luLawInfo)
                 // Endpoint: /Web/Rest/OP/luLawInfo?pnu=...
-                if (activeTab === 'regulation' || !data.basic) {
+                if (activeTab === 'regulation' || (!data.basic && !selectedAddress.jimok)) {
                     const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
                         params: { pnu: pnu, format: 'xml' }
                     });
@@ -82,12 +94,17 @@ const Sidebar = ({ selectedAddress }) => {
                     // Check for API Error in XML
                     const errCode = xmlDoc.getElementsByTagName("error_code")[0]?.textContent;
                     if (errCode) {
-                        throw new Error(`API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
+                        // If we already have basic info from map click, don't throw blocking error, just log it
+                        if (selectedAddress.jimok) {
+                            console.warn(`LuLawInfo API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
+                        } else {
+                            throw new Error(`API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
+                        }
                     }
 
-                    const jimok = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || '-';
-                    const area = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || '-';
-                    const price = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent || '-';
+                    const jimok = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || selectedAddress.jimok || '-';
+                    const area = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || selectedAddress.area || '-';
+                    const price = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent || selectedAddress.price || '-';
                     const uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
 
                     setData(prev => ({
@@ -251,7 +268,7 @@ const Sidebar = ({ selectedAddress }) => {
                                         <div className="flex flex-wrap gap-2">
                                             {data.regulation?.uses && data.regulation.uses.length > 0 ? (
                                                 data.regulation.uses.map((use, i) => (
-                                                    <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
+                                                    <span key={`${use}-${i}`} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
                                                         {use}
                                                     </span>
                                                 ))
