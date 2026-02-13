@@ -212,18 +212,17 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         url: `https://api.vworld.kr/req/wms`,
                         params: {
                             'LAYERS': layer.id,
-                            'STYLES': layer.id,
+                            'STYLES': '',
                             'CRS': 'EPSG:3857',
+                            'API': 'VWORLD',
+                            'BOX': '1.3.0',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
-                            'key': API_CONFIG.VWORLD_KEY, // Changed back to 'key' for standard VWorld 2.0 API
-                            'DOMAIN': window.location.hostname, // Dynamic domain
-                            'title': layer.label,
-                            'WIDTH': 512,
-                            'HEIGHT': 512
+                            'VERSION': '1.3.0',
+                            'key': API_CONFIG.VWORLD_KEY,
+                            'DOMAIN': window.location.hostname
                         },
-                        serverType: 'geoserver'
-                        // removed crossOrigin to prevent CORS issues with VWorld
+                        crossOrigin: 'anonymous' // Restore for canvas operations
                     });
 
                     // Error Handling
