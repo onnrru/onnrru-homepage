@@ -262,11 +262,11 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         url: 'https://api.vworld.kr/req/wms', // [FIX] Switch to req/wms per example
                         params: {
                             'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
-                            'STYLES': 'lp_pa_cbnd_bonbun_line,lp_pa_cbnd_bubun_line', // [FIX] Add _line suffix
+                            'STYLES': 'lp_pa_cbnd_bonbun_line,lp_pa_cbnd_bubun_line',
                             'FORMAT': 'image/png',
-                            'TRANSPARENT': 'true',
+                            'TRANSPARENT': 'TRUE', // Uppercase TRUE per example (unlikely to matter but safe)
                             'VERSION': '1.3.0',
-                            'CRS': 'EPSG:3857',        // [FIX] Match example (900913 ≈ 3857)
+                            'CRS': 'EPSG:900913',  // [FIX] Exact match with user example
                             'KEY': apiKey,
                             'DOMAIN': window.location.hostname
                         },
@@ -375,7 +375,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     try {
                         // Use Proxy for Data API to avoid CORS
                         // /api/vworld -> https://api.vworld.kr
-                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
+                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
                         const response = await fetch(dataUrl);
                         const data = await response.json();
 
