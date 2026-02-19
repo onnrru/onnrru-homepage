@@ -1,6 +1,6 @@
 export const API_CONFIG = {
     // Base URLs
-    EUM_BASE_URL: '/api/eum',
+    EUM_BASE_URL: '/api/eum', // Use Proxy for Mixed Content & CORS
     VWORLD_BASE_URL: '/api/vworld', // Keep proxy for Data API (CORS)
     VWORLD_MAP_URL: 'https://api.vworld.kr', // Revert to Direct URL for Tiles
 

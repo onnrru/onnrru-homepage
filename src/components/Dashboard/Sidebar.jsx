@@ -269,7 +269,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {selectedParcels.map((p, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
+                                            <tr key={p.properties?.pnu || idx} className="hover:bg-gray-50">
                                                 <td className="p-2 truncate max-w-[120px]" title={p.properties?.addr}>
                                                     {p.properties?.addr || '-'}
                                                 </td>

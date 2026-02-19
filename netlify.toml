@@ -15,6 +15,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/eum/*"
+  to = "http://api.eum.go.kr/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
