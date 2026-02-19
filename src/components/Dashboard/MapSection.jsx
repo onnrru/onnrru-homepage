@@ -403,8 +403,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        // [Proxy Refinement] Force /api/vworld
-                        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+                        // [Proxy Refinement] Force /api/vworld (Hardcoded for stability)
+                        const VWORLD_DATA_BASE = '/api/vworld';
                         const dataUrl = `${VWORLD_DATA_BASE}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
 
                         const res = await fetch(dataUrl);
@@ -454,8 +454,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        // [Proxy Refinement] Force /api/vworld
-                        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+                        // [Proxy Refinement] Force /api/vworld (Hardcoded for stability)
+                        const VWORLD_DATA_BASE = '/api/vworld';
                         const dataUrl = `${VWORLD_DATA_BASE}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
 
                         const res = await fetch(dataUrl);
@@ -472,22 +472,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             const featureData = data.response.result.featureCollection.features[0];
                             const props = featureData.properties;
 
-                            if (markerSrc) {
-                                markerSrc.clear();
-                                const format = new OL.format.GeoJSON();
-                                const feature = format.readFeature(featureData, {
-                                    featureProjection: 'EPSG:3857',
-                                    dataProjection: 'EPSG:4326'
-                                });
-
-                                // Polygon Highlight Style (Red Border, Transparent Fill)
-                                const polygonStyle = new OL.style.Style({
-                                    stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }),
-                                    fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.05)' })
-                                });
-                                feature.setStyle(polygonStyle);
-                                markerSrc.addFeature(feature);
-                            }
+                            // [Interaction Upgrade] Unify Highlight Logic
+                            highlightParcelFeature(featureData);
 
                             if (onAddressSelect && props.pnu) {
                                 const newAddress = {
@@ -634,7 +620,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         if (enrichLockRef.current) return; // Prevent Recursive Loop
 
         const apiKey = API_CONFIG.VWORLD_KEY;
-        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+        // [Proxy Refinement] Force /api/vworld (Hardcoded for stability)
+        const VWORLD_DATA_BASE = '/api/vworld';
 
         const lon = parseFloat(selectedAddress.x);
         const lat = parseFloat(selectedAddress.y);

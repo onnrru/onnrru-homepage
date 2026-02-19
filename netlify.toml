@@ -2,34 +2,35 @@
   command = "npm run build"
   publish = "dist"
 
-# Government Data API (Toji-Eum)
-# Government Data API (Toji-Eum) - Routing via User's GC Proxy
-[[redirects]]
-  from = "/api/eum/*"
-  to = "http://34.50.25.171:8080/api/eum/:splat"
-  status = 200
-  force = true
-
-# VWorld Search API
+# 1) DATA API proxy (Must be before SPA fallback)
 [[redirects]]
   from = "/api/vworld/*"
   to = "https://api.vworld.kr/:splat"
   status = 200
   force = true
 
-# VWorld Map API (Tiles/Scripts)
+# 2) MAP TILE proxy
 [[redirects]]
   from = "/vworld_map/*"
   to = "https://map.vworld.kr/:splat"
   status = 200
   force = true
 
+# Government Data API (Toji-Eum)
+[[redirects]]
+  from = "/api/eum/*"
+  to = "http://34.50.25.171:8080/api/eum/:splat"
+  status = 200
+  force = true
+
+# Other API proxy
 [[redirects]]
   from = "/api/*"
   to = "http://34.50.25.171:8080/api/:splat"
   status = 200
   force = true
 
+# 3) SPA fallback (Must be last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
