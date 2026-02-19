@@ -4,7 +4,7 @@ import { API_CONFIG } from '../../config/api';
 // Full Layer List extracted from User Reference (Exhaustive)
 const ALL_LAYERS = [
     // --- Major / Quick Access (Basic) ---
-    { id: 'dt_d002', label: '지적도', category: '기본' },
+    { id: 'LP_PA_CBND_BUBUN', label: '지적도', category: '기본' },
 
     // --- Zoning Areas (용도지역) ---
     { id: 'LT_C_UQ111', label: '도시지역', category: '용도지역' },
@@ -107,7 +107,7 @@ const ALL_LAYERS = [
 
 // Top 6 Quick Access Layers
 const QUICK_LAYER_IDS = [
-    'dt_d002', // Cadastral
+    'LP_PA_CBND_BUBUN', // Cadastral
     'LT_C_UQ111',     // Urban Area
     'LT_C_UQ112',     // Management Area
     'LT_C_UQ113',     // Agriculture Area
@@ -148,7 +148,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             const isActive = prev.includes(layerId);
 
             // Auto-Zoom for Cadastral Layer
-            if (layerId === 'dt_d002' && !isActive) {
+            if (layerId === 'LP_PA_CBND_BUBUN' && !isActive) {
                 if (mapObj) {
                     const view = mapObj.getView();
                     if (view.getZoom() < 14) {
@@ -277,7 +277,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 // 3. WMS Layers (Others)
                 const wmsLayers = ALL_LAYERS
-                    .filter(l => l.id !== 'dt_d002')
+                    .filter(l => l.id !== 'LP_PA_CBND_BUBUN')
                     .map(layer => {
                         const source = new OL.source.TileWMS({
                             url: `https://api.vworld.kr/req/wms`, // WMS might need direct or proxy. Browsers usually block mixed content if site is HTTPS.
@@ -437,12 +437,12 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
             // WMTS Cadastral
-            if (name === 'dt_d002') {
-                layer.setVisible(activeLayers.includes('dt_d002'));
+            if (name === 'LP_PA_CBND_BUBUN') {
+                layer.setVisible(activeLayers.includes('LP_PA_CBND_BUBUN'));
             }
 
             // WMS Layers
-            if (ALL_LAYERS.some(l => l.id === name && l.id !== 'dt_d002')) {
+            if (ALL_LAYERS.some(l => l.id === name && l.id !== 'LP_PA_CBND_BUBUN')) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
@@ -764,7 +764,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         if (!layer) return null;
 
                         // Handle Cadastral and others with no good legend
-                        if (id === 'dt_d002') return null;
+                        if (id === 'LP_PA_CBND_BUBUN') return null;
 
                         return (
                             <div key={id} className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-200 backdrop-blur-sm animate-slide-up">
