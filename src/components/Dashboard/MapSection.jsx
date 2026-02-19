@@ -249,28 +249,29 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Final Fix: EPSG:4326)
+                // 2. Cadastral Layer (WMS - User Snippet Applied)
                 // Layers: dt_d002
                 // URL: ned/wms/CtnlgsSpceService
-                // CRS: EPSG:4326 (Required by VWorld Data API)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
+                        // 1. 주소 확인: ned/wms 경로 사용
                         url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService',
                         params: {
-                            'layers': 'dt_d002',
-                            'styles': '',
-                            'crs': 'EPSG:4326',
+                            'layers': 'dt_d002',      // 지적도 레이어 ID
+                            'styles': 'dt_d002',
                             'format': 'image/png',
                             'transparent': 'true',
                             'version': '1.3.0',
+                            'crs': 'EPSG:4326',       // VWorld 지적도 서버의 기본 좌표계
                             'key': apiKey,
                             'domain': window.location.hostname
                         },
-                        projection: 'EPSG:4326' // Essential for OL to reproject if view is 3857
+                        // 2. 투영법 명시: 서버는 4326으로 주지만 지도는 3857이므로 변환 필요
+                        projection: 'EPSG:4326'
                     }),
-                    zIndex: 9, // High priority
+                    zIndex: 15, // 지적도는 가장 위에 보여야 하므로 우선순위를 높임
                     visible: false,
-                    minZoom: 14
+                    minZoom: 14 // 너무 저배율에서는 데이터가 안 나오므로 최소 14 이상 권장
                 });
                 cadastralLayer.set('name', 'dt_d002');
 
