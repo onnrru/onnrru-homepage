@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_CONFIG } from '../../config/api';
 
-const Sidebar = ({ selectedAddress }) => {
+const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('regulation'); // 'regulation', 'notice', 'guide', 'devlist'
+
+    // [Multi-Selection] Calculate Total Area
+    const totalArea = React.useMemo(() => {
+        if (!selectedParcels || selectedParcels.length === 0) return 0;
+        return selectedParcels.reduce((sum, p) => sum + (parseFloat(p.properties?.parea) || 0), 0);
+    }, [selectedParcels]);
 
     // Data States
     const [data, setData] = useState({
@@ -243,6 +249,40 @@ const Sidebar = ({ selectedAddress }) => {
 
                 {/* Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
+                    {/* [Multi-Selection] Summary Section */}
+                    {selectedParcels && selectedParcels.length > 1 && (
+                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-sm font-bold text-gray-800">선택된 필지 ({selectedParcels.length})</h3>
+                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                    총 {totalArea.toLocaleString()} ㎡
+                                </span>
+                            </div>
+                            <div className="max-h-[150px] overflow-y-auto bg-white rounded border border-gray-200 text-xs">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50 text-gray-700 font-semibold sticky top-0">
+                                        <tr>
+                                            <th className="p-2">주소</th>
+                                            <th className="p-2 text-center">지목</th>
+                                            <th className="p-2 text-right">면적</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {selectedParcels.map((p, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50">
+                                                <td className="p-2 truncate max-w-[120px]" title={p.properties?.addr}>
+                                                    {p.properties?.addr || '-'}
+                                                </td>
+                                                <td className="p-2 text-center">{p.properties?.jimok || '-'}</td>
+                                                <td className="p-2 text-right">{parseFloat(p.properties?.parea || 0).toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {error && (
                         <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">
                             {error}

@@ -7,6 +7,8 @@ import BottomPanel from './BottomPanel';
 
 const ConsultingDashboard = () => {
     const [selectedAddress, setSelectedAddress] = React.useState(null);
+    // [Multi-Selection] Lifted State for multiple parcels
+    const [selectedParcels, setSelectedParcels] = React.useState([]);
 
     return (
         <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
@@ -14,7 +16,10 @@ const ConsultingDashboard = () => {
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel */}
-                <Sidebar selectedAddress={selectedAddress} />
+                <Sidebar
+                    selectedAddress={selectedAddress}
+                    selectedParcels={selectedParcels}
+                />
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col min-w-0">
@@ -23,6 +28,8 @@ const ConsultingDashboard = () => {
                         <MapSection
                             selectedAddress={selectedAddress}
                             onAddressSelect={setSelectedAddress}
+                            selectedParcels={selectedParcels}
+                            onParcelsChange={setSelectedParcels}
                         />
                     </div>
 
