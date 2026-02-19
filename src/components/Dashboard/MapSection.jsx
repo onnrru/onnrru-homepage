@@ -144,19 +144,23 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const drawInteraction = useRef(null);
 
     const toggleLayer = (layerId) => {
+        // [FIX] Auto-Zoom for Cadastral Layer (User Request: Level 17)
+        // Move outside setActiveLayers to ensure mapObj closure is fresh and side effect runs reliable.
+        if (layerId === 'LP_PA_CBND_BUBUN' && !activeLayers.includes(layerId)) {
+            console.log("Toggle Cadastral: Attempting Auto-Zoom...");
+            if (mapObj) {
+                const view = mapObj.getView();
+                if (view.getZoom() < 17) {
+                    console.log(`Zooming to 17 (Current: ${view.getZoom()})...`);
+                    view.animate({ zoom: 17, duration: 500 });
+                }
+            } else {
+                console.error("mapObj is null during toggleLayer");
+            }
+        }
+
         setActiveLayers(prev => {
             const isActive = prev.includes(layerId);
-
-            // Auto-Zoom for Cadastral Layer (User Request: Level 17)
-            if (layerId === 'LP_PA_CBND_BUBUN' && !isActive) {
-                if (mapObj) {
-                    const view = mapObj.getView();
-                    if (view.getZoom() < 17) {
-                        view.animate({ zoom: 17, duration: 500 });
-                    }
-                }
-            }
-
             return isActive
                 ? prev.filter(id => id !== layerId)
                 : [...prev, layerId];
@@ -269,6 +273,11 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         // Projection: Explicitly set source to 4326 so OL reprojects to 3857
                         projection: 'EPSG:4326',
                         // crossOrigin: 'anonymous' // Removed to prevent CORS issues with opaque responses
+                        tileLoadFunction: function (tile, src) {
+                            console.log("Cadastral Tile Request:", src);
+                            const image = tile.getImage();
+                            image.src = src;
+                        }
                     }),
                     zIndex: 15, // Top Priority
                     visible: false,
