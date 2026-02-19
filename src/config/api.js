@@ -2,7 +2,7 @@ export const API_CONFIG = {
     // Base URLs (Proxied in Vite)
     EUM_BASE_URL: '/api/eum',
     VWORLD_BASE_URL: '/api/vworld',
-    VWORLD_MAP_URL: '/vworld_map',
+    VWORLD_MAP_URL: '/api/vworld', // Corrected: Use api.vworld.kr for WMTS/Tiles
 
     // Keys
     VWORLD_KEY: 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
