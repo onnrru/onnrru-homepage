@@ -147,12 +147,12 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         setActiveLayers(prev => {
             const isActive = prev.includes(layerId);
 
-            // Auto-Zoom for Cadastral Layer
+            // Auto-Zoom for Cadastral Layer (User Request: Level 17)
             if (layerId === 'LP_PA_CBND_BUBUN' && !isActive) {
                 if (mapObj) {
                     const view = mapObj.getView();
-                    if (view.getZoom() < 14) {
-                        view.animate({ zoom: 14, duration: 500 });
+                    if (view.getZoom() < 17) {
+                        view.animate({ zoom: 17, duration: 500 });
                     }
                 }
             }
