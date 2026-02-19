@@ -147,6 +147,9 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const cadastralLayerRef = useRef(null);
     const cadastralPendingRef = useRef(false); // Prevent duplicate moveend/animate triggers
 
+    // [Stabilization] Refs for Data Enrichment
+    const enrichLockRef = useRef(false);
+
     // [Interaction Upgrade] Refs for Event Access
     const activeLayersRef = useRef([]);
     const markerSourceRef = useRef(null);
@@ -400,10 +403,15 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
-                        const response = await fetch(dataUrl);
-                        const data = await response.json();
+                        // [Proxy Refinement] Force /api/vworld
+                        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+                        const dataUrl = `${VWORLD_DATA_BASE}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
 
+                        const res = await fetch(dataUrl);
+                        const text = await res.text();
+                        if (text.trim().startsWith('<')) return; // HTML Error Check
+
+                        const data = JSON.parse(text);
                         if (data?.response?.status !== "OK") return;
 
                         const featureData = data.response.result.featureCollection.features?.[0];
@@ -446,11 +454,19 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        // Use Proxy for Data API to avoid CORS
-                        // /api/vworld -> https://api.vworld.kr
-                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
-                        const response = await fetch(dataUrl);
-                        const data = await response.json();
+                        // [Proxy Refinement] Force /api/vworld
+                        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+                        const dataUrl = `${VWORLD_DATA_BASE}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
+
+                        const res = await fetch(dataUrl);
+                        const text = await res.text();
+
+                        if (text.trim().startsWith('<')) {
+                            console.error('MapClick: VWorld returned HTML', text.slice(0, 100));
+                            return;
+                        }
+
+                        const data = JSON.parse(text);
 
                         if (data.response && data.response.status === "OK") {
                             const featureData = data.response.result.featureCollection.features[0];
@@ -586,6 +602,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     }, [mapObj, activeLayers]); // Re-run when activeLayers changes
 
     // [Interaction Upgrade] Enforce Cadastral Zoom Lower Bound (>= 17)
+    // [Refinement] Use 'moveend' to be smoother than 'change:resolution'
     useEffect(() => {
         if (!mapObj) return;
         const view = mapObj.getView();
@@ -593,54 +610,76 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
         const MIN_Z = 17;
 
-        const onResChange = () => {
+        const onMoveEnd = () => {
             const cadastralOn = activeLayersRef.current.includes('LP_PA_CBND_BUBUN');
             if (!cadastralOn) return;
 
             const z = view.getZoom();
             if (Number.isFinite(z) && z < MIN_Z) {
-                view.animate({ zoom: MIN_Z, duration: 250 });
+                // animate 대신 setZoom이 더 "덜 튐"
+                view.setZoom(MIN_Z);
             }
         };
 
-        view.on('change:resolution', onResChange);
-        return () => view.un('change:resolution', onResChange);
+        mapObj.on('moveend', onMoveEnd);
+        return () => mapObj.un('moveend', onMoveEnd);
     }, [mapObj]);
 
     // [Interaction Upgrade] Data Enrichment on Search Selection
+    // [Refinement] Fix Infinite Loop & Proxy
     const lastEnrichKeyRef = useRef(null);
 
     useEffect(() => {
         if (!mapObj || !selectedAddress?.x || !selectedAddress?.y) return;
-        const OL = window.ol;
+        if (enrichLockRef.current) return; // Prevent Recursive Loop
+
         const apiKey = API_CONFIG.VWORLD_KEY;
+        const VWORLD_DATA_BASE = API_CONFIG.VWORLD_BASE_URL || '/api/vworld';
+
+        const lon = parseFloat(selectedAddress.x);
+        const lat = parseFloat(selectedAddress.y);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
 
         // Prevent duplicate calls
-        const key = `${selectedAddress.x},${selectedAddress.y},${selectedAddress.pnu || ''}`;
+        const key = `${lon},${lat},${selectedAddress.pnu || ''}`;
         if (lastEnrichKeyRef.current === key) return;
         lastEnrichKeyRef.current = key;
 
+        // Check if we already have enough data
+        const alreadyEnough =
+            !!selectedAddress.pnu &&
+            selectedAddress.jimok != null &&
+            selectedAddress.area != null &&
+            selectedAddress.price != null &&
+            selectedAddress.zone != null;
+
         const run = async () => {
             try {
-                const lon = parseFloat(selectedAddress.x);
-                const lat = parseFloat(selectedAddress.y);
-
                 const dataUrl =
-                    `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature` +
-                    `&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})` +
-                    `&key=${apiKey}&domain=${window.location.hostname}`;
+                    `${VWORLD_DATA_BASE}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun` +
+                    `&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
 
                 const res = await fetch(dataUrl);
-                const json = await res.json();
+                const text = await res.text();
 
+                // Check HTML Response (Error)
+                if (text.trim().startsWith('<')) {
+                    console.error('VWorld returned HTML. Check proxy/baseURL.', text.slice(0, 120));
+                    return;
+                }
+
+                const json = JSON.parse(text);
                 if (json?.response?.status !== "OK") return;
+
                 const featureData = json.response?.result?.featureCollection?.features?.[0];
                 if (!featureData) return;
 
-                // 1) Highlight
+                // 1) Highlight (Always)
                 highlightParcelFeature(featureData);
 
-                // 2) Enrich Address Info
+                // 2) Enrich Address Info (Only if needed)
+                if (alreadyEnough) return;
+
                 const props = featureData.properties || {};
                 const enriched = {
                     ...selectedAddress,
@@ -662,7 +701,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     enriched.zone !== selectedAddress.zone;
 
                 if (changed && onAddressSelect && enriched.pnu) {
+                    enrichLockRef.current = true;
                     onAddressSelect(enriched);
+                    // Unlock next cycle
+                    setTimeout(() => { enrichLockRef.current = false; }, 0);
                 }
             } catch (e) {
                 console.error("SelectedAddress enrich failed:", e);
