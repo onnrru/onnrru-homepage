@@ -208,10 +208,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 baseLayer.set('name', 'base');
 
                 // Gray Layer (White Map - 백지도)
-                // Correct Case: 'gray' (lowercase) for VWorld WMTS
+                // Correct URL: use 'white' in path
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/white/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 0,
@@ -249,16 +249,15 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Final Fix)
-                // Layers: lp_pa_cb_nd_bu (Continuous Cadastral - Standard)
-                // MinZoom: 14 (Optimized for performance/visibility)
-                // Transparent: true
+                // 2. Cadastral Layer (WMS - Integrated Layer)
+                // Layers: lp_pa_cbnd_bu_ms (Common Integrated Cadastral)
+                // MinZoom: 14
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/req/wms',
                         params: {
-                            'LAYERS': 'lp_pa_cb_nd_bu',
-                            'STYLES': 'lp_pa_cb_nd_bu',
+                            'LAYERS': 'lp_pa_cbnd_bu_ms',
+                            'STYLES': 'lp_pa_cbnd_bu_ms',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
                             'VERSION': '1.3.0',
@@ -269,7 +268,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     }),
                     zIndex: 9, // High priority
                     visible: false,
-                    minZoom: 14 // Optimized limit
+                    minZoom: 14
                 });
                 cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
 
