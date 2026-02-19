@@ -249,23 +249,24 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Correct Endpoint applied)
-                // Layers: dt_d002 (Continuous Cadastral)
-                // Endpoint: ned/wms/CtnlgsSpceService (Specific for this data)
-                // MinZoom: 14
+                // 2. Cadastral Layer (WMS - Final Fix: EPSG:4326)
+                // Layers: dt_d002
+                // URL: ned/wms/CtnlgsSpceService
+                // CRS: EPSG:4326 (Required by VWorld Data API)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService',
                         params: {
-                            'LAYERS': 'dt_d002',
-                            'STYLES': 'dt_d002',
-                            'FORMAT': 'image/png',
-                            'TRANSPARENT': 'TRUE',
-                            'VERSION': '1.3.0',
-                            'CRS': 'EPSG:3857',
-                            'KEY': apiKey,
-                            'DOMAIN': window.location.hostname
-                        }
+                            'layers': 'dt_d002',
+                            'styles': '',
+                            'crs': 'EPSG:4326',
+                            'format': 'image/png',
+                            'transparent': 'true',
+                            'version': '1.3.0',
+                            'key': apiKey,
+                            'domain': window.location.hostname
+                        },
+                        projection: 'EPSG:4326' // Essential for OL to reproject if view is 3857
                     }),
                     zIndex: 9, // High priority
                     visible: false,
