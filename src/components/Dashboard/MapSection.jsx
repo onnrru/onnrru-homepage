@@ -4,7 +4,7 @@ import { API_CONFIG } from '../../config/api';
 // Full Layer List extracted from User Reference (Exhaustive)
 const ALL_LAYERS = [
     // --- Major / Quick Access (Basic) ---
-    { id: 'lp_pa_cb_nd_bu', label: '지적도', category: '기본' },
+    { id: 'dt_d002', label: '지적도', category: '기본' },
 
     // --- Zoning Areas (용도지역) ---
     { id: 'LT_C_UQ111', label: '도시지역', category: '용도지역' },
@@ -107,7 +107,7 @@ const ALL_LAYERS = [
 
 // Top 6 Quick Access Layers
 const QUICK_LAYER_IDS = [
-    'lp_pa_cb_nd_bu', // Cadastral
+    'dt_d002', // Cadastral
     'LT_C_UQ111',     // Urban Area
     'LT_C_UQ112',     // Management Area
     'LT_C_UQ113',     // Agriculture Area
@@ -148,7 +148,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             const isActive = prev.includes(layerId);
 
             // Auto-Zoom for Cadastral Layer
-            if (layerId === 'lp_pa_cb_nd_bu' && !isActive) {
+            if (layerId === 'dt_d002' && !isActive) {
                 if (mapObj) {
                     const view = mapObj.getView();
                     if (view.getZoom() < 14) {
@@ -249,15 +249,15 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Integrated Layer)
-                // Layers: lp_pa_cbnd_bu_ms (Common Integrated Cadastral)
+                // 2. Cadastral Layer (WMS - Final Fix with dt_d002)
+                // Layers: dt_d002 (Continuous Cadastral - WFS/WMS Standard)
                 // MinZoom: 14
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/req/wms',
                         params: {
-                            'LAYERS': 'lp_pa_cbnd_bu_ms',
-                            'STYLES': 'lp_pa_cbnd_bu_ms',
+                            'LAYERS': 'dt_d002',
+                            'STYLES': 'dt_d002',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
                             'VERSION': '1.3.0',
@@ -270,11 +270,11 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     visible: false,
                     minZoom: 14
                 });
-                cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
+                cadastralLayer.set('name', 'dt_d002');
 
                 // 3. WMS Layers (Others)
                 const wmsLayers = ALL_LAYERS
-                    .filter(l => l.id !== 'lp_pa_cb_nd_bu')
+                    .filter(l => l.id !== 'dt_d002')
                     .map(layer => {
                         const source = new OL.source.TileWMS({
                             url: `https://api.vworld.kr/req/wms`, // WMS might need direct or proxy. Browsers usually block mixed content if site is HTTPS.
@@ -434,12 +434,12 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
             // WMTS Cadastral
-            if (name === 'lp_pa_cb_nd_bu') {
-                layer.setVisible(activeLayers.includes('lp_pa_cb_nd_bu'));
+            if (name === 'dt_d002') {
+                layer.setVisible(activeLayers.includes('dt_d002'));
             }
 
             // WMS Layers
-            if (ALL_LAYERS.some(l => l.id === name && l.id !== 'lp_pa_cb_nd_bu')) {
+            if (ALL_LAYERS.some(l => l.id === name && l.id !== 'dt_d002')) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
@@ -616,36 +616,42 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
             {/* Measurement Tools (Left Vertical) */}
             {/* Measurement Tools (Left Vertical) */}
-            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-1 items-center bg-white rounded-lg shadow-md border border-gray-200 p-1 pointer-events-auto">
-                <span className="text-[10px] font-bold text-gray-500 mb-1">스케치</span>
+            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-2 p-1 pointer-events-auto">
 
+                {/* Distance */}
                 <button
                     onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
-                    className={`flex flex-col items-center justify-center w-12 h-12 rounded transition-colors
-                        ${measureMode === 'distance' ? 'bg-blue-50 text-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
+                        ${measureMode === 'distance'
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
+                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
                     title="거리 재기"
                 >
-                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m8-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m1-4V5m6 14v-2a2 2 0 00-2-2h-1a2 2 0 00-2 2v2m-2-4h.01M17 16h.01"></path></svg>
-                    <span className="text-[10px] leading-none">거리</span>
+                    <svg className="w-5 h-5 mb-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m8-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m1-4V5m6 14v-2a2 2 0 00-2-2h-1a2 2 0 00-2 2v2m-2-4h.01M17 16h.01"></path></svg>
+                    <span className="text-[9px] font-bold leading-none">거리</span>
                 </button>
 
+                {/* Area */}
                 <button
                     onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
-                    className={`flex flex-col items-center justify-center w-12 h-12 rounded transition-colors
-                        ${measureMode === 'area' ? 'bg-blue-50 text-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
+                        ${measureMode === 'area'
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
+                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
                     title="면적 재기"
                 >
-                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    <span className="text-[10px] leading-none">면적</span>
+                    <svg className="w-5 h-5 mb-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span className="text-[9px] font-bold leading-none">면적</span>
                 </button>
 
+                {/* Clear */}
                 <button
                     onClick={clearMeasurements}
-                    className="flex flex-col items-center justify-center w-12 h-12 rounded hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
-                    title="지우기"
+                    className="flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border border-white bg-white text-gray-500 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all duration-200"
+                    title="초기화"
                 >
-                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    <span className="text-[10px] leading-none">초기화</span>
+                    <svg className="w-5 h-5 mb-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span className="text-[9px] font-bold leading-none">지우기</span>
                 </button>
             </div>
 
@@ -755,7 +761,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         if (!layer) return null;
 
                         // Handle Cadastral and others with no good legend
-                        if (id === 'lp_pa_cb_nd_bu') return null;
+                        if (id === 'dt_d002') return null;
 
                         return (
                             <div key={id} className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-200 backdrop-blur-sm animate-slide-up">
