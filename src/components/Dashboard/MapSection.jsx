@@ -143,22 +143,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const measureSource = useRef(null);
     const drawInteraction = useRef(null);
 
-    const toggleLayer = (layerId) => {
-        // [FIX] Auto-Zoom for Cadastral Layer (User Request: Level 17)
-        // Move outside setActiveLayers to ensure mapObj closure is fresh and side effect runs reliable.
-        if (layerId === 'LP_PA_CBND_BUBUN' && !activeLayers.includes(layerId)) {
-            console.log("Toggle Cadastral: Attempting Auto-Zoom...");
-            if (mapObj) {
-                const view = mapObj.getView();
-                if (view.getZoom() < 17) {
-                    console.log(`Zooming to 17 (Current: ${view.getZoom()})...`);
-                    view.animate({ zoom: 17, duration: 500 });
-                }
-            } else {
-                console.error("mapObj is null during toggleLayer");
-            }
-        }
+    // [Stabilization] Refs for Cadastral Layer
+    const cadastralLayerRef = useRef(null);
+    const cadastralPendingRef = useRef(false); // Prevent duplicate moveend/animate triggers
 
+    const toggleLayer = (layerId) => {
+        // [Stabilization] Auto-zoom logic moved to dedicated useEffect.
+        // This function now only toggles state.
         setActiveLayers(prev => {
             const isActive = prev.includes(layerId);
             return isActive
@@ -260,6 +251,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/req/wms',
+                        crossOrigin: 'anonymous', // [Stabilization]
                         params: {
                             service: 'WMS',
                             request: 'GetMap',
@@ -278,6 +270,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     minZoom: 14 // 14레벨 유지
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
+                cadastralLayerRef.current = cadastralLayer; // [Stabilization] Link Ref
 
                 // 3. WMS Layers (Others)
                 const wmsLayers = ALL_LAYERS
@@ -427,7 +420,85 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         initMap();
     }, []);
 
-    // Effect: Handle Layer Visibility
+    // [Stabilization] Dedicated Effect for Cadastral Layer
+    useEffect(() => {
+        if (!mapObj) return;
+
+        const cadastralLayer = cadastralLayerRef.current;
+        if (!cadastralLayer) return;
+
+        const view = mapObj.getView();
+        if (!view) return;
+
+        const cadastralOn = activeLayers.includes('LP_PA_CBND_BUBUN');
+
+        // Recommended Zoom Range
+        const MIN_Z = 17;
+        const MAX_Z = 19;
+
+        // Force Tile Refresh
+        const refreshCadastralTiles = () => {
+            const src = cadastralLayer.getSource?.();
+            if (!src) return;
+            if (typeof src.updateParams === 'function') {
+                src.updateParams({ _t: Date.now() });
+            } else if (typeof src.refresh === 'function') {
+                src.refresh();
+            } else if (typeof src.changed === 'function') {
+                src.changed();
+            }
+        };
+
+        // OFF: Turn off and reset pending
+        if (!cadastralOn) {
+            cadastralPendingRef.current = false;
+            cadastralLayer.setVisible(false);
+            return;
+        }
+
+        // ON: If pending, skip
+        if (cadastralPendingRef.current) return;
+
+        // Check Zoom
+        const zRaw = view.getZoom();
+        const z = Number.isFinite(zRaw) ? zRaw : MIN_Z;
+        const targetZoom = Math.max(MIN_Z, Math.min(MAX_Z, z));
+
+        const needZoomMove = Math.round(z) !== Math.round(targetZoom);
+
+        // Turn off temporarily
+        cadastralLayer.setVisible(false);
+
+        const turnOnAfterMove = () => {
+            cadastralPendingRef.current = false;
+            refreshCadastralTiles();
+            cadastralLayer.setVisible(true);
+        };
+
+        if (!needZoomMove) {
+            refreshCadastralTiles();
+            cadastralLayer.setVisible(true);
+            return;
+        }
+
+        // Move and then Turn On
+        cadastralPendingRef.current = true;
+
+        mapObj.once('moveend', () => {
+            const stillOn = activeLayers.includes('LP_PA_CBND_BUBUN'); // activeLayers from closure might be stale, need refs if strictly relying on latest state, but dependency array handles it
+            if (!stillOn) { // Note: activeLayers is in dependency array, so this effect re-runs on change.
+                cadastralPendingRef.current = false;
+                cadastralLayer.setVisible(false);
+                return;
+            }
+            turnOnAfterMove();
+        });
+
+        view.animate({ zoom: targetZoom, duration: 350 });
+
+    }, [mapObj, activeLayers]); // Re-run when activeLayers changes
+
+    // Effect: Handle Layer Visibility (Generic Checks)
     useEffect(() => {
         if (!mapObj) return;
         const layers = mapObj.getLayers();
@@ -440,10 +511,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             if (name === 'midnight') layer.setVisible(mapType === 'midnight');
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
-            // WMTS Cadastral
-            if (name === 'LP_PA_CBND_BUBUN') {
-                layer.setVisible(activeLayers.includes('LP_PA_CBND_BUBUN'));
-            }
+            // WMTS Cadastral [REMOVED] - Handled by Dedicated Effect above
+            // if (name === 'LP_PA_CBND_BUBUN') {
+            //     layer.setVisible(activeLayers.includes('LP_PA_CBND_BUBUN'));
+            // }
 
             // WMS Layers
             if (ALL_LAYERS.some(l => l.id === name && l.id !== 'LP_PA_CBND_BUBUN')) {
