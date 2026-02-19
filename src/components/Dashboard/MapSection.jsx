@@ -268,7 +268,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         },
                         // Projection: Explicitly set source to 4326 so OL reprojects to 3857
                         projection: 'EPSG:4326',
-                        crossOrigin: 'anonymous' // Security
+                        // crossOrigin: 'anonymous' // Removed to prevent CORS issues with opaque responses
                     }),
                     zIndex: 15, // Top Priority
                     visible: false,
@@ -399,10 +399,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                     x: lon,
                                     y: lat,
                                     pnu: props.pnu,
-                                    price: props.jiga,    // 공시지가
-                                    area: props.parea,    // 면적
-                                    jimok: props.jimok,   // 지목
-                                    zone: props.unm       // 용도지역
+                                    jimok: props.jimok, // 지목 (예: 대)
+                                    area: props.parea,  // 면적 (㎡)
+                                    price: props.jiga,  // 개별공시지가 (원/㎡)
+                                    zone: props.unm     // 용도지역명
                                 };
                                 onAddressSelect(newAddress);
                             }
