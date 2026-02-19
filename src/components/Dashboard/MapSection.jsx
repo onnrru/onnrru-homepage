@@ -196,6 +196,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 baseLayer.set('name', 'base');
 
                 // Gray Layer (White Map - 백지도)
+                // Correct Case: 'gray' (lowercase) for VWorld WMTS
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
@@ -236,17 +237,27 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMTS - NEW)
-                // Use Proxy, explicit layer 'lp_pa_cb_nd_bu'
+                // 2. Cadastral Layer (WMS - Corrected)
+                // Layers: LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN (Continuous Cadastral)
+                // MinZoom: 15 (High detail only)
+                // Transparent: true
                 const cadastralLayer = new OL.layer.Tile({
-                    source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/lp_pa_cb_nd_bu/{z}/{y}/{x}.png`,
-                        attributions: 'VWorld',
+                    source: new OL.source.TileWMS({
+                        url: 'https://api.vworld.kr/req/wms',
+                        params: {
+                            'LAYERS': 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN',
+                            'STYLES': 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN',
+                            'FORMAT': 'image/png',
+                            'TRANSPARENT': 'TRUE',
+                            'VERSION': '1.3.0',
+                            'CRS': 'EPSG:3857',
+                            'KEY': apiKey,
+                            'DOMAIN': window.location.hostname
+                        }
                     }),
-                    zIndex: 9, // High priority, below Hybrid
+                    zIndex: 9, // High priority
                     visible: false,
-                    maxZoom: 19,
-                    minZoom: 14 // VWorld often limits cadastral to higher zooms
+                    minZoom: 15 // Restricted to high zoom levels
                 });
                 cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
 
@@ -744,7 +755,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                 </div>
                                 <div className="bg-gray-50 rounded p-1 flex justify-center">
                                     <img
-                                        src={`https://api.vworld.kr/req/image?key=${API_CONFIG.VWORLD_KEY}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id.toUpperCase()}`}
+                                        src={`https://api.vworld.kr/req/image?service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id.toUpperCase()}&style=${layer.id.toUpperCase()}&key=${API_CONFIG.VWORLD_KEY}`}
                                         alt="범례"
                                         className="max-w-full h-auto object-contain min-h-[20px]"
                                         onError={(e) => {
