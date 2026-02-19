@@ -144,11 +144,23 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const drawInteraction = useRef(null);
 
     const toggleLayer = (layerId) => {
-        setActiveLayers(prev =>
-            prev.includes(layerId)
+        setActiveLayers(prev => {
+            const isActive = prev.includes(layerId);
+
+            // Auto-Zoom for Cadastral Layer
+            if (layerId === 'lp_pa_cb_nd_bu' && !isActive) {
+                if (mapObj) {
+                    const view = mapObj.getView();
+                    if (view.getZoom() < 14) {
+                        view.animate({ zoom: 14, duration: 500 });
+                    }
+                }
+            }
+
+            return isActive
                 ? prev.filter(id => id !== layerId)
-                : [...prev, layerId]
-        );
+                : [...prev, layerId];
+        });
     };
 
     // Initialize VWorld Map (OpenLayers)
@@ -237,16 +249,16 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Corrected)
-                // Layers: LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN (Continuous Cadastral)
-                // MinZoom: 15 (High detail only)
+                // 2. Cadastral Layer (WMS - Final Fix)
+                // Layers: lp_pa_cb_nd_bu (Continuous Cadastral - Standard)
+                // MinZoom: 14 (Optimized for performance/visibility)
                 // Transparent: true
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/req/wms',
                         params: {
-                            'LAYERS': 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN',
-                            'STYLES': 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN',
+                            'LAYERS': 'lp_pa_cb_nd_bu',
+                            'STYLES': 'lp_pa_cb_nd_bu',
                             'FORMAT': 'image/png',
                             'TRANSPARENT': 'TRUE',
                             'VERSION': '1.3.0',
@@ -257,7 +269,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     }),
                     zIndex: 9, // High priority
                     visible: false,
-                    minZoom: 15 // Restricted to high zoom levels
+                    minZoom: 14 // Optimized limit
                 });
                 cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
 
@@ -378,15 +390,16 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                             if (onAddressSelect && props.pnu) {
                                 const newAddress = {
-                                    address: props.addr || "",
-                                    roadAddr: props.addr || "",
+                                    address: props.addr || selectedAddress || "",
+                                    roadAddr: props.road || props.addr || "",
                                     parcelAddr: props.addr || "",
                                     x: lon,
                                     y: lat,
                                     pnu: props.pnu,
-                                    price: props.jiga,     // JIGA -> price
-                                    area: props.parea,     // PAREA -> area
-                                    jimok: props.jimok     // JIMOK -> jimok
+                                    price: props.jiga,    // 공시지가
+                                    area: props.parea,    // 면적
+                                    jimok: props.jimok,   // 지목
+                                    zone: props.unm       // 용도지역
                                 };
                                 onAddressSelect(newAddress);
                             }
@@ -593,7 +606,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     };
 
     return (
-        <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
+        <div className={`flex-1 relative bg-gray-100 overflow-hidden group h-full w-full ${measureMode ? 'cursor-crosshair' : ''}`}>
             <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none" tabIndex="0"></div>
 
             {/* Error/Loading */}
