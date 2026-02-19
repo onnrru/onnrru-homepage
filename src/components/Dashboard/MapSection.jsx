@@ -249,31 +249,32 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - User Snippet Applied)
-                // Layers: dt_d002
-                // URL: ned/wms/CtnlgsSpceService
+                // 2. Cadastral Layer (Final User Standard - ned/wms)
+                // Source: ned/wms/CtnlgsSpceService
+                // Params: layers='dt_d002' (WMS ID), styles='dt_d002'
+                // Internal ID: LP_PA_CBND_BUBUN (Application Consistency)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        // 1. 주소 확인: ned/wms 경로 사용
-                        url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService',
+                        url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService', // Core Fix: ned/wms endpoint
                         params: {
-                            'layers': 'dt_d002',      // 지적도 레이어 ID
+                            'layers': 'dt_d002',       // Reference WMS Layer ID
                             'styles': 'dt_d002',
                             'format': 'image/png',
                             'transparent': 'true',
                             'version': '1.3.0',
-                            'crs': 'EPSG:4326',       // VWorld 지적도 서버의 기본 좌표계
+                            'crs': 'EPSG:4326',        // Server Native CRS
                             'key': apiKey,
                             'domain': window.location.hostname
                         },
-                        // 2. 투영법 명시: 서버는 4326으로 주지만 지도는 3857이므로 변환 필요
-                        projection: 'EPSG:4326'
+                        // Projection: Explicitly set source to 4326 so OL reprojects to 3857
+                        projection: 'EPSG:4326',
+                        crossOrigin: 'anonymous' // Security
                     }),
-                    zIndex: 15, // 지적도는 가장 위에 보여야 하므로 우선순위를 높임
+                    zIndex: 15, // Top Priority
                     visible: false,
-                    minZoom: 14 // 너무 저배율에서는 데이터가 안 나오므로 최소 14 이상 권장
+                    minZoom: 14 // Data Heavy -> Limit zoom
                 });
-                cadastralLayer.set('name', 'dt_d002');
+                cadastralLayer.set('name', 'LP_PA_CBND_BUBUN'); // Internal ID match
 
                 // 3. WMS Layers (Others)
                 const wmsLayers = ALL_LAYERS
