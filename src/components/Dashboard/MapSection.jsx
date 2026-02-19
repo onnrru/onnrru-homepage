@@ -261,8 +261,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService', // Core Fix: ned/wms endpoint
                         params: {
-                            'layers': 'dt_d002',       // Reference WMS Layer ID
-                            'styles': 'dt_d002',
+                            'layers': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', // Reference WMS Layer IDs (Bonbun, Bubun)
+                            'styles': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
                             'format': 'image/png',
                             'transparent': 'true',
                             'version': '1.3.0',
