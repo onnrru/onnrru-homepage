@@ -249,12 +249,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 2. Cadastral Layer (WMS - Final Fix with dt_d002)
-                // Layers: dt_d002 (Continuous Cadastral - WFS/WMS Standard)
+                // 2. Cadastral Layer (WMS - Correct Endpoint applied)
+                // Layers: dt_d002 (Continuous Cadastral)
+                // Endpoint: ned/wms/CtnlgsSpceService (Specific for this data)
                 // MinZoom: 14
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: 'https://api.vworld.kr/req/wms',
+                        url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService',
                         params: {
                             'LAYERS': 'dt_d002',
                             'STYLES': 'dt_d002',
