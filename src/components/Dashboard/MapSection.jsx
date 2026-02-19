@@ -121,7 +121,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
     // Toggles
     const [showHybrid, setShowHybrid] = useState(false);
-    const [mapType, setMapType] = useState('satellite'); // 'satellite' or 'base'
+    const [mapType, setMapType] = useState('satellite'); // 'satellite', 'base', 'gray', 'midnight'
     const [activeLayers, setActiveLayers] = useState([]);
     const [showLayerMenu, setShowLayerMenu] = useState(false);
 
@@ -180,11 +180,14 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 }
 
                 const apiKey = API_CONFIG.VWORLD_KEY;
+                // USE PROXY PATH (Defined in netlify.toml and api.js)
+                // /vworld_map/* -> https://map.vworld.kr/*
+                const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL || '/vworld_map';
 
                 // 1. Base Layers
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Base/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Base/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 0,
@@ -192,9 +195,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 baseLayer.set('name', 'base');
 
+                // Gray Layer (White Map - 백지도)
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 0,
@@ -204,7 +208,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 const midnightLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/midnight/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/midnight/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 0,
@@ -214,7 +218,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Satellite/{z}/{y}/{x}.jpeg`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Satellite/{z}/{y}/{x}.jpeg`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 0,
@@ -224,7 +228,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Hybrid/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
                     zIndex: 10,
@@ -233,37 +237,35 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 hybridLayer.set('name', 'hybrid');
 
                 // 2. Cadastral Layer (WMTS - NEW)
+                // Use Proxy, explicit layer 'lp_pa_cb_nd_bu'
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/lp_pa_cb_nd_bu/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/lp_pa_cb_nd_bu/{z}/{y}/{x}.png`,
+                        attributions: 'VWorld',
                     }),
                     zIndex: 9, // High priority, below Hybrid
-                    visible: false
+                    visible: false,
+                    maxZoom: 19,
+                    minZoom: 14 // VWorld often limits cadastral to higher zooms
                 });
                 cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
 
                 // 3. WMS Layers (Others)
-                // Filter out cadastral from WMS list
                 const wmsLayers = ALL_LAYERS
                     .filter(l => l.id !== 'lp_pa_cb_nd_bu')
                     .map(layer => {
                         const source = new OL.source.TileWMS({
-                            url: `https://api.vworld.kr/req/wms`,
+                            url: `https://api.vworld.kr/req/wms`, // WMS might need direct or proxy. Browsers usually block mixed content if site is HTTPS.
                             params: {
-                                'LAYERS': layer.id.toLowerCase(),
-                                'STYLES': '',
+                                'LAYERS': layer.id.toLowerCase(), // VWorld is case-sensitive often, but usually lowercase is safe for IDs
+                                'STYLES': layer.id.toLowerCase(), // Try to match style to layer ID for valid WMS
                                 'CRS': 'EPSG:3857',
                                 'FORMAT': 'image/png',
                                 'TRANSPARENT': 'TRUE',
                                 'VERSION': '1.3.0',
-                                'key': API_CONFIG.VWORLD_KEY,
+                                'key': apiKey,
                                 'DOMAIN': window.location.hostname
                             }
-                        });
-
-                        // Error Handling
-                        source.on('tileloaderror', (event) => {
-                            // Suppress console spam for common empty tiles
                         });
 
                         const olLayer = new OL.layer.Tile({
@@ -280,22 +282,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 const markerSrc = new OL.source.Vector();
                 const markerLayer = new OL.layer.Vector({
                     source: markerSrc,
-                    zIndex: 20,
-                    style: new OL.style.Style({
-                        fill: new OL.style.Fill({
-                            color: 'rgba(255, 255, 255, 0.2)'
-                        }),
-                        stroke: new OL.style.Stroke({
-                            color: '#ff0000',
-                            width: 2
-                        }),
-                        image: new OL.style.Circle({
-                            radius: 7,
-                            fill: new OL.style.Fill({
-                                color: '#ffcc33'
-                            })
-                        })
-                    })
+                    zIndex: 20
                 });
                 setMarkerSource(markerSrc);
 
@@ -351,6 +338,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
+                        // Use Proxy for Data API to avoid CORS
+                        // /api/vworld -> https://api.vworld.kr
                         const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
                         const response = await fetch(dataUrl);
                         const data = await response.json();
@@ -367,10 +356,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                     dataProjection: 'EPSG:4326'
                                 });
 
-                                // Polygon Highlight Style (Transparent Fill, Red Border)
+                                // Polygon Highlight Style (Red Border, Transparent Fill)
                                 const polygonStyle = new OL.style.Style({
-                                    stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }), // Red Stroke
-                                    fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.01)' }) // Very Transparent Fill
+                                    stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }),
+                                    fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.05)' })
                                 });
                                 feature.setStyle(polygonStyle);
                                 markerSrc.addFeature(feature);
@@ -384,9 +373,9 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                     x: lon,
                                     y: lat,
                                     pnu: props.pnu,
-                                    price: props.jiga,
-                                    area: props.parea,
-                                    jimok: props.jimok
+                                    price: props.jiga,     // JIGA -> price
+                                    area: props.parea,     // PAREA -> area
+                                    jimok: props.jimok     // JIMOK -> jimok
                                 };
                                 onAddressSelect(newAddress);
                             }
@@ -471,8 +460,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 mapObj.removeInteraction(drawInteraction.current);
                 drawInteraction.current = null;
             }
-            // Clear tooltips if needed? No, user might want to see result.
-            // But we should remove help tooltip.
             if (mapObj && helpTooltipElement.current) {
                 mapObj.removeOverlay(helpTooltip.current);
             }
@@ -558,7 +545,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     tooltipCoord = geom.getInteriorPoint().getCoordinates();
                 } else if (geom instanceof OL.geom.LineString) {
                     const length = OL.sphere.getLength(geom);
-                    output = length > 100
+                    output = length > 1000
                         ? (Math.round(length / 1000 * 100) / 100) + ' km'
                         : (Math.round(length * 100) / 100) + ' m';
                     tooltipCoord = geom.getLastCoordinate();
@@ -569,7 +556,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         });
 
         draw.on('drawend', () => {
-            measureTooltipElement.current.className = 'ol-tooltip ol-tooltip-static bg-black/70 text-white px-2 py-1 rounded text-xs border border-white/20';
+            measureTooltipElement.current.className = 'ol-tooltip ol-tooltip-static bg-black/70 text-white px-2 py-1 rounded text-xs border border-white/20 shadow-sm';
             measureTooltip.current.setOffset([0, -7]);
             setSketch(null);
             measureTooltipElement.current = null;
@@ -589,12 +576,9 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         if (measureSource.current) {
             measureSource.current.clear();
         }
-        // Remove static overlays? Hard to track them all without storing them.
-        // Simple way: reload map or store array of overlays.
-        // For now, let's just clear features. Overlays will remain stuck on map if we don't remove them.
-        // Correct approach: Store separate overlays or query DOM.
         const staticTooltips = document.querySelectorAll('.ol-tooltip-static');
         staticTooltips.forEach(el => el.remove());
+        setMeasureMode(null);
     };
 
     return (
@@ -605,6 +589,33 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && <div className="bg-white/90 px-4 py-2 rounded shadow text-gray-800 font-medium">지도 데이터를 불러오는 중...</div>}
                 {mapError && <div className="bg-white/90 px-4 py-2 rounded shadow text-red-600 font-bold">{mapError}</div>}
+            </div>
+
+            {/* Measurement Tools (Left Vertical) */}
+            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-2 pointer-events-auto">
+                <button
+                    onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
+                    className={`w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-all border
+                        ${measureMode === 'distance' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    title="거리 재기"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m8-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m1-4V5m6 14v-2a2 2 0 00-2-2h-1a2 2 0 00-2 2v2m-2-4h.01M17 16h.01"></path></svg>
+                </button>
+                <button
+                    onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
+                    className={`w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-all border
+                        ${measureMode === 'area' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    title="면적 재기"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                </button>
+                <button
+                    onClick={clearMeasurements}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg shadow-md bg-white text-red-500 border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-all"
+                    title="지우기"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
             </div>
 
             {/* Main Controls (Top Right) */}
@@ -622,7 +633,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             <button
                                 key={type.id}
                                 onClick={() => setMapType(type.id)}
-                                className={`px-3 h-full text-xs font-bold rounded transition-colors 
+                                className={`px-3 h-full text-xs font-bold rounded transition-colors
                                     ${mapType === type.id
                                         ? 'bg-gray-800 text-white shadow-sm'
                                         : 'bg-white text-gray-600 hover:bg-gray-100'}`}
@@ -633,7 +644,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                         <button
                             onClick={() => setShowHybrid(!showHybrid)}
-                            className={`px-3 h-full text-xs font-bold rounded transition-colors 
+                            className={`px-3 h-full text-xs font-bold rounded transition-colors
                                 ${showHybrid
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-white text-gray-600 hover:bg-gray-100'}`}
@@ -642,7 +653,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         </button>
                     </div>
 
-                    {/* Cadastral Map (Separate) */}
+                    {/* Cadastral Map (WMTS) */}
                     <button
                         onClick={() => toggleLayer('lp_pa_cb_nd_bu')}
                         className={`px-3 text-xs font-bold rounded shadow-sm border transition-all h-full
@@ -653,29 +664,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         지적도
                     </button>
                 </div>
-
-                {/* Measurement Tools (New) */}
-                <div className="flex gap-1 bg-white rounded shadow-sm p-1 border border-gray-200">
-                    <button
-                        onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
-                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${measureMode === 'distance' ? 'bg-orange-500 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
-                    >
-                        거리
-                    </button>
-                    <button
-                        onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
-                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${measureMode === 'area' ? 'bg-orange-500 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
-                    >
-                        면적
-                    </button>
-                    <button
-                        onClick={clearMeasurements}
-                        className="px-3 py-1 text-xs font-bold rounded hover:bg-red-50 text-red-600 border-l border-gray-200"
-                    >
-                        지우기
-                    </button>
-                </div>
-
 
                 {/* 2. Basic Exposed Layers (Zoning) */}
                 <div className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-100 backdrop-blur-sm flex gap-2">
@@ -734,10 +722,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     {activeLayers.map(id => {
                         const layer = ALL_LAYERS.find(l => l.id === id);
                         if (!layer) return null;
-                        // Skip cadastral legend if handled specially or if self-explanatory
-                        // But user wanted fixing "No results". For Cadastral, WMTS doesn't have valid GetLegendGraphic usually, 
-                        // or we can use a static image if available. VWorld doesn't expose good legend for cadastral.
-                        // Let's hide legend for Cadastral to avoid "No results" error which is ugly.
+
+                        // Handle Cadastral and others with no good legend
                         if (id === 'lp_pa_cb_nd_bu') return null;
 
                         return (
@@ -754,7 +740,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                         alt="범례"
                                         className="max-w-full h-auto object-contain min-h-[20px]"
                                         onError={(e) => {
-                                            // Handle broken legend
                                             e.target.style.display = 'none';
                                             e.target.parentElement.innerHTML = '<span class="text-[10px] text-gray-400">범례 없음</span>';
                                         }}

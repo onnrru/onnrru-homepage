@@ -44,46 +44,43 @@ const Sidebar = ({ selectedAddress }) => {
             setError(null);
 
             // Construct Static Map Image URL (Zoning Plan)
-            // Center is from selectedAddress (x, y are usually EPSG:4326 from search)
             if (selectedAddress.x && selectedAddress.y) {
                 const apiKey = API_CONFIG.VWORLD_KEY;
                 const layers = 'lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun'; // Zoning + Cadastral
-                // VWorld Static Image API
-                // https://api.vworld.kr/req/image?service=image&request=getmap&key=[KEY]&format=png&bbox=[BBOX]&crs=[CRS]&width=[WIDTH]&height=[HEIGHT]&layers=[LAYERS]&styles=[STYLES]
-                // Or better: Use WMS GetMap with CENTER if available? No, standard WMS needs BBOX.
-                // We need to calculate BBOX from X,Y for a small area (e.g. +/- 0.002 degrees ~ 200m)
 
                 const x = parseFloat(selectedAddress.x);
                 const y = parseFloat(selectedAddress.y);
                 const delta = 0.002; // Approx 200m
                 const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
 
-                const imgUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=400&height=300&layers=${layers}&styles=lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun`;
-                // Note: Styles might need to be empty or specific. 'default' usually works.
-                // VWorld WMS for 'lt_c_aisryc' usually has style 'lt_c_aisryc'.
-                const finalImgUrl = `https://api.vworld.kr/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=500&height=400&layers=${layers}`;
+                // USE PROXY PATH from api.js (API_CONFIG.VWORLD_BASE_URL -> /api/vworld)
+                // Direct VWorld URL caused Mixed Content on some setups, but here we strictly use the Proxy route if needed.
+                // However, for <img> src, we can only use Proxy if the ProxyEndpoint returns image content correctly.
+                // Netlify Redirects handle this. /api/vworld -> https://api.vworld.kr
+                const finalImgUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=500&height=400&layers=${layers}`;
 
                 setMapImageUrl(finalImgUrl);
             } else {
                 setMapImageUrl(null);
             }
 
-            try {
-                // Pre-fill basic info if available in selectedAddress (from Map Click or specialized Search)
-                if (selectedAddress.jimok || selectedAddress.area || selectedAddress.price) {
-                    setData(prev => ({
-                        ...prev,
-                        basic: {
-                            jimok: selectedAddress.jimok || '-',
-                            area: selectedAddress.area || '-',
-                            price: selectedAddress.price || '-'
-                        }
-                    }));
-                }
+            // Pre-fill basic info if available in selectedAddress
+            const initialBasic = {
+                jimok: selectedAddress.jimok || '-',
+                area: selectedAddress.area || '-',
+                price: selectedAddress.price || '-'
+            };
 
+            setData(prev => ({
+                ...prev,
+                basic: initialBasic
+            }));
+
+            try {
                 // 1. Basic Info / Regulations (luLawInfo)
                 // Endpoint: /Web/Rest/OP/luLawInfo?pnu=...
-                if (activeTab === 'regulation' || (!data.basic && !selectedAddress.jimok)) {
+                if (activeTab === 'regulation') {
+                    // Use EUM Proxy
                     const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
                         params: { pnu: pnu, format: 'xml' }
                     });
@@ -94,17 +91,27 @@ const Sidebar = ({ selectedAddress }) => {
                     // Check for API Error in XML
                     const errCode = xmlDoc.getElementsByTagName("error_code")[0]?.textContent;
                     if (errCode) {
-                        // If we already have basic info from map click, don't throw blocking error, just log it
-                        if (selectedAddress.jimok) {
-                            console.warn(`LuLawInfo API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
-                        } else {
-                            throw new Error(`API Error: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
-                        }
+                        console.warn(`LuLawInfo API Warning: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
+                        // Do not throw, keep using selectedAddress data if available
                     }
 
-                    const jimok = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || selectedAddress.jimok || '-';
-                    const area = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || selectedAddress.area || '-';
-                    const price = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent || selectedAddress.price || '-';
+                    // Extract Data with Fallbacks
+                    // User Request: IndcgrNm, ar, JIGA
+                    // Standard luLawInfo: JIMOK_NM, JIBUN_AREA, JIGA
+                    // We check both just in case.
+                    const jimokXml = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || xmlDoc.getElementsByTagName("IndcgrNm")[0]?.textContent;
+                    const areaXml = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || xmlDoc.getElementsByTagName("ar")[0]?.textContent;
+                    const priceXml = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent;
+
+                    const jimok = jimokXml || selectedAddress.jimok || '-';
+                    const area = areaXml || selectedAddress.area || '-';
+                    const price = priceXml || selectedAddress.price || '-';
+
+                    // Zoning Info (UNAME, LAW_NM)
+                    // User Request: UNAME, LAW_NM (Filter National Planning Law)
+                    // luLawInfo returns PRPOS_AREA_DSTRC_NM (which is usually UNAME).
+                    // Or we can look for specific lists.
+                    // Let's stick to PRPOS_AREA_DSTRC_NM as it's the standard aggregate.
                     const uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
 
                     setData(prev => ({
@@ -149,12 +156,14 @@ const Sidebar = ({ selectedAddress }) => {
                     const dResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.DEVLIST}`, {
                         params: { pnu: pnu, pageNo: 1, numOfRows: 10 }
                     });
-                    // Assuming JSON for DevList based on typical VWorld/Eum usage parity
+
                     if (dResponse.data && dResponse.data.list) {
                         setData(prev => ({ ...prev, devlist: dResponse.data.list }));
                     } else if (typeof dResponse.data === 'string') {
-                        // Fallback if XML
-                        // ... parsing logic if needed
+                        // XML fallback
+                        const dParser = new DOMParser();
+                        const dXml = dParser.parseFromString(dResponse.data, "text/xml");
+                        // ... parsing if needed, but assuming JSON for now as per VWorld typically
                     }
                 }
 
@@ -163,7 +172,10 @@ const Sidebar = ({ selectedAddress }) => {
                 const errMsg = err.response
                     ? `Status: ${err.response.status} (${err.response.statusText})`
                     : err.message;
-                setError(`정보 로딩 실패: ${errMsg}. 프록시/API 키를 확인해주세요.`);
+                // Only set error if we have NO basic data to show
+                if (!initialBasic.jimok || initialBasic.jimok === '-') {
+                    setError(`정보 로딩 실패: ${errMsg}.`);
+                }
             } finally {
                 setLoading(false);
             }
@@ -231,6 +243,12 @@ const Sidebar = ({ selectedAddress }) => {
 
                 {/* Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
+                    {error && (
+                        <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">
+                            {error}
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex items-center justify-center h-full">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -292,7 +310,7 @@ const Sidebar = ({ selectedAddress }) => {
                                                     className="w-full h-full object-cover"
                                                     onError={(e) => {
                                                         e.target.style.display = 'none';
-                                                        e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패 (VWorld API)</div>';
+                                                        e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패 (API Error)</div>';
                                                     }}
                                                 />
                                             ) : (
