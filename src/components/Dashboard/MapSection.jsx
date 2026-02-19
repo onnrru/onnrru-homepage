@@ -259,31 +259,25 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // Internal ID: LP_PA_CBND_BUBUN (Application Consistency)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: 'https://api.vworld.kr/req/wms', // [FIX] Switch to req/wms per example
+                        url: 'https://api.vworld.kr/req/wms',
                         params: {
-                            'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
-                            'STYLES': 'lp_pa_cbnd_bonbun_line,lp_pa_cbnd_bubun_line',
-                            'FORMAT': 'image/png',
-                            'TRANSPARENT': 'TRUE', // Uppercase TRUE per example (unlikely to matter but safe)
-                            'VERSION': '1.3.0',
-                            'CRS': 'EPSG:900913',  // [FIX] Exact match with user example
-                            'KEY': apiKey,
-                            'DOMAIN': window.location.hostname
-                        },
-                        // Projection: Source is now 3857, matches view
-                        projection: 'EPSG:3857',
-                        // crossOrigin: 'anonymous' // Removed to prevent CORS issues with opaque responses
-                        tileLoadFunction: function (tile, src) {
-                            console.log("Cadastral Tile Request:", src);
-                            const image = tile.getImage();
-                            image.src = src;
+                            service: 'WMS',
+                            request: 'GetMap',
+                            version: '1.3.0',
+                            layers: 'lp_pa_cbnd_bubun',   // ✅ 단일 먼저
+                            styles: '',                  // ✅ 반드시 빈값
+                            crs: 'EPSG:3857',
+                            format: 'image/png',
+                            transparent: true,
+                            key: apiKey,                 // ✅ 소문자
+                            domain: window.location.hostname
                         }
                     }),
-                    zIndex: 15, // Top Priority
+                    zIndex: 15,
                     visible: false,
-                    minZoom: 14 // Data Heavy -> Limit zoom
+                    minZoom: 14 // 14레벨 유지
                 });
-                cadastralLayer.set('name', 'LP_PA_CBND_BUBUN'); // Internal ID match
+                cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
 
                 // 3. WMS Layers (Others)
                 const wmsLayers = ALL_LAYERS
@@ -478,7 +472,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     }, [mapObj, selectedAddress]);
 
     // Categories for Filter
-    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !['lp_pa_cb_nd_bu', ...QUICK_LAYER_IDS].includes(l.id)).map(l => l.category))];
+    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !['LP_PA_CBND_BUBUN', ...QUICK_LAYER_IDS].includes(l.id)).map(l => l.category))];
 
     // Basic Exposed Layers (Quick Access)
     const BASIC_LAYERS = [
@@ -705,9 +699,9 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                     {/* Cadastral Map (WMTS) */}
                     <button
-                        onClick={() => toggleLayer('lp_pa_cb_nd_bu')}
+                        onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
                         className={`px-3 text-xs font-bold rounded shadow-sm border transition-all h-full
-                            ${activeLayers.includes('lp_pa_cb_nd_bu')
+                            ${activeLayers.includes('LP_PA_CBND_BUBUN')
                                 ? 'bg-indigo-600 text-white border-indigo-600'
                                 : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                     >
@@ -737,9 +731,9 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 </div>
 
                 {/* 3. Active "Other" Layers (Dynamic Chips) */}
-                {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'lp_pa_cb_nd_bu').length > 0 && (
+                {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'LP_PA_CBND_BUBUN').length > 0 && (
                     <div className="flex flex-wrap gap-2 justify-end max-w-[400px]">
-                        {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'lp_pa_cb_nd_bu').map(id => {
+                        {activeLayers.filter(id => !BASIC_LAYERS.includes(id) && id !== 'LP_PA_CBND_BUBUN').map(id => {
                             const layer = ALL_LAYERS.find(l => l.id === id);
                             if (!layer) return null;
                             return (
@@ -834,7 +828,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         <div className="flex-1 overflow-y-auto p-3 space-y-6">
                             {['용도지역', '용도지구', '용도구역', '도시계획', '환경/산림', '재해/안전', '수자원/해양', '행정/기타'].map(category => {
                                 if (selectedCategory !== '전체' && selectedCategory !== category) return null;
-                                const categoryLayers = ALL_LAYERS.filter(l => l.category === category && !['lp_pa_cb_nd_bu', ...BASIC_LAYERS].includes(l.id));
+                                const categoryLayers = ALL_LAYERS.filter(l => l.category === category && !['LP_PA_CBND_BUBUN', ...BASIC_LAYERS].includes(l.id));
                                 if (categoryLayers.length === 0) return null;
 
                                 return (
