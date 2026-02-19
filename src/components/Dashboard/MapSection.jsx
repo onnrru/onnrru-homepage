@@ -125,12 +125,23 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const [activeLayers, setActiveLayers] = useState([]);
     const [showLayerMenu, setShowLayerMenu] = useState(false);
 
-    // UI Logic
+    // Filter
     const [selectedCategory, setSelectedCategory] = useState('전체');
 
+    // Stats
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
     const [markerSource, setMarkerSource] = useState(null);
+
+    // Measurement State
+    const [measureMode, setMeasureMode] = useState(null); // 'distance' | 'area' | null
+    const [sketch, setSketch] = useState(null);
+    const measureTooltipElement = useRef(null);
+    const measureTooltip = useRef(null);
+    const helpTooltipElement = useRef(null);
+    const helpTooltip = useRef(null);
+    const measureSource = useRef(null);
+    const drawInteraction = useRef(null);
 
     const toggleLayer = (layerId) => {
         setActiveLayers(prev =>
@@ -140,7 +151,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         );
     };
 
-    // Initialize VWorld Map
+    // Initialize VWorld Map (OpenLayers)
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -170,7 +181,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 const apiKey = API_CONFIG.VWORLD_KEY;
 
-                // 1. Base Layer
+                // 1. Base Layers
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Base/{z}/{y}/{x}.png`,
@@ -181,7 +192,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 baseLayer.set('name', 'base');
 
-                // 2. Gray Layer (2D백지도)
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/gray/{z}/{y}/{x}.png`,
@@ -192,7 +202,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 grayLayer.set('name', 'gray');
 
-                // 3. Midnight Layer (2D야간)
                 const midnightLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/midnight/{z}/{y}/{x}.png`,
@@ -203,7 +212,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 midnightLayer.set('name', 'midnight');
 
-                // 4. Satellite Layer
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Satellite/{z}/{y}/{x}.jpeg`,
@@ -214,64 +222,114 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 });
                 satelliteLayer.set('name', 'satellite');
 
-                // 5. Hybrid Layer
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld',
                     }),
-                    zIndex: 10, // Above everything
+                    zIndex: 10,
                     visible: true
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // 4. All WMS Layers (Standardized)
-                const wmsLayers = ALL_LAYERS.map(layer => {
-                    const source = new OL.source.TileWMS({
-                        url: `https://api.vworld.kr/req/wms`,
-                        params: {
-                            'LAYERS': layer.id.toLowerCase(),
-                            'STYLES': '',
-                            'CRS': 'EPSG:3857',
-                            'FORMAT': 'image/png',
-                            'TRANSPARENT': 'TRUE',
-                            'VERSION': '1.3.0',
-                            'key': API_CONFIG.VWORLD_KEY,
-                            'DOMAIN': window.location.hostname
-                        },
-                        // serverType: 'geoserver'  // Removed as suggested
-                        // crossOrigin: 'anonymous' // REMOVED: Causing CORS errors on production domain
-                    });
-
-                    // Error Handling
-                    source.on('tileloaderror', (event) => {
-                        // Log the actual URL that failed to help debugging
-                        const tileUrl = event.tile ? event.tile.src_ : 'unknown';
-                        console.warn(`Layer Load Warning: ${layer.label} (${layer.id})`, tileUrl);
-                    });
-
-                    const olLayer = new OL.layer.Tile({
-                        source: source,
-                        visible: false,
-                        zIndex: layer.id === 'lp_pa_cb_nd_bu' ? 8 : 5, // Cadastral above zoning (5), below Hybrid (10)
-                        opacity: 0.8
-                    });
-                    olLayer.set('name', layer.id);
-                    return olLayer;
+                // 2. Cadastral Layer (WMTS - NEW)
+                const cadastralLayer = new OL.layer.Tile({
+                    source: new OL.source.XYZ({
+                        url: `https://api.vworld.kr/req/wmts/1.0.0/${apiKey}/lp_pa_cb_nd_bu/{z}/{y}/{x}.png`,
+                    }),
+                    zIndex: 9, // High priority, below Hybrid
+                    visible: false
                 });
+                cadastralLayer.set('name', 'lp_pa_cb_nd_bu');
 
-                // 5. Marker/Vector Layer (Topmost of content)
+                // 3. WMS Layers (Others)
+                // Filter out cadastral from WMS list
+                const wmsLayers = ALL_LAYERS
+                    .filter(l => l.id !== 'lp_pa_cb_nd_bu')
+                    .map(layer => {
+                        const source = new OL.source.TileWMS({
+                            url: `https://api.vworld.kr/req/wms`,
+                            params: {
+                                'LAYERS': layer.id.toLowerCase(),
+                                'STYLES': '',
+                                'CRS': 'EPSG:3857',
+                                'FORMAT': 'image/png',
+                                'TRANSPARENT': 'TRUE',
+                                'VERSION': '1.3.0',
+                                'key': API_CONFIG.VWORLD_KEY,
+                                'DOMAIN': window.location.hostname
+                            }
+                        });
+
+                        // Error Handling
+                        source.on('tileloaderror', (event) => {
+                            // Suppress console spam for common empty tiles
+                        });
+
+                        const olLayer = new OL.layer.Tile({
+                            source: source,
+                            visible: false,
+                            zIndex: 5,
+                            opacity: 0.8
+                        });
+                        olLayer.set('name', layer.id);
+                        return olLayer;
+                    });
+
+                // 4. Feature/Marker Layer
                 const markerSrc = new OL.source.Vector();
                 const markerLayer = new OL.layer.Vector({
                     source: markerSrc,
-                    zIndex: 20
+                    zIndex: 20,
+                    style: new OL.style.Style({
+                        fill: new OL.style.Fill({
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }),
+                        stroke: new OL.style.Stroke({
+                            color: '#ff0000',
+                            width: 2
+                        }),
+                        image: new OL.style.Circle({
+                            radius: 7,
+                            fill: new OL.style.Fill({
+                                color: '#ffcc33'
+                            })
+                        })
+                    })
                 });
                 setMarkerSource(markerSrc);
+
+                // 5. Measure Layer
+                const measureSrc = new OL.source.Vector();
+                measureSource.current = measureSrc;
+                const measureLayer = new OL.layer.Vector({
+                    source: measureSrc,
+                    zIndex: 25,
+                    style: new OL.style.Style({
+                        fill: new OL.style.Fill({
+                            color: 'rgba(255, 255, 255, 0.2)'
+                        }),
+                        stroke: new OL.style.Stroke({
+                            color: '#ffcc33',
+                            width: 2
+                        }),
+                        image: new OL.style.Circle({
+                            radius: 7,
+                            fill: new OL.style.Fill({
+                                color: '#ffcc33'
+                            })
+                        })
+                    })
+                });
 
                 // Map Options
                 const mapOptions = {
                     target: 'vworld_map_target',
-                    layers: [baseLayer, grayLayer, midnightLayer, satelliteLayer, hybridLayer, ...wmsLayers, markerLayer],
+                    layers: [
+                        baseLayer, grayLayer, midnightLayer, satelliteLayer,
+                        hybridLayer, cadastralLayer, ...wmsLayers,
+                        markerLayer, measureLayer
+                    ],
                     view: new OL.View({
                         center: [14151740, 4511257],
                         zoom: 17,
@@ -282,9 +340,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
 
                 const map = new OL.Map(mapOptions);
                 window.map = map;
+                setMapObj(map);
 
-                // Click Event Listener
+                // Click Event Listener (Polygon Highlight & Info)
                 map.on('singleclick', async (evt) => {
+                    // Ignore if measuring
+                    if (measureMode) return;
+
                     const coordinate = evt.coordinate;
                     const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
 
@@ -297,7 +359,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             const featureData = data.response.result.featureCollection.features[0];
                             const props = featureData.properties;
 
-                            // Highlight Boundary (Polygon) + Marker
                             if (markerSrc) {
                                 markerSrc.clear();
                                 const format = new OL.format.GeoJSON();
@@ -305,25 +366,14 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                     featureProjection: 'EPSG:3857',
                                     dataProjection: 'EPSG:4326'
                                 });
+
+                                // Polygon Highlight Style (Transparent Fill, Red Border)
                                 const polygonStyle = new OL.style.Style({
-                                    stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }),
-                                    fill: new OL.style.Fill({ color: 'rgba(239, 68, 68, 0.1)' })
+                                    stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }), // Red Stroke
+                                    fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.01)' }) // Very Transparent Fill
                                 });
                                 feature.setStyle(polygonStyle);
                                 markerSrc.addFeature(feature);
-
-                                const markerFeature = new OL.Feature({
-                                    geometry: new OL.geom.Point(coordinate)
-                                });
-                                const markerStyle = new OL.style.Style({
-                                    image: new OL.style.Icon({
-                                        anchor: [0.5, 1],
-                                        src: 'https://map.vworld.kr/images/ol3/marker_blue.png',
-                                        scale: 0.8
-                                    })
-                                });
-                                markerFeature.setStyle(markerStyle);
-                                markerSrc.addFeature(markerFeature);
                             }
 
                             if (onAddressSelect && props.pnu) {
@@ -346,7 +396,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     }
                 });
 
-                setMapObj(map);
                 setIsMapLoading(false);
 
             } catch (err) {
@@ -359,7 +408,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         initMap();
     }, []);
 
-    // Effect: Handle Layer Visibility & Map Type
+    // Effect: Handle Layer Visibility
     useEffect(() => {
         if (!mapObj) return;
         const layers = mapObj.getLayers();
@@ -372,8 +421,13 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             if (name === 'midnight') layer.setVisible(mapType === 'midnight');
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
+            // WMTS Cadastral
+            if (name === 'lp_pa_cb_nd_bu') {
+                layer.setVisible(activeLayers.includes('lp_pa_cb_nd_bu'));
+            }
+
             // WMS Layers
-            if (ALL_LAYERS.some(l => l.id === name)) {
+            if (ALL_LAYERS.some(l => l.id === name && l.id !== 'lp_pa_cb_nd_bu')) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
@@ -388,20 +442,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 const y = parseFloat(selectedAddress.y);
                 const center = ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
 
-                if (markerSource) {
-                    markerSource.clear();
-                    const feature = new ol.Feature({ geometry: new ol.geom.Point(center) });
-                    const iconStyle = new ol.style.Style({
-                        image: new ol.style.Icon({
-                            anchor: [0.5, 1],
-                            src: 'https://map.vworld.kr/images/ol3/marker_blue.png',
-                            scale: 0.8
-                        })
-                    });
-                    feature.setStyle(iconStyle);
-                    markerSource.addFeature(feature);
-                }
-
                 const view = mapObj.getView();
                 if (view) {
                     view.animate({ center: center, duration: 500, zoom: 19 });
@@ -410,10 +450,10 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 console.error("Map Update Error:", e);
             }
         }
-    }, [mapObj, selectedAddress, markerSource]);
+    }, [mapObj, selectedAddress]);
 
     // Categories for Filter
-    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !['lp_pa_cb_nd_bu', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].includes(l.id)).map(l => l.category))];
+    const categories = ['전체', ...new Set(ALL_LAYERS.filter(l => !['lp_pa_cb_nd_bu', ...QUICK_LAYER_IDS].includes(l.id)).map(l => l.category))];
 
     // Basic Exposed Layers (Quick Access)
     const BASIC_LAYERS = [
@@ -422,6 +462,140 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         'LT_C_UQ113', // Agriculture
         'LT_C_UQ114'  // Nature Preservation
     ];
+
+    // --- Measurement Logic ---
+    useEffect(() => {
+        if (!mapObj || !measureMode) {
+            // Cleanup interaction if mode is off
+            if (mapObj && drawInteraction.current) {
+                mapObj.removeInteraction(drawInteraction.current);
+                drawInteraction.current = null;
+            }
+            // Clear tooltips if needed? No, user might want to see result.
+            // But we should remove help tooltip.
+            if (mapObj && helpTooltipElement.current) {
+                mapObj.removeOverlay(helpTooltip.current);
+            }
+            return;
+        }
+
+        const OL = window.ol;
+        const source = measureSource.current;
+
+        // Add Draw Interaction
+        const type = measureMode === 'area' ? 'Polygon' : 'LineString';
+        const draw = new OL.interaction.Draw({
+            source: source,
+            type: type,
+            style: new OL.style.Style({
+                fill: new OL.style.Fill({
+                    color: 'rgba(255, 255, 255, 0.2)'
+                }),
+                stroke: new OL.style.Stroke({
+                    color: 'rgba(0, 0, 0, 0.5)',
+                    lineDash: [10, 10],
+                    width: 2
+                }),
+                image: new OL.style.Circle({
+                    radius: 5,
+                    stroke: new OL.style.Stroke({
+                        color: 'rgba(0, 0, 0, 0.7)'
+                    }),
+                    fill: new OL.style.Fill({
+                        color: 'rgba(255, 255, 255, 0.2)'
+                    })
+                })
+            })
+        });
+
+        // Overlay Logic
+        const createMeasureTooltip = () => {
+            if (measureTooltipElement.current) {
+                measureTooltipElement.current.parentNode.removeChild(measureTooltipElement.current);
+            }
+            measureTooltipElement.current = document.createElement('div');
+            measureTooltipElement.current.className = 'ol-tooltip ol-tooltip-measure bg-black/70 text-white px-2 py-1 rounded text-xs';
+            measureTooltip.current = new OL.Overlay({
+                element: measureTooltipElement.current,
+                offset: [0, -15],
+                positioning: 'bottom-center',
+                stopEvent: false,
+                insertFirst: false
+            });
+            mapObj.addOverlay(measureTooltip.current);
+        };
+
+        const createHelpTooltip = () => {
+            if (helpTooltipElement.current) {
+                helpTooltipElement.current.parentNode.removeChild(helpTooltipElement.current);
+            }
+            helpTooltipElement.current = document.createElement('div');
+            helpTooltipElement.current.className = 'ol-tooltip hidden';
+            helpTooltip.current = new OL.Overlay({
+                element: helpTooltipElement.current,
+                offset: [15, 0],
+                positioning: 'center-left'
+            });
+            mapObj.addOverlay(helpTooltip.current);
+        };
+
+        createMeasureTooltip();
+        createHelpTooltip();
+
+        let listener;
+        draw.on('drawstart', (evt) => {
+            setSketch(evt.feature);
+            let tooltipCoord = evt.coordinate;
+
+            listener = evt.feature.getGeometry().on('change', (evt) => {
+                const geom = evt.target;
+                let output;
+                if (geom instanceof OL.geom.Polygon) {
+                    const area = OL.sphere.getArea(geom);
+                    output = area > 10000
+                        ? (Math.round(area / 1000000 * 100) / 100) + ' km²'
+                        : (Math.round(area * 100) / 100) + ' m²';
+                    tooltipCoord = geom.getInteriorPoint().getCoordinates();
+                } else if (geom instanceof OL.geom.LineString) {
+                    const length = OL.sphere.getLength(geom);
+                    output = length > 100
+                        ? (Math.round(length / 1000 * 100) / 100) + ' km'
+                        : (Math.round(length * 100) / 100) + ' m';
+                    tooltipCoord = geom.getLastCoordinate();
+                }
+                measureTooltipElement.current.innerHTML = output;
+                measureTooltip.current.setPosition(tooltipCoord);
+            });
+        });
+
+        draw.on('drawend', () => {
+            measureTooltipElement.current.className = 'ol-tooltip ol-tooltip-static bg-black/70 text-white px-2 py-1 rounded text-xs border border-white/20';
+            measureTooltip.current.setOffset([0, -7]);
+            setSketch(null);
+            measureTooltipElement.current = null;
+            createMeasureTooltip();
+            OL.Observable.unByKey(listener);
+        });
+
+        mapObj.addInteraction(draw);
+        drawInteraction.current = draw;
+
+        return () => {
+            mapObj.removeInteraction(draw);
+        };
+    }, [mapObj, measureMode]);
+
+    const clearMeasurements = () => {
+        if (measureSource.current) {
+            measureSource.current.clear();
+        }
+        // Remove static overlays? Hard to track them all without storing them.
+        // Simple way: reload map or store array of overlays.
+        // For now, let's just clear features. Overlays will remain stuck on map if we don't remove them.
+        // Correct approach: Store separate overlays or query DOM.
+        const staticTooltips = document.querySelectorAll('.ol-tooltip-static');
+        staticTooltips.forEach(el => el.remove());
+    };
 
     return (
         <div className="flex-1 relative bg-gray-100 overflow-hidden group h-full w-full">
@@ -457,7 +631,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                             </button>
                         ))}
 
-                        {/* Hybrid Toggle (Inside Group, No Separator) */}
                         <button
                             onClick={() => setShowHybrid(!showHybrid)}
                             className={`px-3 h-full text-xs font-bold rounded transition-colors 
@@ -480,6 +653,29 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         지적도
                     </button>
                 </div>
+
+                {/* Measurement Tools (New) */}
+                <div className="flex gap-1 bg-white rounded shadow-sm p-1 border border-gray-200">
+                    <button
+                        onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${measureMode === 'distance' ? 'bg-orange-500 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                    >
+                        거리
+                    </button>
+                    <button
+                        onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${measureMode === 'area' ? 'bg-orange-500 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                    >
+                        면적
+                    </button>
+                    <button
+                        onClick={clearMeasurements}
+                        className="px-3 py-1 text-xs font-bold rounded hover:bg-red-50 text-red-600 border-l border-gray-200"
+                    >
+                        지우기
+                    </button>
+                </div>
+
 
                 {/* 2. Basic Exposed Layers (Zoning) */}
                 <div className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-100 backdrop-blur-sm flex gap-2">
@@ -538,6 +734,12 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     {activeLayers.map(id => {
                         const layer = ALL_LAYERS.find(l => l.id === id);
                         if (!layer) return null;
+                        // Skip cadastral legend if handled specially or if self-explanatory
+                        // But user wanted fixing "No results". For Cadastral, WMTS doesn't have valid GetLegendGraphic usually, 
+                        // or we can use a static image if available. VWorld doesn't expose good legend for cadastral.
+                        // Let's hide legend for Cadastral to avoid "No results" error which is ugly.
+                        if (id === 'lp_pa_cb_nd_bu') return null;
+
                         return (
                             <div key={id} className="bg-white/95 p-2 rounded-lg shadow-lg border border-gray-200 backdrop-blur-sm animate-slide-up">
                                 <div className="flex justify-between items-center mb-1">
@@ -548,10 +750,14 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                                 </div>
                                 <div className="bg-gray-50 rounded p-1 flex justify-center">
                                     <img
-                                        src={`https://api.vworld.kr/req/image?key=${API_CONFIG.VWORLD_KEY}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id}`}
+                                        src={`https://api.vworld.kr/req/image?key=${API_CONFIG.VWORLD_KEY}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer=${layer.id.toUpperCase()}`}
                                         alt="범례"
                                         className="max-w-full h-auto object-contain min-h-[20px]"
-                                        onError={(e) => e.target.style.display = 'none'}
+                                        onError={(e) => {
+                                            // Handle broken legend
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.innerHTML = '<span class="text-[10px] text-gray-400">범례 없음</span>';
+                                        }}
                                     />
                                 </div>
                             </div>
@@ -593,12 +799,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                         <div className="flex-1 overflow-y-auto p-3 space-y-6">
                             {['용도지역', '용도지구', '용도구역', '도시계획', '환경/산림', '재해/안전', '수자원/해양', '행정/기타'].map(category => {
                                 if (selectedCategory !== '전체' && selectedCategory !== category) return null;
-                                // Filter out BASIC LAYERS and Cadastral Map from the list if desired, OR keep them but mark as active.
-                                // User said "Basic exposure... and others are as is".
-                                // Let's show ALL layers in the list for completeness, but maybe group them?
-                                // Actually, Quick Layers were filtered out in previous logic. Let's filter out Basic here too if we want them exclusive, 
-                                // BUT usually "Full Layer List" means FULL.
-                                // Let's use the same filter logic as before but updated for BASIC_LAYERS.
                                 const categoryLayers = ALL_LAYERS.filter(l => l.category === category && !['lp_pa_cb_nd_bu', ...BASIC_LAYERS].includes(l.id));
                                 if (categoryLayers.length === 0) return null;
 
