@@ -251,7 +251,6 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: 'https://api.vworld.kr/req/wms',
-                        crossOrigin: 'anonymous', // [Stabilization]
                         params: {
                             service: 'WMS',
                             request: 'GetMap',
