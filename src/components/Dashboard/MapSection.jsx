@@ -259,19 +259,19 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 // Internal ID: LP_PA_CBND_BUBUN (Application Consistency)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: 'https://api.vworld.kr/ned/wms/CtnlgsSpceService', // Core Fix: ned/wms endpoint
+                        url: 'https://api.vworld.kr/req/wms', // [FIX] Switch to req/wms per example
                         params: {
-                            'layers': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', // Reference WMS Layer IDs (Bonbun, Bubun)
-                            'styles': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
-                            'format': 'image/png',
-                            'transparent': 'true',
-                            'version': '1.3.0',
-                            'crs': 'EPSG:4326',        // Server Native CRS
-                            'key': apiKey,
-                            'domain': window.location.hostname
+                            'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
+                            'STYLES': 'lp_pa_cbnd_bonbun_line,lp_pa_cbnd_bubun_line', // [FIX] Add _line suffix
+                            'FORMAT': 'image/png',
+                            'TRANSPARENT': 'true',
+                            'VERSION': '1.3.0',
+                            'CRS': 'EPSG:3857',        // [FIX] Match example (900913 ≈ 3857)
+                            'KEY': apiKey,
+                            'DOMAIN': window.location.hostname
                         },
-                        // Projection: Explicitly set source to 4326 so OL reprojects to 3857
-                        projection: 'EPSG:4326',
+                        // Projection: Source is now 3857, matches view
+                        projection: 'EPSG:3857',
                         // crossOrigin: 'anonymous' // Removed to prevent CORS issues with opaque responses
                         tileLoadFunction: function (tile, src) {
                             console.log("Cadastral Tile Request:", src);
@@ -375,7 +375,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     try {
                         // Use Proxy for Data API to avoid CORS
                         // /api/vworld -> https://api.vworld.kr
-                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=LP_PA_CBND_BUBUN&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
+                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
                         const response = await fetch(dataUrl);
                         const data = await response.json();
 
