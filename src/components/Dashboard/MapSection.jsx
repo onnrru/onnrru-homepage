@@ -592,29 +592,37 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
             </div>
 
             {/* Measurement Tools (Left Vertical) */}
-            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-2 pointer-events-auto">
+            {/* Measurement Tools (Left Vertical) */}
+            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-1 items-center bg-white rounded-lg shadow-md border border-gray-200 p-1 pointer-events-auto">
+                <span className="text-[10px] font-bold text-gray-500 mb-1">스케치</span>
+
                 <button
                     onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
-                    className={`w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-all border
-                        ${measureMode === 'distance' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    className={`flex flex-col items-center justify-center w-12 h-12 rounded transition-colors
+                        ${measureMode === 'distance' ? 'bg-blue-50 text-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                     title="거리 재기"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m8-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m1-4V5m6 14v-2a2 2 0 00-2-2h-1a2 2 0 00-2 2v2m-2-4h.01M17 16h.01"></path></svg>
+                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m8-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m1-4V5m6 14v-2a2 2 0 00-2-2h-1a2 2 0 00-2 2v2m-2-4h.01M17 16h.01"></path></svg>
+                    <span className="text-[10px] leading-none">거리</span>
                 </button>
+
                 <button
                     onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
-                    className={`w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-all border
-                        ${measureMode === 'area' ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    className={`flex flex-col items-center justify-center w-12 h-12 rounded transition-colors
+                        ${measureMode === 'area' ? 'bg-blue-50 text-blue-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                     title="면적 재기"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span className="text-[10px] leading-none">면적</span>
                 </button>
+
                 <button
                     onClick={clearMeasurements}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg shadow-md bg-white text-red-500 border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-all"
+                    className="flex flex-col items-center justify-center w-12 h-12 rounded hover:bg-red-50 text-gray-600 hover:text-red-600 transition-colors"
                     title="지우기"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span className="text-[10px] leading-none">초기화</span>
                 </button>
             </div>
 
