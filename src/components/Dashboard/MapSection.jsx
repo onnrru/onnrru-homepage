@@ -147,6 +147,39 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
     const cadastralLayerRef = useRef(null);
     const cadastralPendingRef = useRef(false); // Prevent duplicate moveend/animate triggers
 
+    // [Interaction Upgrade] Refs for Event Access
+    const activeLayersRef = useRef([]);
+    const markerSourceRef = useRef(null);
+
+    useEffect(() => {
+        activeLayersRef.current = activeLayers;
+    }, [activeLayers]);
+
+    // [Interaction Upgrade] Highlight Helper
+    const highlightParcelFeature = (featureData) => {
+        const OL = window.ol;
+        const markerSrc = markerSourceRef.current;
+        if (!markerSrc || !OL) return;
+
+        markerSrc.clear();
+
+        const format = new OL.format.GeoJSON();
+        const feature = format.readFeature(featureData, {
+            featureProjection: 'EPSG:3857',
+            dataProjection: 'EPSG:4326'
+        });
+
+        // Red Stroke + Transparent Fill
+        feature.setStyle(
+            new OL.style.Style({
+                stroke: new OL.style.Stroke({ color: '#ef4444', width: 3 }),
+                fill: new OL.style.Fill({ color: 'rgba(239, 68, 68, 0.12)' }) // Transparent Red
+            })
+        );
+
+        markerSrc.addFeature(feature);
+    };
+
     const toggleLayer = (layerId) => {
         // [Stabilization] Auto-zoom logic moved to dedicated useEffect.
         // This function now only toggles state.
@@ -306,6 +339,7 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                     zIndex: 20
                 });
                 setMarkerSource(markerSrc);
+                markerSourceRef.current = markerSrc; // [Interaction Upgrade] Ref Link
 
                 // 5. Measure Layer
                 const measureSrc = new OL.source.Vector();
@@ -349,6 +383,59 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
                 const map = new OL.Map(mapOptions);
                 window.map = map;
                 setMapObj(map);
+
+                // [Interaction Upgrade] Disable default double click zoom
+                map.getInteractions().forEach((i) => {
+                    if (i instanceof OL.interaction.DoubleClickZoom) {
+                        map.removeInteraction(i);
+                    }
+                });
+
+                // [Interaction Upgrade] Double Click Handler (Fetch + Zoom + Select)
+                map.on('dblclick', async (evt) => {
+                    if (measureMode) return;
+                    evt.preventDefault?.(); // Prevent potential default behavior
+
+                    const coordinate = evt.coordinate;
+                    const [lon, lat] = OL.proj.transform(coordinate, 'EPSG:3857', 'EPSG:4326');
+
+                    try {
+                        const dataUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
+                        const response = await fetch(dataUrl);
+                        const data = await response.json();
+
+                        if (data?.response?.status !== "OK") return;
+
+                        const featureData = data.response.result.featureCollection.features?.[0];
+                        if (!featureData) return;
+
+                        // 1) Highlight
+                        highlightParcelFeature(featureData);
+
+                        // 2) Auto Move (Zoom 19)
+                        const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
+                        map.getView().animate({ center: center3857, zoom: 19, duration: 350 });
+
+                        // 3) Fill Info
+                        const props = featureData.properties || {};
+                        if (onAddressSelect && props.pnu) {
+                            onAddressSelect({
+                                address: props.addr || "",
+                                roadAddr: props.road || props.addr || "",
+                                parcelAddr: props.addr || "",
+                                x: lon,
+                                y: lat,
+                                pnu: props.pnu,
+                                jimok: props.jimok,
+                                area: props.parea,
+                                price: props.jiga,
+                                zone: props.unm
+                            });
+                        }
+                    } catch (error) {
+                        console.error("Map dblclick fetch error:", error);
+                    }
+                });
 
                 // Click Event Listener (Polygon Highlight & Info)
                 map.on('singleclick', async (evt) => {
@@ -463,7 +550,8 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         const z = Number.isFinite(zRaw) ? zRaw : MIN_Z;
         const targetZoom = Math.max(MIN_Z, Math.min(MAX_Z, z));
 
-        const needZoomMove = Math.round(z) !== Math.round(targetZoom);
+        // [Interaction Upgrade] Use Range check
+        const needZoomMove = (z < MIN_Z) || (z > MAX_Z);
 
         // Turn off temporarily
         cadastralLayer.setVisible(false);
@@ -496,6 +584,93 @@ const MapSection = ({ selectedAddress, onAddressSelect }) => {
         view.animate({ zoom: targetZoom, duration: 350 });
 
     }, [mapObj, activeLayers]); // Re-run when activeLayers changes
+
+    // [Interaction Upgrade] Enforce Cadastral Zoom Lower Bound (>= 17)
+    useEffect(() => {
+        if (!mapObj) return;
+        const view = mapObj.getView();
+        if (!view) return;
+
+        const MIN_Z = 17;
+
+        const onResChange = () => {
+            const cadastralOn = activeLayersRef.current.includes('LP_PA_CBND_BUBUN');
+            if (!cadastralOn) return;
+
+            const z = view.getZoom();
+            if (Number.isFinite(z) && z < MIN_Z) {
+                view.animate({ zoom: MIN_Z, duration: 250 });
+            }
+        };
+
+        view.on('change:resolution', onResChange);
+        return () => view.un('change:resolution', onResChange);
+    }, [mapObj]);
+
+    // [Interaction Upgrade] Data Enrichment on Search Selection
+    const lastEnrichKeyRef = useRef(null);
+
+    useEffect(() => {
+        if (!mapObj || !selectedAddress?.x || !selectedAddress?.y) return;
+        const OL = window.ol;
+        const apiKey = API_CONFIG.VWORLD_KEY;
+
+        // Prevent duplicate calls
+        const key = `${selectedAddress.x},${selectedAddress.y},${selectedAddress.pnu || ''}`;
+        if (lastEnrichKeyRef.current === key) return;
+        lastEnrichKeyRef.current = key;
+
+        const run = async () => {
+            try {
+                const lon = parseFloat(selectedAddress.x);
+                const lat = parseFloat(selectedAddress.y);
+
+                const dataUrl =
+                    `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature` +
+                    `&data=lp_pa_cbnd_bubun&format=json&geomFilter=POINT(${lon} ${lat})` +
+                    `&key=${apiKey}&domain=${window.location.hostname}`;
+
+                const res = await fetch(dataUrl);
+                const json = await res.json();
+
+                if (json?.response?.status !== "OK") return;
+                const featureData = json.response?.result?.featureCollection?.features?.[0];
+                if (!featureData) return;
+
+                // 1) Highlight
+                highlightParcelFeature(featureData);
+
+                // 2) Enrich Address Info
+                const props = featureData.properties || {};
+                const enriched = {
+                    ...selectedAddress,
+                    address: props.addr || selectedAddress.address || "",
+                    roadAddr: props.road || selectedAddress.roadAddr || props.addr || "",
+                    parcelAddr: props.addr || selectedAddress.parcelAddr || "",
+                    pnu: props.pnu || selectedAddress.pnu,
+                    jimok: props.jimok ?? selectedAddress.jimok,
+                    area: props.parea ?? selectedAddress.area,
+                    price: props.jiga ?? selectedAddress.price,
+                    zone: props.unm ?? selectedAddress.zone
+                };
+
+                const changed =
+                    enriched.pnu !== selectedAddress.pnu ||
+                    enriched.jimok !== selectedAddress.jimok ||
+                    enriched.area !== selectedAddress.area ||
+                    enriched.price !== selectedAddress.price ||
+                    enriched.zone !== selectedAddress.zone;
+
+                if (changed && onAddressSelect && enriched.pnu) {
+                    onAddressSelect(enriched);
+                }
+            } catch (e) {
+                console.error("SelectedAddress enrich failed:", e);
+            }
+        };
+
+        run();
+    }, [mapObj, selectedAddress]);
 
     // Effect: Handle Layer Visibility (Generic Checks)
     useEffect(() => {
