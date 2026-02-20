@@ -79,8 +79,8 @@ export const fetchApartmentTransactions = async (lawdCd, monthsCount = 36) => {
         const { MOLIT_BASE_URL, MOLIT_KEY, ENDPOINTS } = API_CONFIG;
 
         // Prepare URL base
-        // Note: some keys need encoding, some don't. We'll try passing it as decoded first.
-        const encodedKey = encodeURIComponent(MOLIT_KEY);
+        // The key provided by the user is already URL-encoded.
+        const encodedKey = MOLIT_KEY;
 
         const fetchMonthData = async (dealYmd) => {
             const url = `${MOLIT_BASE_URL}${ENDPOINTS.APT_TRADE}?serviceKey=${encodedKey}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
