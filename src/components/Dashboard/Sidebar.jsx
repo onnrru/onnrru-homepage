@@ -36,7 +36,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const unwrapNed = (data) => {
         if (!data) return null;
 
-        // Try various common VWorld response paths
         const paths = [
             data?.response?.body?.items?.item?.[0],
             data?.response?.body?.items?.[0],
@@ -55,7 +54,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         for (const p of paths) {
             if (p && typeof p === 'object' && !Array.isArray(p)) {
-                // Check if this object contains any expected data keys
                 if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
                     return p;
                 }
@@ -90,7 +88,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
                 jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, ''),
                 area: Number(first(selectedAddress.area, selectedAddress.parea, 0)),
-                price: Number(first(selectedAddress.price, selectedAddress.jiga, 0))
+                price: Number(selectedAddress.price, selectedAddress.jiga, 0)
             }] : []);
 
         if (list.length === 0) return { list: [], representative: null, totalArea: 0 };
@@ -124,20 +122,18 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const d = unwrapNed(payload);
         if (!d) throw new Error('NED JSON record not found');
 
-        console.log('NED full record:', d);
-
         return {
             pnu: first(d.pnu, pnu),
             indcgr_code_nm: first(
                 d.indcgr_code_nm, d.indcgrCodeNm,
                 d.lndcgr_code_nm, d.lndcgrCodeNm,
-                d.jimok_nm, d.jimok_name, d.jimok, d.JIMOK, d.lndcgr_nm, d.indcgr_nm
+                d.jimok_nm, d.jimok, d.JIMOK, d.lndcgr_nm
             ),
             ldplc_ar: first(
                 d.ldplc_ar, d.ldplcAr,
                 d.lndpcl_ar, d.lndpclAr,
                 d.lndplc_ar, d.lndplcAr,
-                d.ar, d.area, d.parea, d.PAREA, d.lndcl_ar
+                d.ar, d.area, d.parea, d.PAREA
             ),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
@@ -153,43 +149,48 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
 
-        const res = await axios.get(url, {
-            params: {
-                key, domain, typename: 'dt_d194', pnu,
-                maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326',
-                output: 'text/xml; subtype=gml/2.1.2'
-            },
-            responseType: 'text'
-        });
+        try {
+            const res = await axios.get(url, {
+                params: {
+                    key, domain, typename: 'dt_d194', pnu,
+                    maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326',
+                    output: 'text/xml; subtype=gml/2.1.2'
+                },
+                responseType: 'text'
+            });
 
-        const text = String(res.data || '');
-        if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
-            throw new Error('VWorld WFS returned HTML');
-        }
-
-        const xml = new DOMParser().parseFromString(text, 'text/xml');
-        const pickLocal = (localName) => {
-            const els = xml.getElementsByTagName('*');
-            for (let i = 0; i < els.length; i++) {
-                if (els[i].localName === localName) return els[i].textContent?.trim() ?? null;
+            const text = String(res.data || '');
+            if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+                throw new Error('VWorld WFS returned HTML');
             }
-            return null;
-        };
 
-        return {
-            pnu: pickLocal('pnu') || pnu,
-            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm'), pickLocal('jimok_nm')),
-            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('lndpcl_ar'), pickLocal('ar'), pickLocal('area')),
-            pblntf_pclnd: pickLocal('pblntf_pclnd'),
-            prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
-            prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
-            lad_use_sittn_nm: pickLocal('lad_use_sittn_nm'),
-            road_side_code_nm: pickLocal('road_side_code_nm')
-        };
+            const xml = new DOMParser().parseFromString(text, 'text/xml');
+            const pickLocal = (localName) => {
+                const els = xml.getElementsByTagName('*');
+                for (let i = 0; i < els.length; i++) {
+                    if (els[i].localName === localName) return els[i].textContent?.trim() ?? null;
+                }
+                return null;
+            };
+
+            return {
+                pnu: pickLocal('pnu') || pnu,
+                indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm')),
+                ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('lndpcl_ar')),
+                pblntf_pclnd: pickLocal('pblntf_pclnd'),
+                prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
+                prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
+                lad_use_sittn_nm: pickLocal('lad_use_sittn_nm'),
+                road_side_code_nm: pickLocal('road_side_code_nm')
+            };
+        } catch (e) {
+            console.error('WFS fetch failed:', e);
+            throw e;
+        }
     };
 
     // --- Effects ---
-    // Minimap Effect
+    // Minimap Effect (Restored to single WMS with fixed zoom)
     useEffect(() => {
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
@@ -198,27 +199,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = getVworldDomain();
         const size = 400;
-        const delta = 0.0015;
 
-        // BBOX order for version 1.3.0 is (ymin, xmin, ymax, xmax)
+        // 지적도가 가장 잘 보이는 약 0.001도 수준 (약 100m)
+        const delta = 0.0012;
+
+        // BBOX order for WMS 1.3.0 is (ymin, xmin, ymax, xmax)
         const bboxWMS = `${y - delta},${x - delta},${y + delta},${x + delta}`;
-        const baseParams = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
+
+        const params = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
             `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bboxWMS)}` +
-            `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
+            `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=FALSE` +
             `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
-        // 1. Base Map (VWorld image API - Standard BBOX xmin,ymin)
-        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326` +
-            `&bbox=${x - delta},${y - delta},${x + delta},${y + delta}&width=${size}&height=${size}&layers=base&domain=${encodeURIComponent(domain)}`;
+        // 백지도 + 도시/관리/농림 지역 + 지적도
+        const layers = ['white', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LP_PA_CBND_BUBUN'].join(',');
+        const url = `/api/vworld/req/wms?${params}&LAYERS=${encodeURIComponent(layers)}`;
 
-        // 2. Zoning (4 layers)
-        const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
-        const zoningUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent(zoningLayers)}`;
-
-        // 3. Cadastral
-        const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
-
-        setMiniMapUrl({ baseUrl, zoningUrl, cadastralUrl });
+        setMiniMapUrl(url);
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
     // Data Fetch Effect
@@ -285,35 +282,21 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
 
-            {/* 0. Mini Map (Layer Overlays) */}
+            {/* 0. Mini Map (Single Request) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
-                        {/* 1. Base Map */}
                         <img
-                            src={miniMapUrl.baseUrl}
-                            alt="배경지도"
-                            className="absolute inset-0 w-full h-full object-cover z-0"
+                            src={miniMapUrl}
+                            alt="민이맵"
+                            className="w-full h-full object-cover"
+                            onError={() => setMiniMapUrl(null)}
                         />
-                        {/* 2. Zoning */}
-                        <img
-                            src={miniMapUrl.zoningUrl}
-                            alt="용도지역"
-                            className="absolute inset-0 w-full h-full object-cover z-10"
-                        />
-                        {/* 3. Cadastral */}
-                        <img
-                            src={miniMapUrl.cadastralUrl}
-                            alt="지적도"
-                            className="absolute inset-0 w-full h-full object-cover z-20"
-                        />
-
-                        {/* Target Marker */}
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-30">
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
-                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm z-40">
-                            VWorld
+                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
+                            VWorld WMS
                         </div>
                     </div>
                 </div>
@@ -337,7 +320,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full py-10">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
-                        <p className="text-xs text-gray-400">데이터 처리 중...</p>
+                        <p className="text-xs text-gray-400">네트워크에서 데이터 추출 중...</p>
                     </div>
                 ) : (
                     <>
@@ -400,7 +383,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </div>
                         </section>
 
-                        {/* 4. Land Specification */}
+                        {/* 4. Land Specification (Collapsible) */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -433,7 +416,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         <table className="w-full text-[10px] text-left">
                                             <thead className="bg-gray-50 text-gray-400 font-bold border-b border-gray-100">
                                                 <tr>
-                                                    <th className="p-2 text-center w-8">No</th>
+                                                    <th className="p-2 text-center w-8 text-[9px]">No</th>
                                                     <th className="p-2">지번</th>
                                                     <th className="p-2 text-right">면적</th>
                                                     <th className="p-2 text-center">지목</th>
@@ -441,9 +424,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {picked.list.map((p, idx) => (
-                                                    <tr key={p.pnu || idx}>
+                                                    <tr key={p.pnu || idx} className="hover:bg-gray-50 transition-colors">
                                                         <td className="p-2 text-center text-gray-400">{idx + 1}</td>
-                                                        <td className="p-2">{extractDongRiBunji(p.addr)}</td>
+                                                        <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
                                                         <td className="p-2 text-right">{p.area.toLocaleString()}</td>
                                                         <td className="p-2 text-center">{p.jimok || '-'}</td>
                                                     </tr>
@@ -452,6 +435,25 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         </table>
                                     </div>
                                 )}
+                            </section>
+                        )}
+
+                        {/* 5. Land Use Plan Map */}
+                        {landUseWmsUrl && showLandUseWms && (
+                            <section>
+                                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                                    토지이용계획도
+                                </h4>
+                                <div className="w-full aspect-video bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
+                                    <img
+                                        src={landUseWmsUrl}
+                                        alt="토지이용계획도"
+                                        className="w-full h-full object-contain"
+                                        onError={() => setShowLandUseWms(false)}
+                                    />
+                                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">WMS</div>
+                                </div>
                             </section>
                         )}
                     </>
