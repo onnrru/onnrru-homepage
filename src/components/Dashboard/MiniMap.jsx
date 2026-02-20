@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { API_CONFIG } from '../../config/api';
 
-const MiniMap = ({ x, y }) => {
+const MiniMap = ({ x, y, feature }) => {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const vectorSourceRef = useRef(null);
 
     useEffect(() => {
         if (!mapRef.current) return;
@@ -35,14 +36,22 @@ const MiniMap = ({ x, y }) => {
             zIndex: 10
         });
 
-        // Marker (Center)
+        // Vector Layer (Polygon or Marker)
         const vectorSource = new OL.source.Vector();
+        vectorSourceRef.current = vectorSource;
         const vectorLayer = new OL.layer.Vector({
             source: vectorSource,
             zIndex: 20,
             style: new OL.style.Style({
+                stroke: new OL.style.Stroke({
+                    color: '#ef4444', // Red
+                    width: 2
+                }),
+                fill: new OL.style.Fill({
+                    color: 'rgba(239, 68, 68, 0.2)' // Transparent Red
+                }),
                 image: new OL.style.Circle({
-                    radius: 6,
+                    radius: 5,
                     fill: new OL.style.Fill({ color: '#ef4444' }),
                     stroke: new OL.style.Stroke({ color: '#ffffff', width: 2 })
                 })
@@ -50,7 +59,7 @@ const MiniMap = ({ x, y }) => {
         });
 
         // 2. View
-        // Initial center, will be updated
+        // Initial center
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
@@ -63,7 +72,7 @@ const MiniMap = ({ x, y }) => {
                 maxZoom: 19,
                 enableRotation: false
             }),
-            controls: [] // No zoom controls etc
+            controls: [] // No controls
         });
 
         mapInstance.current = map;
@@ -76,32 +85,41 @@ const MiniMap = ({ x, y }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Init once
 
-    // Update Center & Marker when Props change
+    // Update Content
     useEffect(() => {
         const OL = window.ol;
         const map = mapInstance.current;
-        if (!map || !OL || !x || !y) return;
+        const src = vectorSourceRef.current;
+        if (!map || !OL || !src || !x || !y) return;
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
 
-        // Update Marker
-        const vectorLayer = map.getLayers().getArray().find(l => l instanceof OL.layer.Vector);
-        if (vectorLayer) {
-            const src = vectorLayer.getSource();
-            src.clear();
-            const feature = new OL.Feature({
+        src.clear();
+
+        if (feature) {
+            // Render Polygon
+            const format = new OL.format.GeoJSON();
+            const olFeature = format.readFeature(feature, {
+                featureProjection: 'EPSG:3857',
+                dataProjection: 'EPSG:4326'
+            });
+            src.addFeature(olFeature);
+        } else {
+            // Fallback: Point Marker
+            const pointFeature = new OL.Feature({
                 geometry: new OL.geom.Point(center)
             });
-            src.addFeature(feature);
+            src.addFeature(pointFeature);
         }
-    }, [x, y]);
+
+    }, [x, y, feature]);
 
     return (
         <div
             ref={mapRef}
             className="w-full h-full bg-white relative"
-            style={{ backgroundColor: '#ffffff' }} // Force white background
+            style={{ backgroundColor: '#ffffff' }}
         />
     );
 };

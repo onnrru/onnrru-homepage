@@ -79,37 +79,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // --- New Definitive API (ladfrlList) ---
-    const fetchLadfrl = async (pnuRaw) => {
-        const key = API_CONFIG.VWORLD_KEY;
-        const pnu = normalizePnu(pnuRaw);
-        const domain = getVworldDomain();
-        const url = `/api/vworld/ned/data/ladfrlList`;
-
-        const res = await axios.get(url, {
-            params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
-            timeout: 5000
-        });
-
-        const root = safeJson(res.data) ?? res.data;
-        const item = root?.response?.body?.items?.item;
-        const row = Array.isArray(item) ? item[0] : item;
-
-        if (!row) throw new Error('ladfrlList empty');
-
-        return {
-            jimok: first(row.lndcgrCodeNm, row.lndcgr_code_nm, row.indcgrCodeNm, row.indcgr_code_nm, '-'),
-            area: Number(first(row.lndpclAr, row.lndpcl_ar, row.ladAr, row.lad_ar, null)),
-            bunji: first(row.mnnmSlno, row.lnmCo, null),
-        };
-    };
-
+    // --- Definitive API: getLandCharacteristics ---
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
         const pnu = normalizePnu(pnuRaw);
+        const domain = getVworldDomain();
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
-        const res = await axios.get(url, { params: { key, domain: getVworldDomain(), pnu, format: 'json' } });
-        return unwrapNed(safeJson(res.data) ?? res.data);
+
+        const res = await axios.get(url, {
+            params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 }
+        });
+
+        const d = unwrapNed(safeJson(res.data) ?? res.data);
+        if (!d) return null;
+        return d;
     };
 
     const fetchLandCharacteristicsWFS = async (pnuRaw) => {
@@ -135,7 +118,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             prpos_area_2_nm: pick('prpos_area_2_nm'),
             lad_use_sittn_nm: pick('lad_use_sittn_nm'),
             road_side_code_nm: pick('road_side_code_nm'),
-            pblntf_pclnd: pick('pblntf_pclnd')
+            pblntf_pclnd: pick('pblntf_pclnd'),
+            lndcgrCodeNm: pick('lndcgrCodeNm') || pick('indcgr_code_nm'),
+            lndpclAr: pick('lndpclAr') || pick('ldplc_ar')
         };
     };
 
@@ -145,14 +130,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             ? selectedParcels.map(p => ({
                 pnu: normalizePnu(p?.properties?.pnu),
                 addr: p?.properties?.addr || p?.properties?.address || '',
-                jimok: '-', // Filled by Meta
-                area: 0     // Filled by Meta
+                // Pass raw feature for minimap if needed, though mostly we use rep
+                feature: p
             }))
             : (selectedAddress?.pnu ? [{
                 pnu: normalizePnu(selectedAddress.pnu),
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
-                jimok: '-',
-                area: 0
+                feature: null // We might not have feature for just address search unless passed
             }] : []);
 
         const representative = listData[0] || null;
@@ -161,7 +145,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     // --- Effects ---
 
-    // 1. Main Data Loading (Ladfrl + Characteristics)
+    // 1. Main Data Loading 
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -169,29 +153,32 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                // (1) Ladfrl (Definitive Jimok/Area)
-                let lad = { jimok: '-', area: null };
-                try {
-                    lad = await fetchLadfrl(repPnu);
-                } catch (e) {
-                    console.warn("Ladfrl failed, using fallback empty");
+                // Priority: getLandCharacteristics
+                let d = await fetchLandCharacteristics(repPnu);
+
+                // Fallback: WFS
+                if (!d) {
+                    try { d = await fetchLandCharacteristicsWFS(repPnu); } catch { }
                 }
 
-                // (2) Characteristics (Usage/Price/Road)
-                let d = {};
-                try { d = await fetchLandCharacteristics(repPnu) || {}; }
-                catch { try { d = await fetchLandCharacteristicsWFS(repPnu) || {}; } catch { } }
+                if (!d) throw new Error("No Data");
+
+                const jimok = first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, d.indcgr_code_nm, '-');
+                const area = Number(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, d.ladAr, d.lad_ar, 0));
 
                 setData({
                     basic: {
-                        jimok: lad.jimok !== '-' ? lad.jimok : first(d.indcgr_code_nm, d.indcgrCodeNm, d.jimok, '-'),
-                        area: (lad.area !== null) ? lad.area : Number(first(d.ldplc_ar, d.ldplcAr, d.area, 0)),
-                        price: Number(first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, 0)),
-                        ladUse: first(d.lad_use_sittn_nm, d.ladUseSittnNm, '-'),
-                        roadSide: first(d.road_side_code_nm, d.roadSideCodeNm, '-')
+                        jimok: jimok,
+                        area: area,
+                        price: Number(first(d.pblntfPclnd, d.pblntf_pclnd, d.jiga, 0)),
+                        ladUse: first(d.ladUseSittnNm, d.lad_use_sittn_nm, '-'),
+                        roadSide: first(d.roadSideCodeNm, d.road_side_code_nm, '-')
                     },
                     regulation: {
-                        uses: [d?.prpos_area_1_nm, d?.prpos_area_2_nm].filter(v => v && !/지정되지\s*않음/.test(v))
+                        uses: [
+                            first(d.prposArea1Nm, d.prpos_area_1_nm),
+                            first(d.prposArea2Nm, d.prpos_area_2_nm)
+                        ].filter(v => v && !/지정되지\s*않음/.test(v))
                     }
                 });
 
@@ -206,7 +193,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // 2. Parcel Meta (Batch Ladfrl)
+    // 2. Parcel Meta (Batch getLandCharacteristics)
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -218,10 +205,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     list.map(async (p) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
-                        // If Rep, optimize? No, standard fetch is cheap enough or safe
                         try {
-                            const l = await fetchLadfrl(pnu);
-                            return [pnu, { area: l.area, jimok: l.jimok }];
+                            const d = await fetchLandCharacteristics(pnu);
+                            if (d) {
+                                return [pnu, {
+                                    area: Number(first(d.lndpclAr, d.lndpcl_ar, 0)),
+                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
+                                }];
+                            }
+                            return [pnu, { area: 0, jimok: '-' }];
                         } catch {
                             return [pnu, { area: 0, jimok: '-' }];
                         }
@@ -242,13 +234,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const hdrAddr = selectedAddress?.roadAddr || picked.representative?.addr || '-';
     const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
+    // Determine feature for MiniMap
+    // If selectedParcels has the feature, use it.
+    // Else check if selectedAddress has it (rare).
+    // The MiniMap handles fallback to point if feature is null.
+    const activeFeature = picked.representative?.feature || (selectedParcels && selectedParcels[0]) || null;
+
+    // Coordinates
+    const mx = selectedAddress?.x || selectedAddress?.lon;
+    const my = selectedAddress?.y || selectedAddress?.lat;
+
     return (
         <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 w-[350px]">
             {/* OpenLayers MiniMap */}
             <div className="p-4 bg-white">
                 <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
-                    {(selectedAddress?.x && selectedAddress?.y)
-                        ? <MiniMap x={selectedAddress.x || selectedAddress.lon} y={selectedAddress.y || selectedAddress.lat} />
+                    {(mx && my)
+                        ? <MiniMap x={mx} y={my} feature={activeFeature} />
                         : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">위치 정보 없음</div>
                     }
                 </div>
@@ -359,7 +361,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                     const dJimok = first(meta.jimok, p.jimok, '-');
                                                     const dArea = first(meta.area, p.area, null);
 
-                                                    // Ensure display is strictly based on data presence
                                                     const displayArea = (dArea !== null && dArea !== undefined) ? Number(dArea).toLocaleString() : '-';
 
                                                     return (
