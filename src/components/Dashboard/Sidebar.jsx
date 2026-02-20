@@ -268,10 +268,19 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
 
+                        let cPrpos = [];
                         let d = await fetchLadfrl(pnu);
-                        if (!d) {
+
+                        const c = await fetchLandCharacteristics(pnu);
+                        if (c) {
+                            const cUse1 = findInJson(c, /^(prposArea1Nm|prpos_area_1_nm|prposArea1)$/);
+                            const cUse2 = findInJson(c, /^(prposArea2Nm|prpos_area_2_nm|prposArea2)$/);
+                            if (cUse1) cPrpos.push(cUse1);
+                            if (cUse2) cPrpos.push(cUse2);
+                        }
+
+                        if (!d && c) {
                             // Try simple characteristics logic if lad fails
-                            const c = await fetchLandCharacteristics(pnu);
                             const cJimok = findInJson(c, /^(lndcgrCodeNm|lndcgr_code_nm|jimok)$/);
                             const cArea = findInJson(c, /^(lndpclAr|lndpcl_ar|ladAr)$/);
                             if (cJimok || cArea) {
@@ -280,9 +289,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         }
 
                         if (d) {
-                            return [pnu, d];
+                            return [pnu, { ...d, uses: cPrpos }];
                         }
-                        return [pnu, { area: 0, jimok: '-' }];
+                        return [pnu, { area: 0, jimok: '-', uses: cPrpos }];
                     })
                 );
                 if (!active) return;
@@ -296,6 +305,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const totalAr = Object.values(parcelMeta).reduce((sum, v) => sum + (v.area || 0), 0);
     const displayTotal = totalAr > 0 ? totalAr : (data.basic?.area || 0);
+
+    // Combine Uses from main and all parcels
+    const allUsesSet = new Set(data.regulation?.uses || []);
+    Object.values(parcelMeta).forEach(v => {
+        if (v.uses) v.uses.forEach(u => allUsesSet.add(u));
+    });
+    const finalCombinedUses = Array.from(allUsesSet).filter(v => v && !/지정되지\s*않음/.test(v) && v !== '-');
 
     const hdrAddr = selectedAddress?.roadAddr || selectedAddress?.address || picked.representative?.addr || '-';
     const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
@@ -323,7 +339,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 </div>
             </div>
 
-            <div className="flex-1 p-6 space-y-8 bg-white overflow-y-auto">
+            <div className="flex-1 p-5 space-y-6 bg-white overflow-y-auto">
                 {loading && !data.basic ? (
                     <div className="flex justify-center py-20 opacity-30">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -338,50 +354,54 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                 국토계획법 및 타법령 지역·지구 등
                             </h4>
                             <div className="flex flex-wrap gap-2">
-                                {data.regulation?.uses.length > 0 ? (
-                                    data.regulation.uses.map((use, i) => (
+                                {finalCombinedUses.length > 0 ? (
+                                    finalCombinedUses.map((use, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-100">{use}</span>
                                     ))
                                 ) : <div className="text-gray-400 text-xs italic">정보 없음</div>}
                             </div>
                         </section>
 
-                        <section>
-                            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                <span className="w-1.5 h-4 bg-ink rounded-full"></span>
-                                토지 기본특성
-                            </h4>
-                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                                <table className="w-full text-sm">
-                                    <tbody className="divide-y divide-gray-100">
-                                        <tr>
-                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500 w-1/3">지목</th>
-                                            <td className="py-3.5 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
-                                            <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                {(data.basic?.area !== null && data.basic?.area !== undefined) ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
-                                            <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">이용상황</th>
-                                            <td className="py-3.5 px-4 text-gray-800">{data.basic?.ladUse || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">도로접면</th>
-                                            <td className="py-3.5 px-4 text-gray-800">{data.basic?.roadSide || '-'}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
+                        {!specOpen && (
+                            <section>
+                                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                                    토지 기본특성
+                                </h4>
+                                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                    <table className="w-full text-sm">
+                                        <tbody className="divide-y divide-gray-100">
+                                            <tr>
+                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500 w-1/3">지목</th>
+                                                <td className="py-3.5 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
+                                                <td className="py-3.5 px-4 text-gray-800 font-bold tracking-tight">
+                                                    {(data.basic?.area !== null && data.basic?.area !== undefined) ?
+                                                        `${Number(data.basic.area).toLocaleString()} m² (${(Number(data.basic.area) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)`
+                                                        : '-'}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
+                                                <td className="py-3.5 px-4 text-gray-800 font-bold">
+                                                    {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">이용상황</th>
+                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.ladUse || '-'}</td>
+                                            </tr>
+                                            <tr>
+                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">도로접면</th>
+                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.roadSide || '-'}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        )}
 
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
@@ -401,7 +421,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                                         <div className="text-[10px] text-gray-400 font-bold mb-1">합계 면적</div>
-                                        <div className="text-lg font-bold text-blue-700">{displayTotal.toLocaleString()} m²</div>
+                                        <div className="text-sm font-bold text-blue-700 tracking-tight">
+                                            {displayTotal.toLocaleString()} m² <span className="text-xs text-gray-500 font-normal">({(displayTotal * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</span>
+                                        </div>
                                     </div>
                                 </div>
                                 {specOpen && (
@@ -428,7 +450,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                             <td className="p-2 text-center text-gray-400">{idx + 1}</td>
                                                             <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
                                                             <td className="p-2 text-right">{dJimok}</td>
-                                                            <td className="p-2 text-right font-bold">{displayArea}</td>
+                                                            <td className="p-2 text-right">
+                                                                <div className="font-bold">{displayArea}</div>
+                                                                {displayArea !== '-' && <div className="text-[9px] text-gray-400">({(Number(dArea) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</div>}
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
@@ -452,12 +477,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         )}
                     </>
                 )}
-            </div>
-
-            <div className="p-6 border-t border-gray-100 bg-gray-50/50 mt-auto">
-                <button className="w-full py-4 bg-ink text-white rounded-xl font-bold shadow-xl hover:bg-black transition-all">
-                    📄 상세 분석 보고서 생성
-                </button>
             </div>
         </div>
     );

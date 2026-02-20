@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
@@ -6,9 +6,9 @@ import MapSection from './MapSection';
 import BottomPanel from './BottomPanel';
 
 const ConsultingDashboard = () => {
-    const [selectedAddress, setSelectedAddress] = React.useState(null);
-    // [Multi-Selection] Lifted State for multiple parcels
-    const [selectedParcels, setSelectedParcels] = React.useState([]);
+    const [selectedAddress, setSelectedAddress] = useState(null);
+    const [selectedParcels, setSelectedParcels] = useState([]);
+    const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
     return (
         <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
@@ -22,9 +22,9 @@ const ConsultingDashboard = () => {
                 />
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden bg-gray-100">
                     {/* Map Area */}
-                    <div className="flex-1 relative">
+                    <div className="absolute inset-0 z-0">
                         <MapSection
                             selectedAddress={selectedAddress}
                             onAddressSelect={setSelectedAddress}
@@ -33,11 +33,30 @@ const ConsultingDashboard = () => {
                         />
                     </div>
 
-                    {/* Bottom Analysis Panel */}
+                    {/* Floating Toggle Button */}
                     <motion.div
-                        initial={{ y: 100, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.5, duration: 0.5 }}
+                        initial={false}
+                        animate={{ y: isAnalysisOpen ? -288 : 0 }}
+                        transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                        className="absolute bottom-6 right-6 z-40"
+                    >
+                        <button
+                            onClick={() => setIsAnalysisOpen(!isAnalysisOpen)}
+                            className="bg-ink hover:bg-black text-white px-6 py-3.5 rounded-full shadow-[0_10px_25px_rgba(0,0,0,0.3)] font-bold flex items-center gap-2 border-[3px] border-white transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-300 ${isAnalysisOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={isAnalysisOpen ? "M19 9l-7 7-7-7" : "M5 15l7-7 7 7"} />
+                            </svg>
+                            {isAnalysisOpen ? "분석 닫기" : "실거래 분석 표 펼치기"}
+                        </button>
+                    </motion.div>
+
+                    {/* Bottom Analysis Panel Overlay */}
+                    <motion.div
+                        initial={false}
+                        animate={{ y: isAnalysisOpen ? 0 : '100%' }}
+                        transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                        className="absolute bottom-0 left-0 right-0 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] rounded-t-2xl overflow-hidden will-change-transform"
                     >
                         <BottomPanel selectedAddress={selectedAddress} />
                     </motion.div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { API_CONFIG } from '../../config/api';
 
-const MiniMap = ({ x, y, feature }) => {
+const MiniMap = ({ x, y, features }) => {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const vectorSourceRef = useRef(null);
@@ -79,8 +79,8 @@ const MiniMap = ({ x, y, feature }) => {
             view: new OL.View({
                 center: center,
                 zoom: 15,
-                minZoom: 15, // Lock Zoom
-                maxZoom: 15, // Lock Zoom
+                minZoom: 10,
+                maxZoom: 19,
                 enableRotation: false
             }),
             controls: [], // No Zoom/Attr controls
@@ -110,19 +110,29 @@ const MiniMap = ({ x, y, feature }) => {
 
         src.clear();
 
-        if (feature) {
+        if (features && features.length > 0) {
             const format = new OL.format.GeoJSON();
-            try {
-                const olFeature = format.readFeature(feature, {
-                    featureProjection: 'EPSG:3857',
-                    dataProjection: 'EPSG:4326'
-                });
-                src.addFeature(olFeature);
-            } catch (e) {
-                // Feature might be invalid or not GeoJSON
+            let added = false;
+            features.forEach(feat => {
+                if (!feat) return;
+                try {
+                    const olFeature = format.readFeature(feat, {
+                        featureProjection: 'EPSG:3857',
+                        dataProjection: 'EPSG:4326'
+                    });
+                    src.addFeature(olFeature);
+                    added = true;
+                } catch (e) { }
+            });
+
+            if (added) {
+                const extent = src.getExtent();
+                if (!OL.extent.isEmpty(extent)) {
+                    map.getView().fit(extent, { padding: [20, 20, 20, 20], maxZoom: 16, duration: 400 });
+                }
             }
         }
-    }, [x, y, feature]);
+    }, [x, y, features]);
 
     return (
         <div
