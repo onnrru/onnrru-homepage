@@ -35,32 +35,18 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const unwrapNed = (data) => {
         if (!data) return null;
+        const r = data?.response?.result ?? data?.result ?? data;
+        if (Array.isArray(r)) return r[0] ?? null;
+        if (Array.isArray(r?.items)) return r.items[0] ?? null;
+        if (Array.isArray(r?.item)) return r.item[0] ?? null;
 
-        // Try various common VWorld response paths
-        const paths = [
-            data?.response?.body?.items?.item?.[0],
-            data?.response?.body?.items?.[0],
-            data?.response?.result?.items?.[0],
-            data?.response?.result?.item?.[0],
-            data?.body?.items?.[0],
-            data?.result?.items?.[0],
-            data?.items?.[0],
-            data?.item?.[0],
-            data?.features?.[0]?.properties,
-            data?.features?.[0],
-            data?.response?.result,
-            data?.result,
-            data
-        ];
+        // Deep body search
+        const deepBody = data?.response?.body?.items?.item;
+        if (Array.isArray(deepBody)) return deepBody[0] ?? null;
+        if (deepBody && typeof deepBody === 'object') return deepBody;
 
-        for (const p of paths) {
-            if (p && typeof p === 'object' && !Array.isArray(p)) {
-                // Check if this object contains any expected data keys (widened search)
-                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndpcl_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
-                    return p;
-                }
-            }
-        }
+        if (Array.isArray(r?.features)) return r.features[0]?.properties ?? r.features[0] ?? null;
+        if (r && typeof r === 'object' && !r.response) return r;
         return null;
     };
 
@@ -123,18 +109,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const d = unwrapNed(payload);
         if (!d) throw new Error('NED JSON record not found');
 
+        console.log('NED discovered fields:', Object.keys(d));
+
         return {
             pnu: first(d.pnu, pnu),
             indcgr_code_nm: first(
                 d.indcgr_code_nm, d.indcgrCodeNm,
                 d.lndcgr_code_nm, d.lndcgrCodeNm,
-                d.jimok_nm, d.jimok, d.JIMOK
+                d.jimok_nm, d.jimok, d.JIMOK, d.lndcgr_nm, d.lndcgrNm
             ),
             ldplc_ar: first(
                 d.ldplc_ar, d.ldplcAr,
                 d.lndpcl_ar, d.lndpclAr,
                 d.lndplc_ar, d.lndplcAr,
-                d.ar, d.area
+                d.ar, d.area, d.PAREA, d.parea
             ),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
@@ -160,8 +148,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         });
 
         const text = String(res.data || '');
-        console.log('WFS raw head:', text.slice(0, 200));
-
         if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
             throw new Error('VWorld WFS returned HTML');
         }
@@ -203,23 +189,25 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const size = 400;
         const delta = 0.0015;
 
-        // ✅ EPSG:4326 bbox는 (ymin,xmin,ymax,xmax)
-        const bbox4326 = `${y - delta},${x - delta},${y + delta},${x + delta}`;
+        // BBOX for Image API (xmin, ymin, xmax, ymax)
+        const bboxImage = `${x - delta},${y - delta},${x + delta},${y + delta}`;
+        // BBOX for WMS 1.3.0 (ymin, xmin, ymax, xmax)
+        const bboxWMS = `${y - delta},${x - delta},${y + delta},${x + delta}`;
 
-        const baseParams = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
-            `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bbox4326)}` +
+        const wmsBase = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
+            `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bboxWMS)}` +
             `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
             `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
-        // 1. Base Map (VWorld Gray Map)
-        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(`${x - delta},${y - delta},${x + delta},${y + delta}`)}&width=${size}&height=${size}&layers=gray`;
+        // 1. Base Map (VWorld Image API - more stable for base)
+        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(bboxImage)}&width=${size}&height=${size}&layers=base&domain=${encodeURIComponent(domain)}`;
 
-        // 2. Zoning Layer (WMS)
+        // 2. Zoning Overlay (WMS)
         const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
-        const zoningUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent(zoningLayers)}`;
+        const zoningUrl = `/api/vworld/req/wms?${wmsBase}&LAYERS=${encodeURIComponent(zoningLayers)}`;
 
-        // 3. Cadastral Layer (WMS)
-        const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
+        // 3. Cadastral Overlay (WMS)
+        const cadastralUrl = `/api/vworld/req/wms?${wmsBase}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
 
         setMiniMapUrl({ baseUrl, zoningUrl, cadastralUrl });
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
@@ -292,31 +280,31 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
-                        {/* 1. Gray Base Map Layer */}
+                        {/* 1. Base Map Layer */}
                         <img
                             src={miniMapUrl.baseUrl}
                             alt="배경지도"
                             className="absolute inset-0 w-full h-full object-cover"
                         />
-                        {/* 2. Zoning overlay */}
+                        {/* 2. Zoning Layer */}
                         <img
                             src={miniMapUrl.zoningUrl}
                             alt="용도지역"
                             className="absolute inset-0 w-full h-full object-cover"
                         />
-                        {/* 3. Cadastral overlay */}
+                        {/* 3. Cadastral Layer */}
                         <img
                             src={miniMapUrl.cadastralUrl}
                             alt="지적도"
                             className="absolute inset-0 w-full h-full object-cover"
                         />
 
-                        {/* Target Marker (Center) */}
+                        {/* Target Marker */}
                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
                         <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
-                            VWorld WMS
+                            VWorld
                         </div>
                     </div>
                 </div>
@@ -340,7 +328,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full py-10">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
-                        <p className="text-xs text-gray-400">네트워크에서 데이터 추출 중...</p>
+                        <p className="text-xs text-gray-400">데이터 추출 중...</p>
                     </div>
                 ) : (
                     <>
