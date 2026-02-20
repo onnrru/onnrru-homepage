@@ -24,9 +24,9 @@ const parseXmlToJSON = (xmlText) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, "text/xml");
 
-    // Check for errors
+    // Check for errors (MOLIT often uses '000' or '00' for success)
     const resultCode = xmlDoc.getElementsByTagName('resultCode')[0]?.textContent;
-    if (resultCode !== '00') {
+    if (resultCode !== '00' && resultCode !== '000') {
         const resultMsg = xmlDoc.getElementsByTagName('resultMsg')[0]?.textContent;
         console.error('API Error:', resultMsg);
         return [];
