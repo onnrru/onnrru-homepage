@@ -42,26 +42,26 @@ const parseXmlToJSON = (xmlText) => {
         const getText = (tag) => item.getElementsByTagName(tag)[0]?.textContent?.trim() || '';
 
         // The price comes with commas, remove them and convert to Number
-        const priceStr = getText('거래금액').replace(/,/g, '');
+        const priceStr = getText('dealAmount').replace(/,/g, '');
         const price = Number(priceStr);
 
         result.push({
             // Core identifiers
-            apartmentName: getText('아파트'),
-            dongName: getText('법정동').trim(), // Often contains leading space in API
-            jibun: getText('지번'),
+            apartmentName: getText('aptNm'),
+            dongName: getText('umdNm').trim(), // Often contains leading space in API
+            jibun: getText('jibun'),
 
             // Transaction Details
-            dealYear: getText('년'),
-            dealMonth: getText('월'),
-            dealDay: getText('일'),
-            dealDate: `${getText('년')}-${getText('월').padStart(2, '0')}-${getText('일').padStart(2, '0')}`,
+            dealYear: getText('dealYear'),
+            dealMonth: getText('dealMonth'),
+            dealDay: getText('dealDay'),
+            dealDate: `${getText('dealYear')}-${getText('dealMonth').padStart(2, '0')}-${getText('dealDay').padStart(2, '0')}`,
             price: price, // in 10,000 KRW
 
             // Property details
-            area: Number(getText('전용면적')),
-            floor: Number(getText('층')),
-            buildYear: getText('건축년도')
+            area: Number(getText('excluUseAr')),
+            floor: Number(getText('floor')),
+            buildYear: getText('buildYear')
         });
     }
 
