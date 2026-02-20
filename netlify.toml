@@ -21,6 +21,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/molit/*"
+  to = "http://apis.data.go.kr/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
