@@ -40,28 +40,31 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return null;
     };
 
+    // Safe number parsing that handles "1,234.5"
+    const parseNum = (val) => {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') return val;
+        const s = String(val).replace(/,/g, '').trim();
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+    };
+
     const normalizePnu = (pnu) => {
         const s = String(pnu || '').replace(/[^\d]/g, '');
         if (s.length >= 19) return s.slice(0, 19);
         return s;
     };
 
-    // Robust unwrapper that handles various VWorld JSON shapes
     const unwrapNed = (data) => {
         if (!data) return null;
-
-        // 1. Direct object (if previously unwrapped)
-        if (data.pnu || data.lndpclAr || data.lndpcl_ar) return data;
-
-        // 2. Standard Response Structure check
+        if (data.pnu || data.lndpclAr || data.lndpcl_ar || data.ladAr) return data;
         const candidates = [
             data?.response?.body?.items?.item,
             data?.response?.body?.items,
             data?.response?.result?.items,
             data?.response?.result?.featureCollection?.features,
-            data?.landCharacteristics // Sometimes direct custom
+            data?.landCharacteristics
         ];
-
         for (const c of candidates) {
             if (!c) continue;
             if (Array.isArray(c)) {
@@ -69,8 +72,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             }
             if (typeof c === 'object') return c;
         }
-
-        // 3. Fallback: Check root props
         return null;
     };
 
@@ -82,7 +83,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // --- Definitive API: getLandCharacteristics ---
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
         const pnu = normalizePnu(pnuRaw);
@@ -119,7 +119,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             for (let i = 0; i < els.length; i++) if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
             return null;
         };
-        // Manually construct an object that mimics the JSON response
         return {
             prposArea1Nm: pick('prpos_area_1_nm'),
             prposArea2Nm: pick('prpos_area_2_nm'),
@@ -131,7 +130,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
-    // --- Memoized Logic ---
     const picked = React.useMemo(() => {
         const listData = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => ({
@@ -149,9 +147,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list: listData, representative };
     }, [selectedParcels, selectedAddress]);
 
-    // --- Effects ---
-
-    // 1. Main Data Loading 
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -159,10 +154,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                // Priority: getLandCharacteristics (REST)
                 let d = await fetchLandCharacteristics(repPnu);
-
-                // Fallback: WFS
                 if (!d) {
                     try { d = await fetchLandCharacteristicsWFS(repPnu); } catch { }
                 }
@@ -175,14 +167,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     d.jimok, '-'
                 );
 
-                const area = Number(first(
+                // Use parseNum to handle comma-separated strings
+                const area = parseNum(first(
                     d.lndpclAr, d.lndpcl_ar,
                     d.ldplcAr, d.ldplc_ar,
                     d.ladAr, d.lad_ar,
                     d.parea, 0
                 ));
 
-                const price = Number(first(
+                const price = parseNum(first(
                     d.pblntfPclnd, d.pblntf_pclnd,
                     d.jiga, 0
                 ));
@@ -224,7 +217,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // 2. Parcel Meta 
+    // Parcel Meta
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -240,7 +233,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             const d = await fetchLandCharacteristics(pnu) || await fetchLandCharacteristicsWFS(pnu);
                             if (d) {
                                 return [pnu, {
-                                    area: Number(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, 0)),
+                                    area: parseNum(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, 0)),
                                     jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, '-')
                                 }];
                             }

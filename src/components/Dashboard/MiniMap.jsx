@@ -26,16 +26,22 @@ const MiniMap = ({ x, y, feature }) => {
             zIndex: 1
         });
 
-        // (B) Cadastral Overlay
-        const cadastralLayer = new OL.layer.Tile({
+        // (B) Combined Overlay: Zoning + Cadastral
+        // Layers: 
+        // lt_c_uq111: Urban Area
+        // lt_c_uq112: Management Area
+        // lt_c_uq113: Agri/Forest Area
+        // lt_c_uq114: Nature Conservation Area
+        // lp_pa_cbnd_bubun: Cadastral (Parcel Boundaries)
+        const overlayLayer = new OL.layer.Tile({
             source: new OL.source.TileWMS({
                 url: 'https://api.vworld.kr/req/wms',
                 params: {
                     SERVICE: 'WMS',
                     REQUEST: 'GetMap',
                     VERSION: '1.3.0',
-                    LAYERS: 'lp_pa_cbnd_bubun',
-                    STYLES: 'lp_pa_cbnd_bubun',
+                    LAYERS: 'lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114,lp_pa_cbnd_bubun',
+                    STYLES: 'lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114,lp_pa_cbnd_bubun',
                     CRS: 'EPSG:3857',
                     FORMAT: 'image/png',
                     TRANSPARENT: 'TRUE',
@@ -70,15 +76,16 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // 2. View
-        // Zoom 15 (Requested: ~4 steps out from 19)
+        // Zoom 14 (Requested: Max zoom-out where cadastral is visible)
+        // VWorld Cadastral usually visible 14+.
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
             target: mapRef.current,
-            layers: [whiteLayer, cadastralLayer, vectorLayer],
+            layers: [whiteLayer, overlayLayer, vectorLayer],
             view: new OL.View({
                 center: center,
-                zoom: 15,
+                zoom: 14,
                 minZoom: 13,
                 maxZoom: 19,
                 enableRotation: false
@@ -105,7 +112,7 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        map.getView().setZoom(15); // Force Zoom 15 on update
+        map.getView().setZoom(14); // Force Zoom 14 on update
 
         src.clear();
 
