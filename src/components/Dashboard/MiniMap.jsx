@@ -27,11 +27,13 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // (B) Overlay: Zoning (Bottom) -> Cadastral (Top)
+        // Requested: Urban, Mgmt, Agri + Cadastral
+        // We include Nature Conservation (114) for complete coverage.
         const wmsLayers = [
             'lt_c_uq111', // Urban
             'lt_c_uq112', // Management
             'lt_c_uq113', // Agri/Forest
-            'lt_c_uq114', // Nature Conservation
+            'lt_c_uq114', // Nature Conservation (Implicitly needed for full map)
             'lp_pa_cbnd_bubun' // Cadastral (Lines)
         ].join(',');
 
@@ -73,7 +75,7 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // 2. View
-        // Fixed at Zoom 11 as requested
+        // Fixed at Zoom 12 as requested
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
@@ -81,7 +83,7 @@ const MiniMap = ({ x, y, feature }) => {
             layers: [baseLayer, overlayLayer, vectorLayer],
             view: new OL.View({
                 center: center,
-                zoom: 11,
+                zoom: 12,
                 minZoom: 6,
                 maxZoom: 19,
                 enableRotation: false
@@ -107,7 +109,7 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        map.getView().setZoom(11); // Force Zoom 11
+        map.getView().setZoom(12); // Force Zoom 12
 
         src.clear();
 
