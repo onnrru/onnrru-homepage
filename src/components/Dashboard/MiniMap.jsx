@@ -15,8 +15,18 @@ const MiniMap = ({ x, y, feature }) => {
         }
 
         // 1. Layers
-        // Base: None (White background via CSS container)
-        // Overlay: Cadastral
+
+        // (A) White Base Map (Background)
+        const whiteLayer = new OL.layer.Tile({
+            source: new OL.source.XYZ({
+                url: `https://api.vworld.kr/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/white/{z}/{y}/{x}.png`,
+                attributions: 'VWorld',
+                crossOrigin: 'anonymous'
+            }),
+            zIndex: 1
+        });
+
+        // (B) Cadastral Overlay
         const cadastralLayer = new OL.layer.Tile({
             source: new OL.source.TileWMS({
                 url: 'https://api.vworld.kr/req/wms',
@@ -33,10 +43,11 @@ const MiniMap = ({ x, y, feature }) => {
                     DOMAIN: window.location.hostname
                 }
             }),
-            zIndex: 10
+            zIndex: 10,
+            opacity: 0.8
         });
 
-        // Vector Layer (Polygon or Marker)
+        // (C) Vector Layer (Polygon or Marker)
         const vectorSource = new OL.source.Vector();
         vectorSourceRef.current = vectorSource;
         const vectorLayer = new OL.layer.Vector({
@@ -59,16 +70,16 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // 2. View
-        // Initial center
+        // Zoom 15 (Requested: ~4 steps out from 19)
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
             target: mapRef.current,
-            layers: [cadastralLayer, vectorLayer],
+            layers: [whiteLayer, cadastralLayer, vectorLayer],
             view: new OL.View({
                 center: center,
-                zoom: 19,
-                minZoom: 19,
+                zoom: 15,
+                minZoom: 13,
                 maxZoom: 19,
                 enableRotation: false
             }),
@@ -94,6 +105,7 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
+        map.getView().setZoom(15); // Force Zoom 15 on update
 
         src.clear();
 

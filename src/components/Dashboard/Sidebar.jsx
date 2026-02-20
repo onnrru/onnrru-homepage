@@ -46,28 +46,31 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return s;
     };
 
+    // Robust unwrapper that handles various VWorld JSON shapes
     const unwrapNed = (data) => {
         if (!data) return null;
+
+        // 1. Direct object (if previously unwrapped)
+        if (data.pnu || data.lndpclAr || data.lndpcl_ar) return data;
+
+        // 2. Standard Response Structure check
         const candidates = [
             data?.response?.body?.items?.item,
             data?.response?.body?.items,
             data?.response?.result?.items,
-            data?.response?.result?.item,
-            data?.response?.result,
-            data?.body?.items,
-            data?.result?.items,
-            data?.items,
-            data?.item,
-            data?.result,
-            data
+            data?.response?.result?.featureCollection?.features,
+            data?.landCharacteristics // Sometimes direct custom
         ];
-        for (const candidate of candidates) {
-            if (!candidate) continue;
-            if (Array.isArray(candidate)) {
-                return candidate.length > 0 ? candidate[0] : null;
+
+        for (const c of candidates) {
+            if (!c) continue;
+            if (Array.isArray(c)) {
+                return c.length > 0 ? c[0] : null;
             }
-            if (typeof candidate === 'object') return candidate;
+            if (typeof c === 'object') return c;
         }
+
+        // 3. Fallback: Check root props
         return null;
     };
 
@@ -86,13 +89,16 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const domain = getVworldDomain();
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
 
-        const res = await axios.get(url, {
-            params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 }
-        });
-
-        const d = unwrapNed(safeJson(res.data) ?? res.data);
-        if (!d) return null;
-        return d;
+        try {
+            const res = await axios.get(url, {
+                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 }
+            });
+            const d = unwrapNed(safeJson(res.data) ?? res.data);
+            if (d) return d;
+        } catch (e) {
+            console.warn("REST API fail, trying WFS...", e);
+        }
+        return null;
     };
 
     const fetchLandCharacteristicsWFS = async (pnuRaw) => {
@@ -113,14 +119,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             for (let i = 0; i < els.length; i++) if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
             return null;
         };
+        // Manually construct an object that mimics the JSON response
         return {
-            prpos_area_1_nm: pick('prpos_area_1_nm'),
-            prpos_area_2_nm: pick('prpos_area_2_nm'),
-            lad_use_sittn_nm: pick('lad_use_sittn_nm'),
-            road_side_code_nm: pick('road_side_code_nm'),
-            pblntf_pclnd: pick('pblntf_pclnd'),
+            prposArea1Nm: pick('prpos_area_1_nm'),
+            prposArea2Nm: pick('prpos_area_2_nm'),
+            ladUseSittnNm: pick('lad_use_sittn_nm'),
+            roadSideCodeNm: pick('road_side_code_nm'),
+            pblntfPclnd: pick('pblntf_pclnd'),
             lndcgrCodeNm: pick('lndcgrCodeNm') || pick('indcgr_code_nm'),
-            lndpclAr: pick('lndpclAr') || pick('ldplc_ar')
+            lndpclAr: pick('lndpclAr') || pick('ldplc_ar') || pick('lad_ar')
         };
     };
 
@@ -130,13 +137,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             ? selectedParcels.map(p => ({
                 pnu: normalizePnu(p?.properties?.pnu),
                 addr: p?.properties?.addr || p?.properties?.address || '',
-                // Pass raw feature for minimap if needed, though mostly we use rep
                 feature: p
             }))
             : (selectedAddress?.pnu ? [{
                 pnu: normalizePnu(selectedAddress.pnu),
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
-                feature: null // We might not have feature for just address search unless passed
+                feature: null
             }] : []);
 
         const representative = listData[0] || null;
@@ -153,7 +159,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                // Priority: getLandCharacteristics
+                // Priority: getLandCharacteristics (REST)
                 let d = await fetchLandCharacteristics(repPnu);
 
                 // Fallback: WFS
@@ -163,23 +169,48 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
                 if (!d) throw new Error("No Data");
 
-                const jimok = first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, d.indcgr_code_nm, '-');
-                const area = Number(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, d.ladAr, d.lad_ar, 0));
+                const jimok = first(
+                    d.lndcgrCodeNm, d.lndcgr_code_nm,
+                    d.indcgrCodeNm, d.indcgr_code_nm,
+                    d.jimok, '-'
+                );
+
+                const area = Number(first(
+                    d.lndpclAr, d.lndpcl_ar,
+                    d.ldplcAr, d.ldplc_ar,
+                    d.ladAr, d.lad_ar,
+                    d.parea, 0
+                ));
+
+                const price = Number(first(
+                    d.pblntfPclnd, d.pblntf_pclnd,
+                    d.jiga, 0
+                ));
+
+                const usage = first(
+                    d.ladUseSittnNm, d.lad_use_sittn_nm,
+                    d.ladUse, '-'
+                );
+
+                const road = first(
+                    d.roadSideCodeNm, d.road_side_code_nm,
+                    d.roadSide, '-'
+                );
+
+                const uses = [
+                    first(d.prposArea1Nm, d.prpos_area_1_nm, d.prposArea1),
+                    first(d.prposArea2Nm, d.prpos_area_2_nm, d.prposArea2)
+                ].filter(v => v && !/지정되지\s*않음/.test(v));
 
                 setData({
                     basic: {
                         jimok: jimok,
                         area: area,
-                        price: Number(first(d.pblntfPclnd, d.pblntf_pclnd, d.jiga, 0)),
-                        ladUse: first(d.ladUseSittnNm, d.lad_use_sittn_nm, '-'),
-                        roadSide: first(d.roadSideCodeNm, d.road_side_code_nm, '-')
+                        price: price,
+                        ladUse: usage,
+                        roadSide: road
                     },
-                    regulation: {
-                        uses: [
-                            first(d.prposArea1Nm, d.prpos_area_1_nm),
-                            first(d.prposArea2Nm, d.prpos_area_2_nm)
-                        ].filter(v => v && !/지정되지\s*않음/.test(v))
-                    }
+                    regulation: { uses: uses }
                 });
 
                 const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
@@ -193,7 +224,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // 2. Parcel Meta (Batch getLandCharacteristics)
+    // 2. Parcel Meta 
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -206,11 +237,11 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
                         try {
-                            const d = await fetchLandCharacteristics(pnu);
+                            const d = await fetchLandCharacteristics(pnu) || await fetchLandCharacteristicsWFS(pnu);
                             if (d) {
                                 return [pnu, {
-                                    area: Number(first(d.lndpclAr, d.lndpcl_ar, 0)),
-                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
+                                    area: Number(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, 0)),
+                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, '-')
                                 }];
                             }
                             return [pnu, { area: 0, jimok: '-' }];
@@ -231,16 +262,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const totalAr = Object.values(parcelMeta).reduce((sum, v) => sum + (v.area || 0), 0);
     const displayTotal = totalAr > 0 ? totalAr : (data.basic?.area || 0);
 
-    const hdrAddr = selectedAddress?.roadAddr || picked.representative?.addr || '-';
+    const hdrAddr = selectedAddress?.roadAddr || selectedAddress?.address || picked.representative?.addr || '-';
     const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
-    // Determine feature for MiniMap
-    // If selectedParcels has the feature, use it.
-    // Else check if selectedAddress has it (rare).
-    // The MiniMap handles fallback to point if feature is null.
     const activeFeature = picked.representative?.feature || (selectedParcels && selectedParcels[0]) || null;
-
-    // Coordinates
     const mx = selectedAddress?.x || selectedAddress?.lon;
     const my = selectedAddress?.y || selectedAddress?.lat;
 
