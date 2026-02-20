@@ -31,6 +31,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return maybe;
     };
 
+    // Helper to find first non-empty value
     const first = (...vals) => {
         for (const v of vals) {
             if (v === 0) return 0;
@@ -82,39 +83,38 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // 1. LadfrlList (Jimok/Area)
-    const fetchLadfrl = async (pnuRaw) => {
+    // API 1: LadfrlList (Backup Area/Jimok)
+    const fetchLadfrl = async (pnu) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const pnu = normalizePnu(pnuRaw);
         const domain = getVworldDomain();
         const url = `/api/vworld/ned/data/ladfrlList`;
         try {
             const res = await axios.get(url, {
                 params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
-                timeout: 3000
+                timeout: 2000
             });
             const d = unwrapNed(safeJson(res.data) ?? res.data);
             if (d) return {
                 jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-'),
                 area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0))
             };
-        } catch { }
+        } catch (e) { /* ignore */ }
         return null;
     };
 
-    // 2. LandInfo (Characteristics)
-    const fetchLandCharacteristics = async (pnuRaw) => {
+    // API 2: LandCharacteristics (Main)
+    const fetchLandCharacteristics = async (pnu) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const pnu = normalizePnu(pnuRaw);
         const domain = getVworldDomain();
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
         try {
             const res = await axios.get(url, {
-                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 }
+                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
+                timeout: 3000
             });
             const d = unwrapNed(safeJson(res.data) ?? res.data);
             if (d) return d;
-        } catch { }
+        } catch (e) { /* ignore */ }
         return null;
     };
 
@@ -135,65 +135,57 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list: listData, representative };
     }, [selectedParcels, selectedAddress]);
 
-    // MAIN DATA FETCH
+    // MAIN DATA FETCH (Sequential Fail-safe)
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
             if (!repPnu) { setData({ basic: null, regulation: null }); return; }
 
             setLoading(true); setError(null);
-            try {
-                // Parallel fetch for robustness
-                const [lad, char] = await Promise.all([
-                    fetchLadfrl(repPnu),
-                    fetchLandCharacteristics(repPnu)
-                ]);
 
-                if (!lad && !char) throw new Error("No Data");
+            // 1. Try Main API
+            let d = await fetchLandCharacteristics(repPnu);
 
-                const d = char || {};
+            // 2. If Main failed or critical data missing, try secondary
+            let lad = null;
+            if (!d || !d.lndpclAr && !d.lndpcl_ar && !d.ladAr) {
+                lad = await fetchLadfrl(repPnu);
+            }
 
-                // Merge strategies
-                const finalJimok = lad?.jimok && lad.jimok !== '-'
-                    ? lad.jimok
-                    : first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, d.jimok, '-');
+            // Construct Final Data Object
+            const finalJimok = lad?.jimok || first(d?.lndcgrCodeNm, d?.lndcgr_code_nm, d?.indcgrCodeNm, d?.jimok, '-');
+            const finalArea = lad?.area || parseNum(first(d?.lndpclAr, d?.lndpcl_ar, d?.ldplc_ar, d?.ladAr, 0));
+            const finalPrice = parseNum(first(d?.pblntfPclnd, d?.pblntf_pclnd, d?.jiga, 0));
+            const finalUsage = first(d?.ladUseSittnNm, d?.lad_use_sittn_nm, d?.ladUse, '-');
+            const finalRoad = first(d?.roadSideCodeNm, d?.road_side_code_nm, d?.roadSide, '-');
 
-                const finalArea = (lad?.area > 0)
-                    ? lad.area
-                    : parseNum(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, d.ladAr, 0));
+            const uses = [
+                first(d?.prposArea1Nm, d?.prpos_area_1_nm),
+                first(d?.prposArea2Nm, d?.prpos_area_2_nm)
+            ].filter(v => v && !/지정되지\s*않음/.test(v));
 
-                const price = parseNum(first(d.pblntfPclnd, d.pblntf_pclnd, d.jiga, 0));
-                const usage = first(d.ladUseSittnNm, d.lad_use_sittn_nm, d.ladUse, '-');
-                const road = first(d.roadSideCodeNm, d.road_side_code_nm, d.roadSide, '-');
+            setData({
+                basic: {
+                    jimok: finalJimok,
+                    area: finalArea,
+                    price: finalPrice,
+                    ladUse: finalUsage,
+                    roadSide: finalRoad
+                },
+                regulation: { uses: uses }
+            });
 
-                const uses = [
-                    first(d.prposArea1Nm, d.prpos_area_1_nm),
-                    first(d.prposArea2Nm, d.prpos_area_2_nm)
-                ].filter(v => v && !/지정되지\s*않음/.test(v));
+            // WMS is always same
+            const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
+            setLandUseWmsUrl(wmsUrl);
+            setShowLandUseWms(true);
 
-                setData({
-                    basic: {
-                        jimok: finalJimok,
-                        area: finalArea,
-                        price: price,
-                        ladUse: usage,
-                        roadSide: road
-                    },
-                    regulation: { uses: uses }
-                });
-
-                const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
-                setLandUseWmsUrl(wmsUrl);
-                setShowLandUseWms(true);
-            } catch (err) {
-                console.error("Sidebar Error:", err);
-                setError('정보 조회 실패');
-            } finally { setLoading(false); }
+            setLoading(false);
         };
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // META FETCH (Use Combined)
+    // META FETCH (Simple Sequential)
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -206,19 +198,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
 
-                        // Try Ladfrl first (faster/lighter usually)
-                        let l = await fetchLadfrl(pnu);
-                        if (!l) {
-                            const d = await fetchLandCharacteristics(pnu);
-                            if (d) {
-                                l = {
-                                    area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0)),
-                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
-                                };
-                            }
+                        // Try Main
+                        let d = await fetchLandCharacteristics(pnu);
+
+                        // Try Backup if needed
+                        if (!d) {
+                            const l = await fetchLadfrl(pnu);
+                            if (l) return [pnu, l];
                         }
 
-                        return [pnu, l || { area: 0, jimok: '-' }];
+                        if (d) {
+                            return [pnu, {
+                                area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0)),
+                                jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
+                            }];
+                        }
+
+                        return [pnu, { area: 0, jimok: '-' }];
                     })
                 );
                 if (!active) return;

@@ -27,8 +27,6 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // (B) Overlay: Zoning (Bottom) -> Cadastral (Top)
-        // Order in WMS param: Left=Bottom, Right=Top
-        // We want Zoning below Cadastral Lines.
         const wmsLayers = [
             'lt_c_uq111', // Urban
             'lt_c_uq112', // Management
@@ -45,7 +43,7 @@ const MiniMap = ({ x, y, feature }) => {
                     REQUEST: 'GetMap',
                     VERSION: '1.3.0',
                     LAYERS: wmsLayers,
-                    STYLES: wmsLayers, // Default styles
+                    STYLES: wmsLayers,
                     CRS: 'EPSG:3857',
                     FORMAT: 'image/png',
                     TRANSPARENT: 'TRUE',
@@ -66,16 +64,16 @@ const MiniMap = ({ x, y, feature }) => {
             style: new OL.style.Style({
                 stroke: new OL.style.Stroke({
                     color: '#ef4444', // Red
-                    width: 2
+                    width: 3 // Thicker for Zoom 9
                 }),
                 fill: new OL.style.Fill({
-                    color: 'rgba(239, 68, 68, 0.2)'
+                    color: 'rgba(239, 68, 68, 0.4)' // Stronger fill for Zoom 9
                 })
             })
         });
 
         // 2. View
-        // Fixed at Zoom 14 as requested
+        // Fixed at Zoom 9 as requested (Very Wide View)
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
@@ -83,13 +81,12 @@ const MiniMap = ({ x, y, feature }) => {
             layers: [baseLayer, overlayLayer, vectorLayer],
             view: new OL.View({
                 center: center,
-                zoom: 14,
-                minZoom: 14, // Lock zoom
-                maxZoom: 14, // Lock zoom
+                zoom: 9,
+                minZoom: 6,
+                maxZoom: 19,
                 enableRotation: false
             }),
-            controls: [] // No controls
-            // interactions: [] // Optional: disable interaction? Keep it for panning if needed.
+            controls: []
         });
 
         mapInstance.current = map;
@@ -110,8 +107,7 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        // Ensure zoom is 14
-        if (map.getView().getZoom() !== 14) map.getView().setZoom(14);
+        map.getView().setZoom(9); // Force Zoom 9
 
         src.clear();
 
