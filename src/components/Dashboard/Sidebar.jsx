@@ -5,14 +5,12 @@ import { API_CONFIG } from '../../config/api';
 const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [specOpen, setSpecOpen] = useState(false);
-    // UI Sync: If Parcel Spec is detailed, basic char table is brief
     const [charOpen, setCharOpen] = useState(true);
 
     const [miniMapUrl, setMiniMapUrl] = useState(null);
     const [landUseWmsUrl, setLandUseWmsUrl] = useState(null);
     const [showLandUseWms, setShowLandUseWms] = useState(true);
 
-    // Sync Logic: specOpen (Detailed) -> charOpen (Brief)
     const toggleSpec = () => {
         const next = !specOpen;
         setSpecOpen(next);
@@ -25,7 +23,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         setSpecOpen(!next);
     };
 
-    // --- Utility Functions ---
     const getVworldDomain = () => window.location.origin;
 
     const safeJson = (maybe) => {
@@ -51,13 +48,28 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const unwrapNed = (data) => {
         if (!data) return null;
-        const b = data?.response?.body?.items?.item;
-        if (Array.isArray(b)) return b[0] || null;
-        if (b && typeof b === 'object') return b;
-
-        const r = data?.response?.result?.items?.[0] ?? data?.response?.result ?? data?.result ?? data;
-        if (Array.isArray(r)) return r[0] ?? null;
-        if (r && typeof r === 'object' && !r.response) return r;
+        const paths = [
+            data?.response?.body?.items?.item?.[0],
+            data?.response?.body?.items?.[0],
+            data?.response?.result?.items?.[0],
+            data?.response?.result?.item?.[0],
+            data?.body?.items?.[0],
+            data?.result?.items?.[0],
+            data?.items?.[0],
+            data?.item?.[0],
+            data?.features?.[0]?.properties,
+            data?.features?.[0],
+            data?.response?.result,
+            data?.result,
+            data
+        ];
+        for (const p of paths) {
+            if (p && typeof p === 'object' && !Array.isArray(p)) {
+                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok || p.lndpcl_ar || p.parea || p.area) {
+                    return p;
+                }
+            }
+        }
         return null;
     };
 
@@ -69,7 +81,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // --- Memoized Values ---
     const picked = React.useMemo(() => {
         const listData = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => {
@@ -77,16 +88,16 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 return {
                     pnu: props.pnu,
                     addr: props.addr || props.address || '',
-                    jimok: first(props.jimok, props.indcgr_code_nm, props.lndcgr_code_nm, props.jimok_nm, '-'),
-                    area: Number(first(props.parea, props.area, props.ldplc_ar, props.lndpcl_ar, 0)),
+                    jimok: first(props.jimok, props.indcgr_code_nm, props.lndcgr_code_nm, props.jimok_nm, props.lndcgr_nm, '-'),
+                    area: Number(first(props.parea, props.area, props.ldplc_ar, props.lndpcl_ar, props.lndcl_ar, 0)),
                     price: Number(first(props.jiga, props.price, props.pblntf_pclnd, 0)),
                 };
             })
             : (selectedAddress?.pnu ? [{
                 pnu: selectedAddress.pnu,
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
-                jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, '-'),
-                area: Number(first(selectedAddress.area, selectedAddress.parea, 0)),
+                jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, selectedAddress.lndcgr_code_nm, '-'),
+                area: Number(first(selectedAddress.area, selectedAddress.parea, selectedAddress.ldplc_ar, 0)),
                 price: Number(first(selectedAddress.price, selectedAddress.jiga, 0))
             }] : []);
 
@@ -96,12 +107,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list: listData, representative, totalArea };
     }, [selectedParcels, selectedAddress]);
 
-    // --- State Management ---
     const [data, setData] = useState({ basic: null, regulation: null });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // --- Data Fetching Helpers ---
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = getVworldDomain();
@@ -115,8 +124,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         return {
             pnu: first(d.pnu, pnu),
-            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok_nm, d.jimok),
-            ldplc_ar: first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.lndplcAr, d.ar, d.area),
+            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok_nm, d.jimok, d.lndcgr_nm),
+            ldplc_ar: first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.lndpclAr, d.ar, d.area, d.parea, d.PAREA, d.lndcl_ar),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
             prpos_area_2_nm: first(d.prpos_area_2_nm, d.prposArea2Nm),
@@ -152,8 +161,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         return {
             pnu: pickLocal('pnu') || pnu,
-            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm')),
-            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('ar'), pickLocal('area')),
+            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm'), pickLocal('jimok_nm')),
+            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('lndpcl_ar'), pickLocal('ar'), pickLocal('area')),
             pblntf_pclnd: pickLocal('pblntf_pclnd'),
             prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
             prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
@@ -162,8 +171,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
-    // --- Effects ---
-    // Minimap Effect
     useEffect(() => {
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
@@ -172,8 +179,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = getVworldDomain();
         const size = 400;
-
-        // 지적도 최소 구별 줌레벨 (0.001 보정)
         const delta = 0.0008;
         const bboxWMS = `${y - delta},${x - delta},${y + delta},${x + delta}`;
 
@@ -182,14 +187,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=FALSE` +
             `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
-        // 백지도 + 도시/관리/농림 + 지적도 (LP_PA_CBND_BUBUN)
-        const layers = ['Base', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LP_PA_CBND_BUBUN'].join(',');
+        // 'white' for White Map (백지도)
+        const layers = ['white', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LP_PA_CBND_BUBUN'].join(',');
         const url = `/api/vworld/req/wms?${params}&LAYERS=${encodeURIComponent(layers)}`;
 
         setMiniMapUrl(url);
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
-    // Data Fetch Effect
     useEffect(() => {
         const run = async () => {
             const 대표Pnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -226,7 +230,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // --- Rendering ---
     const 대표필지 = picked.representative;
     const 대표도로주소 = selectedAddress?.roadAddr || 대표필지?.addr || '-';
     const 외필지표시 = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
@@ -234,7 +237,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
 
-            {/* 0. Mini Map */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
@@ -251,7 +253,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 </div>
             )}
 
-            {/* 1. Header */}
             <div className="p-6 pt-2 border-b border-gray-100 flex-shrink-0 bg-white">
                 <h2 className="text-xs font-bold text-ink uppercase tracking-wider mb-2">대상지 정보</h2>
                 <div className="text-xl font-bold text-gray-900 font-serif break-keep leading-tight">
@@ -259,7 +260,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 </div>
             </div>
 
-            {/* Content Body */}
             <div className="flex-1 p-6 space-y-8 bg-white overflow-y-auto">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full py-10">
@@ -269,7 +269,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     <>
                         {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">{error}</div>}
 
-                        {/* 2. Zoning Section */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -288,7 +287,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </div>
                         </section>
 
-                        {/* 3. Land Characteristics Table (Syncable State) */}
                         <section>
                             <div className="flex justify-between items-center mb-3">
                                 <h4 className="font-bold text-gray-800 flex items-center gap-2">
@@ -334,7 +332,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             )}
                         </section>
 
-                        {/* 4. Land Specification (Collapsible) */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -388,7 +385,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </section>
                         )}
 
-                        {/* 5. Land Use Plan Map */}
                         {landUseWmsUrl && showLandUseWms && (
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -409,7 +405,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 )}
             </div>
 
-            {/* 6. Footer Action */}
             <div className="p-6 border-t border-gray-100 bg-gray-50/50 mt-auto">
                 <button className="w-full py-4 bg-ink text-white rounded-xl font-bold">
                     📄 상세 분석 보고서 생성
