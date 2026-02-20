@@ -14,7 +14,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                 {payload.map((entry, index) => (
                     <div key={index} className="flex flex-col gap-1 text-xs">
                         {entry.dataKey === 'avg' && (
-                            <span style={{ color: entry.color }}>평균 실거래가: {entry.value?.toLocaleString()}만원</span>
+                            <span style={{ color: entry.color }}>평균 실거래가: {(entry.value / 10000).toFixed(2)}억원</span>
                         )}
                         {entry.payload.count !== undefined && (
                             <span className="text-gray-500">거래건수: {entry.payload.count}건</span>
@@ -35,7 +35,7 @@ const TrendTooltip = ({ active, payload, label }) => {
                 {payload.map((entry, index) => (
                     <div key={index} className="flex justify-between items-center text-xs mb-1">
                         <span style={{ color: entry.color }}>{entry.name}:</span>
-                        <span>{entry.value?.toLocaleString()}만원
+                        <span>{(entry.value / 10000).toFixed(2)}억원
                             {entry.payload[`${entry.dataKey.split('Avg')[0]}Count`] ? ` (${entry.payload[`${entry.dataKey.split('Avg')[0]}Count`]}건)` : ''}
                         </span>
                     </div>
@@ -51,6 +51,7 @@ const BottomPanel = ({ selectedAddress }) => {
     const [analysisData, setAnalysisData] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(AREA_CATEGORIES[0]);
     const [selectedApartment, setSelectedApartment] = useState(null);
+    const [regionLabels, setRegionLabels] = useState({ gu: '행정구', dong: '행정동' });
 
     useEffect(() => {
         const loadData = async () => {
@@ -65,17 +66,30 @@ const BottomPanel = ({ selectedAddress }) => {
                 // pnu is 19 chars: 0-5 is Sigungu (LAWD_CD), 5-10 is Dong code
                 const lawdCd = selectedAddress.pnu.substring(0, 5);
 
-                // Get dong name from address (e.g., "서울특별시 강남구 역삼동" -> "역삼동")
                 const addressParts = selectedAddress.roadAddr?.split(' ') || selectedAddress.jibunAddr?.split(' ') || [];
-                const dongName = addressParts.find(part => part.endsWith('동') || part.endsWith('읍') || part.endsWith('면')) || '';
 
-                if (lawdCd && dongName) {
-                    console.log("Fetching API for:", { lawdCd, dongName });
+                // 1. Identify broader unit (Gu or Gun/Si)
+                const sigunguPart = addressParts.find(part => part.endsWith('구') || part.endsWith('군') || part.endsWith('시')) || '행정구';
+
+                // 2. Identify minimum unit (Dong or Eup/Myeon + Ri)
+                let targetUnitName = '';
+                const dongPart = addressParts.find(part => part.endsWith('동'));
+                const eupMyeonPart = addressParts.find(part => part.endsWith('읍') || part.endsWith('면'));
+                const riPart = addressParts.find(part => part.endsWith('리'));
+
+                if (dongPart) {
+                    targetUnitName = dongPart;
+                } else if (eupMyeonPart) {
+                    targetUnitName = riPart ? `${eupMyeonPart} ${riPart}` : eupMyeonPart;
+                } else {
+                    targetUnitName = addressParts[addressParts.length - 1] || '';
+                }
+
+                if (lawdCd && targetUnitName) {
+                    setRegionLabels({ gu: sigunguPart, dong: targetUnitName });
+
                     const rawData = await fetchApartmentTransactions(lawdCd, 36); // 3 years
-                    console.log("Raw Data Sample:", rawData.slice(0, 3));
-                    console.log("All Unique Dongs in Raw Data:", [...new Set(rawData.map(d => d.dongName))]);
-                    const processed = processTransactionData(rawData, dongName);
-                    console.log("Processed Data:", processed);
+                    const processed = processTransactionData(rawData, targetUnitName);
                     setAnalysisData(processed);
                     setSelectedApartment(null); // Reset selection on new area
                 } else {
@@ -115,7 +129,7 @@ const BottomPanel = ({ selectedAddress }) => {
         const dongAvg = analysisData.dongOverallAverages[selectedCategory];
         if (dongAvg > 0) {
             data.push({
-                name: '동 전체 평균',
+                name: `${regionLabels.dong} 전체 평균`,
                 avg: dongAvg,
                 count: '-', // we could calculate total count if needed
                 type: 'average'
@@ -123,7 +137,7 @@ const BottomPanel = ({ selectedAddress }) => {
         }
 
         return data;
-    }, [analysisData, selectedCategory]);
+    }, [analysisData, selectedCategory, regionLabels]);
 
     // Format data for Line Chart (Trend)
     const lineChartData = useMemo(() => {
@@ -191,22 +205,25 @@ const BottomPanel = ({ selectedAddress }) => {
     return (
         <div className="h-72 bg-white border-t border-gray-200 flex flex-col overflow-hidden">
             {/* Area Category Tabs */}
-            <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex gap-2">
-                {AREA_CATEGORIES.map(cat => (
-                    <button
-                        key={cat}
-                        onClick={() => {
-                            setSelectedCategory(cat);
-                            setSelectedApartment(null);
-                        }}
-                        className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${selectedCategory === cat
-                            ? 'bg-primary text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                    >
-                        {cat}
-                    </button>
-                ))}
+            <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-700 whitespace-nowrap">전용면적 구분</span>
+                <div className="flex gap-2">
+                    {AREA_CATEGORIES.map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => {
+                                setSelectedCategory(cat);
+                                setSelectedApartment(null);
+                            }}
+                            className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors border ${selectedCategory === cat
+                                ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                }`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="flex-1 flex overflow-hidden">
@@ -215,7 +232,7 @@ const BottomPanel = ({ selectedAddress }) => {
                     <div className="flex justify-between items-center mb-2 px-3">
                         <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            아파트별 평균 실거래가
+                            아파트별 평균 실거래가 <span className="text-xs font-normal text-gray-500">(3년)</span>
                         </h3>
                         <div className="text-[10px] text-gray-400">해당 면적형 기준</div>
                     </div>
@@ -239,7 +256,7 @@ const BottomPanel = ({ selectedAddress }) => {
                                         tick={{ fontSize: 10, fill: '#6b7280' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(value) => `${value > 0 ? (value / 10000).toFixed(1) + '억' : '0'}`}
+                                        tickFormatter={(value) => `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`}
                                         width={45}
                                     />
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f9fafb' }} />
@@ -299,7 +316,7 @@ const BottomPanel = ({ selectedAddress }) => {
                                     tick={{ fontSize: 10, fill: '#6b7280' }}
                                     axisLine={false}
                                     tickLine={false}
-                                    tickFormatter={(value) => `${value > 0 ? (value / 10000).toFixed(1) + '억' : '0'}`}
+                                    tickFormatter={(value) => `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`}
                                     width={45}
                                 />
                                 <Tooltip content={<TrendTooltip />} />
@@ -308,7 +325,7 @@ const BottomPanel = ({ selectedAddress }) => {
                                 <Line
                                     type="monotone"
                                     dataKey="guAvg"
-                                    name="행정구 평균"
+                                    name={`${regionLabels.gu} 평균`}
                                     stroke="#9ca3af"
                                     strokeWidth={2}
                                     dot={{ r: 2, fill: '#9ca3af' }}
@@ -317,7 +334,7 @@ const BottomPanel = ({ selectedAddress }) => {
                                 <Line
                                     type="monotone"
                                     dataKey="dongAvg"
-                                    name="행정동 평균"
+                                    name={`${regionLabels.dong} 평균`}
                                     stroke="#10b981"
                                     strokeWidth={2}
                                     dot={{ r: 3, fill: '#10b981' }}
