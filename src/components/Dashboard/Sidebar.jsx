@@ -10,6 +10,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [showLandUseWms, setShowLandUseWms] = useState(true);
 
     // --- Utility Functions ---
+    const getVworldDomain = () => window.location.origin;
+
+    const safeJson = (maybe) => {
+        if (typeof maybe === 'string') {
+            try { return JSON.parse(maybe); } catch { return null; }
+        }
+        return maybe;
+    };
+
     const first = (...vals) => {
         for (const v of vals) {
             if (v === 0) return 0;
@@ -25,7 +34,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     };
 
     const unwrapNed = (data) => {
-        // Safe navigation for various VWorld response formats
         const r = data?.response?.result ?? data?.result ?? data;
         if (Array.isArray(r)) return r[0] ?? null;
         if (Array.isArray(r?.items)) return r.items[0] ?? null;
@@ -80,37 +88,25 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // --- Data Fetching Helpers ---
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.hostname; // Reverted to hostname
+        const domain = getVworldDomain();
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
 
         const res = await axios.get(url, {
-            params: { key, domain, pnu, format: 'json' },
-            responseType: 'json'
+            params: { key, domain, pnu, format: 'json' }
         });
 
-        console.log('NED raw response:', res.data); // Added logging as requested
+        const payload = safeJson(res.data) ?? res.data;
+        console.log('NED raw response:', payload);
 
-        const d = unwrapNed(res.data);
+        const d = unwrapNed(payload);
         if (!d) throw new Error('NED JSON record not found');
 
         return {
             pnu: first(d.pnu, pnu),
-            indcgr_code_nm: first(
-                d.indcgr_code_nm, d.indcgrCodeNm,
-                d.lndcgr_code_nm, d.lndcgrCodeNm,
-                d.lndcgr_code_nm_nm, d.lndcgrCodeNmNm,
-                d.jimok, d.JIMOK
-            ),
-            ldplc_ar: first(
-                d.ldplc_ar, d.ldplcAr,
-                d.lndplc_ar, d.lndplcAr,
-                d.lndpcl_ar, d.lndpclAr,
-                d.lndpclArea,
-                d.indcgr_ar, d.indcgrAr,
-                d.ar, d.area
-            ),
-            pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.pblntf_pclnd_nm, d.jiga, d.JIGA),
+            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.lndcgrCodeNm, d.jimok, d.JIMOK),
+            ldplc_ar: first(d.ldplc_ar, d.ldplcAr, d.lndplc_ar, d.lndplcAr, d.ar, d.area),
+            pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
             prpos_area_2_nm: first(d.prpos_area_2_nm, d.prposArea2Nm),
             lad_use_sittn_nm: first(d.lad_use_sittn_nm, d.ladUseSittnNm),
@@ -120,7 +116,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const fetchLandCharacteristicsWFS = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.hostname;
+        const domain = getVworldDomain();
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
 
@@ -168,25 +164,31 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // --- Effects ---
     // Minimap Effect
     useEffect(() => {
-        // Robust coordinate check (fallback to lon/lat if x/y missing)
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
         if (!x || !y) { setMiniMapUrl(null); return; }
 
         const key = API_CONFIG.VWORLD_KEY;
-        const size = 400; // Slightly larger for better clarity
+        const domain = getVworldDomain();
+        const size = 400;
         const delta = 0.0015;
-        const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
 
-        // Simplified layer list for better stability (City/Cadastral)
-        const layers = [
-            'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114',
-            'LP_PA_CBND_BUBUN'
-        ].join(',');
+        // ✅ EPSG:4326 bbox는 (ymin,xmin,ymax,xmax)
+        const bbox4326 = `${y - delta},${x - delta},${y + delta},${x + delta}`;
 
-        // Using VWORLD_MAP_URL via proxy path
-        const url = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${bbox}&width=${size}&height=${size}&layers=${layers}`;
-        setMiniMapUrl(url);
+        const baseParams = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
+            `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bbox4326)}` +
+            `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
+            `&EXCEPTIONS=text/xml&KEY=${encodeURIComponent(key)}&DOMAIN=${encodeURIComponent(domain)}`;
+
+        // ✅ 4개 레이어(용도지역) 1장
+        const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
+        const zoningUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent(zoningLayers)}`;
+
+        // ✅ 지적도 1장
+        const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
+
+        setMiniMapUrl({ zoningUrl, cadastralUrl });
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
     // Data Fetch Effect
@@ -211,7 +213,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     c = await fetchLandCharacteristicsWFS(대표Pnu);
                 }
 
-                // Robust mapping with fallbacks to representative object
                 const area = first(c.ldplc_ar, picked.representative?.area, null);
                 const jimok = first(c.indcgr_code_nm, picked.representative?.jimok, '-');
                 const price = first(c.pblntf_pclnd, picked.representative?.price, null);
@@ -230,7 +231,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 });
 
                 const key = API_CONFIG.VWORLD_KEY;
-                const domain = window.location.hostname;
+                const domain = getVworldDomain();
                 const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(key)}&domain=${encodeURIComponent(domain)}&pnu=${encodeURIComponent(대표Pnu)}`;
                 setLandUseWmsUrl(url);
                 setShowLandUseWms(true);
@@ -257,22 +258,28 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             {/* 0. Mini Map (Square) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
-                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50 shadow-inner">
+                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
+                        {/* zoning overlay */}
                         <img
-                            src={miniMapUrl}
-                            alt="미니맵"
-                            className="w-full h-full object-cover"
-                            onError={() => {
-                                console.warn("Minimap load failed");
-                                setMiniMapUrl(null);
-                            }}
+                            src={miniMapUrl.zoningUrl}
+                            alt="용도지역"
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={() => setMiniMapUrl(null)}
                         />
+                        {/* cadastral overlay */}
+                        <img
+                            src={miniMapUrl.cadastralUrl}
+                            alt="지적도"
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={() => setMiniMapUrl(null)}
+                        />
+
                         {/* Target Marker (Center) */}
                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
                         <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
-                            VWorld
+                            VWorld WMS
                         </div>
                     </div>
                 </div>
