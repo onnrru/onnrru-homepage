@@ -9,6 +9,7 @@ export const API_CONFIG = {
 
     // Eum Endpoints
     ENDPOINTS: {
+        SEARCHZONE: '/Web/Rest/OP/searchZone', // 지역지구 코드 검색
         LULAW: '/Web/Rest/OP/luLawInfo', // 토지이용규제
         LANDUSE: '/Web/Rest/OP/searchLunCd', // 토지이용행위
         RESTRICT: '/Web/Rest/OP/arLandUseInfo', // 행위제한정보

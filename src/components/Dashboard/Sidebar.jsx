@@ -38,33 +38,28 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // State for image
-    const [mapImageUrl, setMapImageUrl] = useState(null);
-
-    // Helper: Short Jibun Address
+    // Helper: Short Jibun Address (Dong/Li + Number extraction)
     const shortJibun = (addr = '') => {
-        const s = String(addr).trim();
-        const m = s.match(/([가-힣0-9]+(?:동|리))\s+(\d+(?:-\d+)?)/);
-        if (m) return `${m[1]} ${m[2]}`;
-        const parts = s.split(/\s+/);
-        if (parts.length >= 2) {
-            const last = parts[parts.length - 1];
-            const prev = parts[parts.length - 2];
-            if (/\d/.test(last) && /(동|리)$/.test(prev)) return `${prev} ${last}`;
+        const tokens = String(addr).split(/\s+/).filter(Boolean);
+        // Find last token ending with '동' or '리' that has a subsequent token (number)
+        for (let i = tokens.length - 1; i >= 0; i--) {
+            if (/[동리]$/.test(tokens[i]) && tokens[i + 1]) {
+                // If next token looks like a number (e.g., 123, 123-4)
+                if (/^\d+(-\d+)?$/.test(tokens[i + 1])) return `${tokens[i]} ${tokens[i + 1]}`;
+            }
         }
-        return s;
+        // Fallback: take last two tokens
+        return tokens.slice(-2).join(' ');
     };
 
     // Fetch Data Effect
     useEffect(() => {
         const fetchData = async () => {
-            // Use Representative Parcel PNU if available, else selectedAddress
+            // Priority: Representative Parcel PNU > Selected Address PNU
             const targetPnu = representativeParcel?.properties?.pnu || selectedAddress?.pnu;
             if (!targetPnu) {
-                // If no selection at all
                 if (!selectedAddress) {
                     setData({ basic: null, regulation: null, notice: [], guide: [], devlist: [] });
-                    setMapImageUrl(null);
                     return;
                 }
             }
@@ -72,31 +67,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             setLoading(true);
             setError(null);
 
-            // Coordinates for VWorld Image (Representative or Selected)
-            const targetX = representativeParcel?.properties?.x || selectedAddress?.x;
-            const targetY = representativeParcel?.properties?.y || selectedAddress?.y;
-
-            if (targetX && targetY) {
-                const apiKey = API_CONFIG.VWORLD_KEY;
-                const layers = 'lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun';
-                const x = parseFloat(targetX);
-                const y = parseFloat(targetY);
-                const delta = 0.002;
-                const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
-                const finalImgUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=500&height=400&layers=${layers}`;
-                setMapImageUrl(finalImgUrl);
-            } else {
-                setMapImageUrl(null);
-            }
-
-            // Pre-fill basic info from Representative Parcel
-            // Use VWorld properties if available (more reliable for UNM/JIMOK)
+            // Pre-fill basic info from selection
             const props = representativeParcel?.properties || {};
             const initialBasic = {
                 jimok: props.jimok || selectedAddress?.jimok || '-',
                 area: props.parea || selectedAddress?.area || '-',
                 price: props.jiga || selectedAddress?.price || '-',
-                zone: props.unm || selectedAddress?.zone || '-' // VWorld Zone
+                zone: props.unm || selectedAddress?.zone || '-',
+                bcr: '-', // 건폐율
+                far: '-'  // 용적률
             };
 
             setData(prev => ({ ...prev, basic: initialBasic }));
@@ -104,43 +83,71 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             try {
                 if (!targetPnu) throw new Error("PNU 없음");
 
-                // 1. Regulations (luLawInfo) - Optional for detailed zoning list
+                // 1. Regulations (luLawInfo with Code Search)
                 if (activeTab === 'regulation') {
-                    const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
-                        params: { pnu: targetPnu, format: 'xml' }
-                    });
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(luResponse.data, "text/xml");
+                    const areaCd = targetPnu.substring(0, 5);
+                    const zoneString = props.unm || selectedAddress?.zone || '';
+                    // Split zone names (e.g., "제1종일반주거지역, 가축사육제한구역")
+                    const candidates = zoneString.split(/[,\/]/).map(s => s.trim()).filter(Boolean);
 
-                    const errCode = xmlDoc.getElementsByTagName("error_code")[0]?.textContent;
-                    if (errCode) console.warn(`LuLawInfo API Warning: ${errCode}`);
+                    let ucodes = [];
+                    // A. Search Codes for each candidate name
+                    for (const uname of candidates) {
+                        try {
+                            const sr = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.SEARCHZONE}`, {
+                                params: { areaCd, uname, format: 'xml' }
+                            });
+                            const sXml = new DOMParser().parseFromString(sr.data, "text/xml");
+                            const foundUcode = sXml.getElementsByTagName("UCODE")[0]?.textContent;
+                            if (foundUcode) ucodes.push(foundUcode);
+                        } catch (e) {
+                            console.warn(`SearchZone failed for ${uname}:`, e);
+                        }
+                    }
 
-                    // We rely on VWorld 'unm' for primary zoning, but check API for others
-                    const uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
+                    const ucodeList = ucodes.join(',');
+                    let uses = [];
+                    let bcr = '-', far = '-';
 
-                    // Allow 0 values
-                    const jimokXml = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent;
-                    const areaXml = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent;
-                    const priceXml = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent;
+                    // B. Fetch Law Info if codes found
+                    if (ucodeList) {
+                        const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
+                            params: { areaCd, ucodeList, format: 'xml' }
+                        });
+                        const xmlDoc = new DOMParser().parseFromString(luResponse.data, "text/xml");
+                        uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
+
+                        // C. Fetch Restriction Info (BCR/FAR)
+                        // Try with first ucode
+                        if (ucodes.length > 0) {
+                            try {
+                                const arResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.RESTRICT}`, {
+                                    params: { areaCd, ucode: ucodes[0], format: 'xml' }
+                                });
+                                const arXml = new DOMParser().parseFromString(arResponse.data, "text/xml");
+                                bcr = arXml.getElementsByTagName("BLD_CVRG_RAT")[0]?.textContent || '-';
+                                far = arXml.getElementsByTagName("FLR_AR_RAT")[0]?.textContent || '-';
+                            } catch (e) {
+                                console.warn("BCR/FAR fetch failed:", e);
+                            }
+                        }
+                    }
 
                     setData(prev => ({
                         ...prev,
                         basic: {
                             ...prev.basic,
-                            // Update only if XML has valid data, otherwise keep VWorld/Address data
-                            jimok: jimokXml || prev.basic.jimok,
-                            area: areaXml || prev.basic.area,
-                            price: priceXml || prev.basic.price
+                            bcr: bcr !== '-' ? `${bcr}%` : '-',
+                            far: far !== '-' ? `${far}%` : '-'
                         },
-                        regulation: { uses }
+                        regulation: { uses: uses.length > 0 ? uses : (candidates.length > 0 ? candidates : []) }
                     }));
                 }
 
                 // 2. Notice
                 if (activeTab === 'notice') {
                     const noticeResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.NOTICE}`, { params: { pnu: targetPnu } });
-                    const nParser = new DOMParser();
-                    const nXml = nParser.parseFromString(noticeResponse.data, "text/xml");
+                    const nXml = new DOMParser().parseFromString(noticeResponse.data, "text/xml");
                     const notices = Array.from(nXml.getElementsByTagName("Map")).map(item => ({
                         title: item.getElementsByTagName("LCNM")[0]?.textContent || "고시",
                         summary: item.getElementsByTagName("NOTIFI_NM")[0]?.textContent || "-",
@@ -176,7 +183,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             } catch (err) {
                 console.error("Sidebar API Error:", err);
                 const errMsg = err.response ? `Status: ${err.response.status}` : err.message;
-                // Keep basic data if we have it
                 if (!initialBasic.jimok || initialBasic.jimok === '-') {
                     setError(`정보 로딩 실패: ${errMsg}`);
                 }
@@ -188,7 +194,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         fetchData();
     }, [activeTab, representativeParcel, selectedAddress]);
 
-    // Data Helpers
     const hasArea = (val) => val !== null && val !== undefined && val !== '-';
     const hasPrice = (val) => val !== null && val !== undefined && val !== '-';
 
@@ -217,32 +222,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             </div>
 
             {/* Content Section */}
-            <div className="flex-1 flex flex-col min-h-0">
-                {/* Expand Toggle */}
-                <div className="p-6 pb-2 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">토지이음 분석 정보</h3>
-                    <button
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-transform ${isExpanded ? 'rotate-180 bg-gray-100' : ''}`}
-                        title={isExpanded ? "축소하기" : "상세보기 (확대)"}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                    </button>
-                </div>
-
-                {/* Tabs */}
-                {isExpanded && (
-                    <div className="px-6 border-b border-gray-200 flex gap-4 overflow-x-auto scrollbar-hide">
-                        {[{ id: 'regulation', label: '규제정보' }, { id: 'notice', label: '고시정보' }, { id: 'guide', label: '쉬운규제안내' }, { id: 'devlist', label: '개발인허가' }].map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-ink text-ink' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
+            <div className="flex-1 flex flex-col min-h-0 bg-white">
                 <div className="flex-1 p-6 overflow-y-auto">
                     {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">{error}</div>}
 
@@ -252,7 +232,26 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         <>
                             {activeTab === 'regulation' && (
                                 <div className="space-y-6">
-                                    {/* 1. Basic Table */}
+                                    {/* 1. Zoning / Regulations List (MOVED UP) */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                            <span className="w-1 h-4 bg-ink rounded-full"></span>
+                                            국토계획법 및 타법령에 따른 지역·지구 등
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {data.regulation?.uses && data.regulation.uses.length > 0 ? (
+                                                data.regulation.uses.map((use, i) => (
+                                                    <span key={`${use}-${i}`} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
+                                                        {use}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <div className="text-gray-400 text-xs">해당 정보 없음</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Basic Table (MOVED DOWN) */}
                                     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                                         <table className="w-full text-sm">
                                             <tbody>
@@ -262,7 +261,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                 </tr>
                                                 <tr className="border-b border-gray-100">
                                                     <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">면적</th>
-                                                    {/* Display Total Area Here if Multi-Selected, or Rep Area */}
                                                     <td className="py-3 px-4 text-gray-800">
                                                         {hasArea(totalArea) ? `${totalArea.toLocaleString()} m²` : '-'}
                                                     </td>
@@ -271,38 +269,19 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                     <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">개별공시지가</th>
                                                     <td className="py-3 px-4 text-gray-800">{hasPrice(data.basic?.price) ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}</td>
                                                 </tr>
+                                                <tr className="border-b border-gray-100">
+                                                    <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">건폐율</th>
+                                                    <td className="py-3 px-4 text-gray-800 font-bold text-blue-700">{data.basic?.bcr || '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">용적률</th>
+                                                    <td className="py-3 px-4 text-gray-800 font-bold text-blue-700">{data.basic?.far || '-'}</td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
 
-                                    {/* 2. Zoning / Regulations List (Priority: VWorld Zone > API) */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                            <span className="w-1 h-4 bg-ink rounded-full"></span>
-                                            국토계획법 및 타법령에 따른 지역·지구 등
-                                        </h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {/* Primary: VWorld Zone string split by space or comma */}
-                                            {data.basic?.zone && data.basic.zone !== '-' && (
-                                                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
-                                                    {data.basic.zone}
-                                                </span>
-                                            )}
-
-                                            {/* Secondary: API List (prevent duplicates if possible, simpler to just show) */}
-                                            {data.regulation?.uses && data.regulation.uses.length > 0 ? (
-                                                data.regulation.uses.map((use, i) => (
-                                                    <span key={`${use}-${i}`} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
-                                                        {use}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                !data.basic?.zone && <div className="text-gray-400 text-xs">해당 정보 없음</div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* 3. Land Specification Table (New) */}
+                                    {/* 3. Land Specification Table */}
                                     {selectedParcels && selectedParcels.length > 0 && (
                                         <div className="bg-white rounded-lg border border-gray-200 p-4">
                                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -342,23 +321,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                             </div>
                                         </div>
                                     )}
-
-                                    {/* 4. Land Use Map (Representative) */}
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4">
-                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                            <span className="w-1 h-4 bg-ink rounded-full"></span>
-                                            토지이용규제 확인도면 (용도지역)
-                                        </h4>
-                                        <div className="w-full aspect-video bg-gray-100 rounded overflow-hidden relative border border-gray-300">
-                                            {mapImageUrl ? (
-                                                <img src={mapImageUrl} alt="토지이용계획확인도" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패</div>'; }} />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 정보 없음</div>
-                                            )}
-                                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded">VWorld</div>
-                                        </div>
-                                        <p className="mt-2 text-xs text-gray-500 text-right">* VWorld 연속주제도 기반 (실제와 다를 수 있음)</p>
-                                    </div>
                                 </div>
                             )}
 
@@ -388,13 +350,38 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 </div>
             </div>
 
-            {!isExpanded && (
-                <div className="p-4 border-t border-gray-200">
+            {/* Bottom Actions: Toggle & Detailed Report */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+                {/* Header Row with Toggle Button (MOVED TO BOTTOM) */}
+                <div className="mb-4 flex justify-between items-center">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">토지이음 분석정보 →</h3>
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-transform ${isExpanded ? 'rotate-180 bg-gray-200' : 'bg-white border border-gray-200 shadow-sm'}`}
+                        title={isExpanded ? "축소하기" : "상세보기 (확대)"}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                </div>
+
+                {isExpanded && (
+                    <div className="mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
+                        {[{ id: 'regulation', label: '규제' }, { id: 'notice', label: '고시' }, { id: 'guide', label: '안내' }, { id: 'devlist', label: '개발' }].map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 text-xs font-bold rounded-lg border transition-colors ${activeTab === tab.id ? 'bg-ink text-white border-ink' : 'bg-white text-gray-400 border-gray-200 hover:text-gray-600'}`}>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {!isExpanded && (
                     <button className="w-full py-3 bg-ink text-white rounded-lg font-medium shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2">
                         <span>📄 상세 보고서 생성</span>
                     </button>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };
