@@ -55,8 +55,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         for (const p of paths) {
             if (p && typeof p === 'object' && !Array.isArray(p)) {
-                // Check if this object contains any expected data keys
-                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
+                // Check if this object contains any expected data keys (widened search)
+                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndpcl_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
                     return p;
                 }
             }
@@ -125,8 +125,17 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         return {
             pnu: first(d.pnu, pnu),
-            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.lndcgrCodeNm, d.jimok, d.JIMOK),
-            ldplc_ar: first(d.ldplc_ar, d.ldplcAr, d.lndplc_ar, d.lndplcAr, d.ar, d.area),
+            indcgr_code_nm: first(
+                d.indcgr_code_nm, d.indcgrCodeNm,
+                d.lndcgr_code_nm, d.lndcgrCodeNm,
+                d.jimok_nm, d.jimok, d.JIMOK
+            ),
+            ldplc_ar: first(
+                d.ldplc_ar, d.ldplcAr,
+                d.lndpcl_ar, d.lndpclAr,
+                d.lndplc_ar, d.lndplcAr,
+                d.ar, d.area
+            ),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
             prpos_area_2_nm: first(d.prpos_area_2_nm, d.prposArea2Nm),
@@ -202,17 +211,17 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
             `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
-        // ✅ 4개 레이어(용도지역) 1장
+        // 1. Base Map (VWorld Gray Map)
+        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(`${x - delta},${y - delta},${x + delta},${y + delta}`)}&width=${size}&height=${size}&layers=gray`;
+
+        // 2. Zoning Layer (WMS)
         const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
         const zoningUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent(zoningLayers)}`;
 
-        // ✅ 지적도 1장
+        // 3. Cadastral Layer (WMS)
         const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
 
-        console.log('Minimap Zoning URL:', zoningUrl);
-        console.log('Minimap Cadastral URL:', cadastralUrl);
-
-        setMiniMapUrl({ zoningUrl, cadastralUrl });
+        setMiniMapUrl({ baseUrl, zoningUrl, cadastralUrl });
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
     // Data Fetch Effect
@@ -279,17 +288,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
 
-            {/* 0. Mini Map (Square Overlays) */}
+            {/* 0. Mini Map (Layer Overlays) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
-                        {/* Zoning Layer */}
+                        {/* 1. Gray Base Map Layer */}
+                        <img
+                            src={miniMapUrl.baseUrl}
+                            alt="배경지도"
+                            className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        {/* 2. Zoning overlay */}
                         <img
                             src={miniMapUrl.zoningUrl}
                             alt="용도지역"
                             className="absolute inset-0 w-full h-full object-cover"
                         />
-                        {/* Cadastral Layer */}
+                        {/* 3. Cadastral overlay */}
                         <img
                             src={miniMapUrl.cadastralUrl}
                             alt="지적도"
@@ -297,7 +312,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         />
 
                         {/* Target Marker (Center) */}
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
                         <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
