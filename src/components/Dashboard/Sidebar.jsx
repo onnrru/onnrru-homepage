@@ -6,11 +6,26 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('regulation'); // 'regulation', 'notice', 'guide', 'devlist'
 
-    // [Multi-Selection] Calculate Total Area
-    const totalArea = React.useMemo(() => {
-        if (!selectedParcels || selectedParcels.length === 0) return 0;
-        return selectedParcels.reduce((sum, p) => sum + (parseFloat(p.properties?.parea) || 0), 0);
-    }, [selectedParcels]);
+    // [Multi-Selection] Representative Parcel & Total Area
+    const { representativeParcel, totalArea } = React.useMemo(() => {
+        const parcels = Array.isArray(selectedParcels) && selectedParcels.length > 0
+            ? selectedParcels
+            : (selectedAddress?.pnu ? [{ properties: { ...selectedAddress, parea: selectedAddress.area, jiga: selectedAddress.price } }] : []);
+
+        if (parcels.length === 0) return { representativeParcel: null, totalArea: 0 };
+
+        // 1. Find Representative (Max Area)
+        const rep = parcels.reduce((best, cur) => {
+            const aBest = parseFloat(best?.properties?.parea) || 0;
+            const aCur = parseFloat(cur?.properties?.parea) || 0;
+            return aCur > aBest ? cur : best;
+        }, parcels[0]);
+
+        // 2. Calculate Total Area
+        const total = parcels.reduce((sum, p) => sum + (parseFloat(p?.properties?.parea) || 0), 0);
+
+        return { representativeParcel: rep, totalArea: total };
+    }, [selectedParcels, selectedAddress]);
 
     // Data States
     const [data, setData] = useState({
@@ -26,112 +41,104 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // State for image
     const [mapImageUrl, setMapImageUrl] = useState(null);
 
+    // Helper: Short Jibun Address
+    const shortJibun = (addr = '') => {
+        const s = String(addr).trim();
+        const m = s.match(/([가-힣0-9]+(?:동|리))\s+(\d+(?:-\d+)?)/);
+        if (m) return `${m[1]} ${m[2]}`;
+        const parts = s.split(/\s+/);
+        if (parts.length >= 2) {
+            const last = parts[parts.length - 1];
+            const prev = parts[parts.length - 2];
+            if (/\d/.test(last) && /(동|리)$/.test(prev)) return `${prev} ${last}`;
+        }
+        return s;
+    };
+
     // Fetch Data Effect
     useEffect(() => {
         const fetchData = async () => {
-            if (!selectedAddress) return;
-
-            // Only proceed if PNU is available
-            const pnu = selectedAddress.pnu;
-            if (!pnu) {
-                setError("토지 정보를 조회하려면 '지번 주소'를 선택해주세요.");
-                setData({
-                    basic: null,
-                    regulation: null,
-                    notice: [],
-                    guide: [],
-                    devlist: []
-                });
-                setMapImageUrl(null);
-                return;
+            // Use Representative Parcel PNU if available, else selectedAddress
+            const targetPnu = representativeParcel?.properties?.pnu || selectedAddress?.pnu;
+            if (!targetPnu) {
+                // If no selection at all
+                if (!selectedAddress) {
+                    setData({ basic: null, regulation: null, notice: [], guide: [], devlist: [] });
+                    setMapImageUrl(null);
+                    return;
+                }
             }
 
             setLoading(true);
             setError(null);
 
-            // Construct Static Map Image URL (Zoning Plan)
-            if (selectedAddress.x && selectedAddress.y) {
+            // Coordinates for VWorld Image (Representative or Selected)
+            const targetX = representativeParcel?.properties?.x || selectedAddress?.x;
+            const targetY = representativeParcel?.properties?.y || selectedAddress?.y;
+
+            if (targetX && targetY) {
                 const apiKey = API_CONFIG.VWORLD_KEY;
-                const layers = 'lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun'; // Zoning + Cadastral
-
-                const x = parseFloat(selectedAddress.x);
-                const y = parseFloat(selectedAddress.y);
-                const delta = 0.002; // Approx 200m
+                const layers = 'lt_c_aisryc,lp_pa_cbnd_bubun,lp_pa_cbnd_bonbun';
+                const x = parseFloat(targetX);
+                const y = parseFloat(targetY);
+                const delta = 0.002;
                 const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
-
-                // USE PROXY PATH from api.js (API_CONFIG.VWORLD_BASE_URL -> /api/vworld)
-                // Direct VWorld URL caused Mixed Content on some setups, but here we strictly use the Proxy route if needed.
-                // However, for <img> src, we can only use Proxy if the ProxyEndpoint returns image content correctly.
-                // Netlify Redirects handle this. /api/vworld -> https://api.vworld.kr
                 const finalImgUrl = `${API_CONFIG.VWORLD_BASE_URL}/req/image?service=image&request=getmap&key=${apiKey}&format=png&bbox=${bbox}&crs=EPSG:4326&width=500&height=400&layers=${layers}`;
-
                 setMapImageUrl(finalImgUrl);
             } else {
                 setMapImageUrl(null);
             }
 
-            // Pre-fill basic info if available in selectedAddress
+            // Pre-fill basic info from Representative Parcel
+            // Use VWorld properties if available (more reliable for UNM/JIMOK)
+            const props = representativeParcel?.properties || {};
             const initialBasic = {
-                jimok: selectedAddress.jimok || '-',
-                area: selectedAddress.area || '-',
-                price: selectedAddress.price || '-'
+                jimok: props.jimok || selectedAddress?.jimok || '-',
+                area: props.parea || selectedAddress?.area || '-',
+                price: props.jiga || selectedAddress?.price || '-',
+                zone: props.unm || selectedAddress?.zone || '-' // VWorld Zone
             };
 
-            setData(prev => ({
-                ...prev,
-                basic: initialBasic
-            }));
+            setData(prev => ({ ...prev, basic: initialBasic }));
 
             try {
-                // 1. Basic Info / Regulations (luLawInfo)
-                // Endpoint: /Web/Rest/OP/luLawInfo?pnu=...
-                if (activeTab === 'regulation') {
-                    // Use EUM Proxy
-                    const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
-                        params: { pnu: pnu, format: 'xml' }
-                    });
+                if (!targetPnu) throw new Error("PNU 없음");
 
+                // 1. Regulations (luLawInfo) - Optional for detailed zoning list
+                if (activeTab === 'regulation') {
+                    const luResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.LULAW}`, {
+                        params: { pnu: targetPnu, format: 'xml' }
+                    });
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(luResponse.data, "text/xml");
 
-                    // Check for API Error in XML
                     const errCode = xmlDoc.getElementsByTagName("error_code")[0]?.textContent;
-                    if (errCode) {
-                        console.warn(`LuLawInfo API Warning: ${xmlDoc.getElementsByTagName("message")[0]?.textContent}`);
-                        // Do not throw, keep using selectedAddress data if available
-                    }
+                    if (errCode) console.warn(`LuLawInfo API Warning: ${errCode}`);
 
-                    // Extract Data with Fallbacks
-                    // User Request: IndcgrNm, ar, JIGA
-                    // Standard luLawInfo: JIMOK_NM, JIBUN_AREA, JIGA
-                    // We check both just in case.
-                    const jimokXml = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent || xmlDoc.getElementsByTagName("IndcgrNm")[0]?.textContent;
-                    const areaXml = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent || xmlDoc.getElementsByTagName("ar")[0]?.textContent;
-                    const priceXml = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent;
-
-                    const jimok = jimokXml || selectedAddress.jimok || '-';
-                    const area = areaXml || selectedAddress.area || '-';
-                    const price = priceXml || selectedAddress.price || '-';
-
-                    // Zoning Info (UNAME, LAW_NM)
-                    // User Request: UNAME, LAW_NM (Filter National Planning Law)
-                    // luLawInfo returns PRPOS_AREA_DSTRC_NM (which is usually UNAME).
-                    // Or we can look for specific lists.
-                    // Let's stick to PRPOS_AREA_DSTRC_NM as it's the standard aggregate.
+                    // We rely on VWorld 'unm' for primary zoning, but check API for others
                     const uses = Array.from(xmlDoc.getElementsByTagName("PRPOS_AREA_DSTRC_NM")).map(node => node.textContent);
+
+                    // Allow 0 values
+                    const jimokXml = xmlDoc.getElementsByTagName("JIMOK_NM")[0]?.textContent;
+                    const areaXml = xmlDoc.getElementsByTagName("JIBUN_AREA")[0]?.textContent;
+                    const priceXml = xmlDoc.getElementsByTagName("JIGA")[0]?.textContent;
 
                     setData(prev => ({
                         ...prev,
-                        basic: { jimok, area, price },
+                        basic: {
+                            ...prev.basic,
+                            // Update only if XML has valid data, otherwise keep VWorld/Address data
+                            jimok: jimokXml || prev.basic.jimok,
+                            area: areaXml || prev.basic.area,
+                            price: priceXml || prev.basic.price
+                        },
                         regulation: { uses }
                     }));
                 }
 
-                // 2. Notice (arMapList)
+                // 2. Notice
                 if (activeTab === 'notice') {
-                    const noticeResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.NOTICE}`, {
-                        params: { pnu: pnu }
-                    });
+                    const noticeResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.NOTICE}`, { params: { pnu: targetPnu } });
                     const nParser = new DOMParser();
                     const nXml = nParser.parseFromString(noticeResponse.data, "text/xml");
                     const notices = Array.from(nXml.getElementsByTagName("Map")).map(item => ({
@@ -143,11 +150,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     setData(prev => ({ ...prev, notice: notices }));
                 }
 
-                // 3. Guide (ebGuideBookList)
+                // 3. Guide
                 if (activeTab === 'guide') {
-                    const gResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.GUIDE}`, { params: { pnu: pnu } });
-                    const gParser = new DOMParser();
-                    const gXml = gParser.parseFromString(gResponse.data, "text/xml");
+                    const gResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.GUIDE}`, { params: { pnu: targetPnu } });
+                    const gXml = new DOMParser().parseFromString(gResponse.data, "text/xml");
                     const guides = Array.from(gXml.getElementsByTagName("GuideBook")).map(item => ({
                         cat: item.getElementsByTagName("CATE_NM")[0]?.textContent,
                         facil: item.getElementsByTagName("FACIL_NM")[0]?.textContent,
@@ -157,65 +163,64 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     setData(prev => ({ ...prev, guide: guides }));
                 }
 
-                // 4. DevList (isDevList)
+                // 4. DevList
                 if (activeTab === 'devlist') {
                     const dResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.DEVLIST}`, {
-                        params: { pnu: pnu, pageNo: 1, numOfRows: 10 }
+                        params: { pnu: targetPnu, pageNo: 1, numOfRows: 10 }
                     });
-
                     if (dResponse.data && dResponse.data.list) {
                         setData(prev => ({ ...prev, devlist: dResponse.data.list }));
-                    } else if (typeof dResponse.data === 'string') {
-                        // XML fallback
-                        const dParser = new DOMParser();
-                        const dXml = dParser.parseFromString(dResponse.data, "text/xml");
-                        // ... parsing if needed, but assuming JSON for now as per VWorld typically
                     }
                 }
 
             } catch (err) {
                 console.error("Sidebar API Error:", err);
-                const errMsg = err.response
-                    ? `Status: ${err.response.status} (${err.response.statusText})`
-                    : err.message;
-                // Only set error if we have NO basic data to show
+                const errMsg = err.response ? `Status: ${err.response.status}` : err.message;
+                // Keep basic data if we have it
                 if (!initialBasic.jimok || initialBasic.jimok === '-') {
-                    setError(`정보 로딩 실패: ${errMsg}.`);
+                    setError(`정보 로딩 실패: ${errMsg}`);
                 }
             } finally {
                 setLoading(false);
             }
         };
 
-        if (selectedAddress) {
-            fetchData();
-        }
-    }, [activeTab, selectedAddress]);
+        fetchData();
+    }, [activeTab, representativeParcel, selectedAddress]);
+
+    // Data Helpers
+    const hasArea = (val) => val !== null && val !== undefined && val !== '-';
+    const hasPrice = (val) => val !== null && val !== undefined && val !== '-';
 
     return (
-        <div
-            className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}
-        >
+        <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
             {/* Header: Target Site Info */}
             <div className="p-6 border-b border-gray-100 flex-shrink-0">
                 <h2 className="text-lg font-bold text-gray-800 mb-1">대상지 정보</h2>
-                <div className="text-xl font-bold text-ink font-serif mb-2 break-keep">
-                    {selectedAddress ? (selectedAddress.roadAddr || selectedAddress.address) : '주소 선택 필요'}
-                </div>
-                <div className="text-sm text-gray-500">
-                    {selectedAddress ? (selectedAddress.parcelAddr || '-') : '-'}
-                </div>
+                {representativeParcel ? (
+                    <>
+                        <div className="text-xl font-bold text-ink font-serif mb-2 break-keep">
+                            {representativeParcel.properties?.road || representativeParcel.properties?.addr || '주소 정보 없음'}
+                            {selectedParcels && selectedParcels.length > 1 && (
+                                <span className="text-sm font-normal text-gray-500 ml-1">
+                                    (외 {selectedParcels.length - 1}필지)
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                            {representativeParcel.properties?.addr || '-'}
+                        </div>
+                    </>
+                ) : (
+                    <div className="text-xl font-bold text-ink font-serif mb-2">주소 선택 필요</div>
+                )}
             </div>
 
-
-
-            {/* Section: Specific Info (Expandable) */}
+            {/* Content Section */}
             <div className="flex-1 flex flex-col min-h-0">
-                {/* Header Row with Toggle Button */}
+                {/* Expand Toggle */}
                 <div className="p-6 pb-2 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-                        토지이음 분석 정보
-                    </h3>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">토지이음 분석 정보</h3>
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
                         className={`p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-transform ${isExpanded ? 'rotate-180 bg-gray-100' : ''}`}
@@ -230,69 +235,19 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 {/* Tabs */}
                 {isExpanded && (
                     <div className="px-6 border-b border-gray-200 flex gap-4 overflow-x-auto scrollbar-hide">
-                        {[
-                            { id: 'regulation', label: '규제정보' },
-                            { id: 'notice', label: '고시정보' },
-                            { id: 'guide', label: '쉬운규제안내' },
-                            { id: 'devlist', label: '개발인허가' }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-ink text-ink' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-                            >
+                        {[{ id: 'regulation', label: '규제정보' }, { id: 'notice', label: '고시정보' }, { id: 'guide', label: '쉬운규제안내' }, { id: 'devlist', label: '개발인허가' }].map(tab => (
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-ink text-ink' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
                                 {tab.label}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
-                    {/* [Multi-Selection] Summary Section */}
-                    {selectedParcels && selectedParcels.length > 1 && (
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-sm font-bold text-gray-800">선택된 필지 ({selectedParcels.length})</h3>
-                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                    총 {totalArea.toLocaleString()} ㎡
-                                </span>
-                            </div>
-                            <div className="max-h-[150px] overflow-y-auto bg-white rounded border border-gray-200 text-xs">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 text-gray-700 font-semibold sticky top-0">
-                                        <tr>
-                                            <th className="p-2">주소</th>
-                                            <th className="p-2 text-center">지목</th>
-                                            <th className="p-2 text-right">면적</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {selectedParcels.map((p, idx) => (
-                                            <tr key={p.properties?.pnu || idx} className="hover:bg-gray-50">
-                                                <td className="p-2 truncate max-w-[120px]" title={p.properties?.addr}>
-                                                    {p.properties?.addr || '-'}
-                                                </td>
-                                                <td className="p-2 text-center">{p.properties?.jimok || '-'}</td>
-                                                <td className="p-2 text-right">{parseFloat(p.properties?.parea || 0).toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {error && (
-                        <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">
-                            {error}
-                        </div>
-                    )}
+                    {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">{error}</div>}
 
                     {loading ? (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        </div>
+                        <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div></div>
                     ) : (
                         <>
                             {activeTab === 'regulation' && (
@@ -307,23 +262,34 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                 </tr>
                                                 <tr className="border-b border-gray-100">
                                                     <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">면적</th>
-                                                    <td className="py-3 px-4 text-gray-800">{data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}</td>
+                                                    {/* Display Total Area Here if Multi-Selected, or Rep Area */}
+                                                    <td className="py-3 px-4 text-gray-800">
+                                                        {hasArea(totalArea) ? `${totalArea.toLocaleString()} m²` : '-'}
+                                                    </td>
                                                 </tr>
-                                                <tr>
+                                                <tr className="border-b border-gray-100">
                                                     <th className="bg-gray-50 py-3 px-4 text-left font-medium text-gray-600">개별공시지가</th>
-                                                    <td className="py-3 px-4 text-gray-800">{data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}</td>
+                                                    <td className="py-3 px-4 text-gray-800">{hasPrice(data.basic?.price) ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
                                     </div>
 
-                                    {/* 2. Zoning / Regulations List */}
+                                    {/* 2. Zoning / Regulations List (Priority: VWorld Zone > API) */}
                                     <div className="bg-white rounded-lg border border-gray-200 p-4">
                                         <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                             <span className="w-1 h-4 bg-ink rounded-full"></span>
                                             국토계획법 및 타법령에 따른 지역·지구 등
                                         </h4>
                                         <div className="flex flex-wrap gap-2">
+                                            {/* Primary: VWorld Zone string split by space or comma */}
+                                            {data.basic?.zone && data.basic.zone !== '-' && (
+                                                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-full border border-indigo-100">
+                                                    {data.basic.zone}
+                                                </span>
+                                            )}
+
+                                            {/* Secondary: API List (prevent duplicates if possible, simpler to just show) */}
                                             {data.regulation?.uses && data.regulation.uses.length > 0 ? (
                                                 data.regulation.uses.map((use, i) => (
                                                     <span key={`${use}-${i}`} className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
@@ -331,12 +297,53 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                     </span>
                                                 ))
                                             ) : (
-                                                <div className="text-gray-400 text-xs">해당 정보 없음</div>
+                                                !data.basic?.zone && <div className="text-gray-400 text-xs">해당 정보 없음</div>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* 2. Confirmation Drawing (Map) */}
+                                    {/* 3. Land Specification Table (New) */}
+                                    {selectedParcels && selectedParcels.length > 0 && (
+                                        <div className="bg-white rounded-lg border border-gray-200 p-4">
+                                            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                                <span className="w-1 h-4 bg-ink rounded-full"></span>
+                                                토지명세표
+                                            </h4>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs text-left">
+                                                    <thead className="bg-gray-50 text-gray-700 font-semibold border-b border-gray-200">
+                                                        <tr>
+                                                            <th className="p-2 text-center w-10">No</th>
+                                                            <th className="p-2">지번</th>
+                                                            <th className="p-2 text-right">면적(m²)</th>
+                                                            <th className="p-2 text-center">지목</th>
+                                                            <th className="p-2 text-right">공시지가</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100">
+                                                        {selectedParcels.map((p, idx) => (
+                                                            <tr key={p.properties?.pnu || idx} className="hover:bg-gray-50 transition-colors">
+                                                                <td className="p-2 text-center text-gray-500">{idx + 1}</td>
+                                                                <td className="p-2 font-medium">{shortJibun(p.properties?.addr)}</td>
+                                                                <td className="p-2 text-right">{parseFloat(p.properties?.parea || 0).toLocaleString()}</td>
+                                                                <td className="p-2 text-center">{p.properties?.jimok || '-'}</td>
+                                                                <td className="p-2 text-right text-gray-600">{parseFloat(p.properties?.jiga || 0).toLocaleString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                                                        <tr>
+                                                            <td className="p-2 text-center" colSpan={2}>합계</td>
+                                                            <td className="p-2 text-right text-blue-700">{totalArea.toLocaleString()}</td>
+                                                            <td className="p-2" colSpan={2}></td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 4. Land Use Map (Representative) */}
                                     <div className="bg-white rounded-lg border border-gray-200 p-4">
                                         <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                             <span className="w-1 h-4 bg-ink rounded-full"></span>
@@ -344,19 +351,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         </h4>
                                         <div className="w-full aspect-video bg-gray-100 rounded overflow-hidden relative border border-gray-300">
                                             {mapImageUrl ? (
-                                                <img
-                                                    src={mapImageUrl}
-                                                    alt="토지이용계획확인도"
-                                                    className="w-full h-full object-cover"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패 (API Error)</div>';
-                                                    }}
-                                                />
+                                                <img src={mapImageUrl} alt="토지이용계획확인도" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 로드 실패</div>'; }} />
                                             ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">
-                                                    도면 정보 없음
-                                                </div>
+                                                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">도면 정보 없음</div>
                                             )}
                                             <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded">VWorld</div>
                                         </div>
@@ -367,37 +364,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
                             {activeTab === 'notice' && (
                                 <div className="space-y-3">
-                                    {data.notice.map((item, i) => (
-                                        <div key={i} className="border-b border-gray-100 pb-3 last:border-0">
-                                            <div className="font-bold text-sm text-gray-800">{item.summary}</div>
-                                            <div className="text-xs text-gray-500 mt-1">{item.date} | {item.author}</div>
-                                        </div>
-                                    ))}
-                                    {data.notice.length === 0 && <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
+                                    {data.notice.length > 0 ? data.notice.map((item, i) => (
+                                        <div key={i} className="border-b border-gray-100 pb-3 last:border-0"><div className="font-bold text-sm text-gray-800">{item.summary}</div><div className="text-xs text-gray-500 mt-1">{item.date} | {item.author}</div></div>
+                                    )) : <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
                                 </div>
                             )}
-
                             {activeTab === 'guide' && (
                                 <div className="space-y-3">
-                                    {data.guide.map((item, i) => (
-                                        <div key={i} className="bg-green-50 p-3 rounded border border-green-100">
-                                            <div className="text-xs font-bold text-green-700 mb-1">{item.facil}</div>
-                                            <div className="text-xs text-gray-600">{item.desc}</div>
-                                        </div>
-                                    ))}
-                                    {data.guide.length === 0 && <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
+                                    {data.guide.length > 0 ? data.guide.map((item, i) => (
+                                        <div key={i} className="bg-green-50 p-3 rounded border border-green-100"><div className="text-xs font-bold text-green-700 mb-1">{item.facil}</div><div className="text-xs text-gray-600">{item.desc}</div></div>
+                                    )) : <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
                                 </div>
                             )}
-
                             {activeTab === 'devlist' && (
                                 <div className="space-y-3">
-                                    {data.devlist.map((item, i) => (
-                                        <div key={i} className="bg-gray-50 p-3 rounded border border-gray-200">
-                                            <div className="text-sm font-bold text-gray-800">{item.lcNm}</div>
-                                            <div className="text-xs text-gray-500 mt-1">{item.devlopActionPurps}</div>
-                                        </div>
-                                    ))}
-                                    {data.devlist.length === 0 && <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
+                                    {data.devlist.length > 0 ? data.devlist.map((item, i) => (
+                                        <div key={i} className="bg-gray-50 p-3 rounded border border-gray-200"><div className="text-sm font-bold text-gray-800">{item.lcNm}</div><div className="text-xs text-gray-500 mt-1">{item.devlopActionPurps}</div></div>
+                                    )) : <div className="text-center text-gray-400 text-xs py-10">데이터 없음</div>}
                                 </div>
                             )}
                         </>
