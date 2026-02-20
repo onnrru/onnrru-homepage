@@ -247,7 +247,9 @@ const MapSection = ({
     }, [onParcelsChange, renderSelectedParcels]);
 
     // props selectedParcels 변경 시 지도에도 반영
+    const selectedParcelsRef = useRef(selectedParcels);
     useEffect(() => {
+        selectedParcelsRef.current = selectedParcels;
         if (!mapObj) return;
         renderSelectedParcels(selectedParcels);
     }, [mapObj, selectedParcels, renderSelectedParcels]);
@@ -462,6 +464,7 @@ const MapSection = ({
                         }
 
                         // dblclick는 "선택 초기화(단일)"로
+                        selectedParcelsRef.current = [fd];
                         commitSelectedParcels([fd]);
                     } catch (e) {
                         console.error('dblclick error:', e);
@@ -497,7 +500,8 @@ const MapSection = ({
                             zone: props.unm
                         });
 
-                        const current = Array.isArray(selectedParcels) ? selectedParcels : [];
+                        // ✅ 여기! props selectedParcels 대신 ref 사용
+                        const current = selectedParcelsRef.current || [];
 
                         // ✅ 지번추가 모드일 때: 토글(추가/해제)
                         if (parcelPickModeRef.current) {
@@ -506,6 +510,9 @@ const MapSection = ({
                                 ? current.filter((x) => getPnu(x) !== pnu)
                                 : [...current, fd];
 
+                            // ✅ 즉시 ref 갱신(렌더 타이밍 이슈 방지)
+                            selectedParcelsRef.current = next;
+
                             commitSelectedParcels(next);
                             // (선택) 멀티 선택 중에는 단일 포커스 마커는 굳이 안 바꿔도 됨
                             // renderSingleFocus(fd); 
@@ -513,6 +520,7 @@ const MapSection = ({
                         }
 
                         // ✅ 지번추가 모드 OFF일 때: 단일 선택
+                        selectedParcelsRef.current = [fd];
                         commitSelectedParcels([fd]);
                         renderSingleFocus(fd);
                     } catch (e) {
