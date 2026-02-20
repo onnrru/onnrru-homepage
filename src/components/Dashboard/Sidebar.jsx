@@ -25,12 +25,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     };
 
     const unwrapNed = (data) => {
+        // Safe navigation for various VWorld response formats
         const r = data?.response?.result ?? data?.result ?? data;
         if (Array.isArray(r)) return r[0] ?? null;
         if (Array.isArray(r?.items)) return r.items[0] ?? null;
         if (Array.isArray(r?.item)) return r.item[0] ?? null;
         if (Array.isArray(r?.features)) return r.features[0]?.properties ?? r.features[0] ?? null;
-        if (r && typeof r === 'object') return r;
+        if (r && typeof r === 'object' && !r.response) return r;
         return null;
     };
 
@@ -79,7 +80,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // --- Data Fetching Helpers ---
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.origin;
+        const domain = window.location.hostname; // Reverted to hostname
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
 
@@ -88,11 +89,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             responseType: 'json'
         });
 
+        console.log('NED raw response:', res.data); // Added logging as requested
+
         const d = unwrapNed(res.data);
-        if (!d) {
-            console.log('NED raw:', res.data);
-            throw new Error('NED JSON record not found');
-        }
+        if (!d) throw new Error('NED JSON record not found');
 
         return {
             pnu: first(d.pnu, pnu),
@@ -120,7 +120,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const fetchLandCharacteristicsWFS = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.origin;
+        const domain = window.location.hostname;
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
 
@@ -134,6 +134,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         });
 
         const text = String(res.data || '');
+        console.log('WFS raw head:', text.slice(0, 200));
+
         if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
             throw new Error('VWorld WFS returned HTML');
         }
@@ -166,23 +168,26 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // --- Effects ---
     // Minimap Effect
     useEffect(() => {
-        const x = Number(selectedAddress?.x);
-        const y = Number(selectedAddress?.y);
+        // Robust coordinate check (fallback to lon/lat if x/y missing)
+        const x = Number(selectedAddress?.x || selectedAddress?.lon);
+        const y = Number(selectedAddress?.y || selectedAddress?.lat);
         if (!x || !y) { setMiniMapUrl(null); return; }
 
         const key = API_CONFIG.VWORLD_KEY;
-        const size = 320;
-        const delta = 0.0012;
+        const size = 400; // Slightly larger for better clarity
+        const delta = 0.0015;
         const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
 
+        // Simplified layer list for better stability (City/Cadastral)
         const layers = [
             'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114',
             'LP_PA_CBND_BUBUN'
         ].join(',');
 
-        const url = `/api/vworld/req/image?service=image&request=getmap&key=${encodeURIComponent(key)}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(bbox)}&width=${size}&height=${size}&layers=${encodeURIComponent(layers)}`;
+        // Using VWORLD_MAP_URL via proxy path
+        const url = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${bbox}&width=${size}&height=${size}&layers=${layers}`;
         setMiniMapUrl(url);
-    }, [selectedAddress?.x, selectedAddress?.y]);
+    }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
     // Data Fetch Effect
     useEffect(() => {
@@ -206,6 +211,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     c = await fetchLandCharacteristicsWFS(대표Pnu);
                 }
 
+                // Robust mapping with fallbacks to representative object
                 const area = first(c.ldplc_ar, picked.representative?.area, null);
                 const jimok = first(c.indcgr_code_nm, picked.representative?.jimok, '-');
                 const price = first(c.pblntf_pclnd, picked.representative?.price, null);
@@ -224,7 +230,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 });
 
                 const key = API_CONFIG.VWORLD_KEY;
-                const domain = window.location.origin;
+                const domain = window.location.hostname;
                 const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(key)}&domain=${encodeURIComponent(domain)}&pnu=${encodeURIComponent(대표Pnu)}`;
                 setLandUseWmsUrl(url);
                 setShowLandUseWms(true);
@@ -251,17 +257,19 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             {/* 0. Mini Map (Square) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
-                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50 shadow-sm">
+                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50 shadow-inner">
                         <img
                             src={miniMapUrl}
                             alt="미니맵"
                             className="w-full h-full object-cover"
-                            onError={() => setMiniMapUrl(null)}
+                            onError={() => {
+                                console.warn("Minimap load failed");
+                                setMiniMapUrl(null);
+                            }}
                         />
                         {/* Target Marker (Center) */}
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                            <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow animate-pulse" />
-                            <div className="w-10 h-10 rounded-full border-2 border-red-500/30 -mt-6 -ml-3.5" />
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                            <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
                         <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
                             VWorld
