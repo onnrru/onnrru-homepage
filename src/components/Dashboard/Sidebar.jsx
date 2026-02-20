@@ -14,7 +14,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const [parcelMeta, setParcelMeta] = useState({}); // { [pnu]: { area, jimok } }
+    const [parcelMeta, setParcelMeta] = useState({});
 
     const toggleSpec = () => {
         const next = !specOpen;
@@ -40,7 +40,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return null;
     };
 
-    // Safe number parsing that handles "1,234.5"
     const parseNum = (val) => {
         if (val === null || val === undefined) return 0;
         if (typeof val === 'number') return val;
@@ -83,51 +82,40 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
+    // 1. LadfrlList (Jimok/Area)
+    const fetchLadfrl = async (pnuRaw) => {
+        const key = API_CONFIG.VWORLD_KEY;
+        const pnu = normalizePnu(pnuRaw);
+        const domain = getVworldDomain();
+        const url = `/api/vworld/ned/data/ladfrlList`;
+        try {
+            const res = await axios.get(url, {
+                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
+                timeout: 3000
+            });
+            const d = unwrapNed(safeJson(res.data) ?? res.data);
+            if (d) return {
+                jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-'),
+                area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0))
+            };
+        } catch { }
+        return null;
+    };
+
+    // 2. LandInfo (Characteristics)
     const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
         const pnu = normalizePnu(pnuRaw);
         const domain = getVworldDomain();
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
-
         try {
             const res = await axios.get(url, {
                 params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 }
             });
             const d = unwrapNed(safeJson(res.data) ?? res.data);
             if (d) return d;
-        } catch (e) {
-            console.warn("REST API fail, trying WFS...", e);
-        }
+        } catch { }
         return null;
-    };
-
-    const fetchLandCharacteristicsWFS = async (pnuRaw) => {
-        const key = API_CONFIG.VWORLD_KEY;
-        const pnu = normalizePnu(pnuRaw);
-        const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
-        const res = await axios.get(url, {
-            params: {
-                key, domain: getVworldDomain(), typename: 'dt_d194', pnu,
-                maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326',
-                output: 'text/xml; subtype=gml/2.1.2'
-            },
-            responseType: 'text'
-        });
-        const xml = new DOMParser().parseFromString(String(res.data || ''), 'text/xml');
-        const pick = (name) => {
-            const els = xml.getElementsByTagName('*');
-            for (let i = 0; i < els.length; i++) if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
-            return null;
-        };
-        return {
-            prposArea1Nm: pick('prpos_area_1_nm'),
-            prposArea2Nm: pick('prpos_area_2_nm'),
-            ladUseSittnNm: pick('lad_use_sittn_nm'),
-            roadSideCodeNm: pick('road_side_code_nm'),
-            pblntfPclnd: pick('pblntf_pclnd'),
-            lndcgrCodeNm: pick('lndcgrCodeNm') || pick('indcgr_code_nm'),
-            lndpclAr: pick('lndpclAr') || pick('ldplc_ar') || pick('lad_ar')
-        };
     };
 
     const picked = React.useMemo(() => {
@@ -147,6 +135,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list: listData, representative };
     }, [selectedParcels, selectedAddress]);
 
+    // MAIN DATA FETCH
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -154,51 +143,38 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                let d = await fetchLandCharacteristics(repPnu);
-                if (!d) {
-                    try { d = await fetchLandCharacteristicsWFS(repPnu); } catch { }
-                }
+                // Parallel fetch for robustness
+                const [lad, char] = await Promise.all([
+                    fetchLadfrl(repPnu),
+                    fetchLandCharacteristics(repPnu)
+                ]);
 
-                if (!d) throw new Error("No Data");
+                if (!lad && !char) throw new Error("No Data");
 
-                const jimok = first(
-                    d.lndcgrCodeNm, d.lndcgr_code_nm,
-                    d.indcgrCodeNm, d.indcgr_code_nm,
-                    d.jimok, '-'
-                );
+                const d = char || {};
 
-                // Use parseNum to handle comma-separated strings
-                const area = parseNum(first(
-                    d.lndpclAr, d.lndpcl_ar,
-                    d.ldplcAr, d.ldplc_ar,
-                    d.ladAr, d.lad_ar,
-                    d.parea, 0
-                ));
+                // Merge strategies
+                const finalJimok = lad?.jimok && lad.jimok !== '-'
+                    ? lad.jimok
+                    : first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, d.jimok, '-');
 
-                const price = parseNum(first(
-                    d.pblntfPclnd, d.pblntf_pclnd,
-                    d.jiga, 0
-                ));
+                const finalArea = (lad?.area > 0)
+                    ? lad.area
+                    : parseNum(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, d.ladAr, 0));
 
-                const usage = first(
-                    d.ladUseSittnNm, d.lad_use_sittn_nm,
-                    d.ladUse, '-'
-                );
-
-                const road = first(
-                    d.roadSideCodeNm, d.road_side_code_nm,
-                    d.roadSide, '-'
-                );
+                const price = parseNum(first(d.pblntfPclnd, d.pblntf_pclnd, d.jiga, 0));
+                const usage = first(d.ladUseSittnNm, d.lad_use_sittn_nm, d.ladUse, '-');
+                const road = first(d.roadSideCodeNm, d.road_side_code_nm, d.roadSide, '-');
 
                 const uses = [
-                    first(d.prposArea1Nm, d.prpos_area_1_nm, d.prposArea1),
-                    first(d.prposArea2Nm, d.prpos_area_2_nm, d.prposArea2)
+                    first(d.prposArea1Nm, d.prpos_area_1_nm),
+                    first(d.prposArea2Nm, d.prpos_area_2_nm)
                 ].filter(v => v && !/지정되지\s*않음/.test(v));
 
                 setData({
                     basic: {
-                        jimok: jimok,
-                        area: area,
+                        jimok: finalJimok,
+                        area: finalArea,
                         price: price,
                         ladUse: usage,
                         roadSide: road
@@ -217,7 +193,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // Parcel Meta
+    // META FETCH (Use Combined)
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -229,18 +205,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     list.map(async (p) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
-                        try {
-                            const d = await fetchLandCharacteristics(pnu) || await fetchLandCharacteristicsWFS(pnu);
+
+                        // Try Ladfrl first (faster/lighter usually)
+                        let l = await fetchLadfrl(pnu);
+                        if (!l) {
+                            const d = await fetchLandCharacteristics(pnu);
                             if (d) {
-                                return [pnu, {
-                                    area: parseNum(first(d.lndpclAr, d.lndpcl_ar, d.ldplc_ar, 0)),
-                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, d.indcgrCodeNm, '-')
-                                }];
+                                l = {
+                                    area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0)),
+                                    jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
+                                };
                             }
-                            return [pnu, { area: 0, jimok: '-' }];
-                        } catch {
-                            return [pnu, { area: 0, jimok: '-' }];
                         }
+
+                        return [pnu, l || { area: 0, jimok: '-' }];
                     })
                 );
                 if (!active) return;

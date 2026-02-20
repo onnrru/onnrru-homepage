@@ -16,23 +16,27 @@ const MiniMap = ({ x, y, feature }) => {
 
         // 1. Layers
 
-        // (A) White Base Map (Background)
-        const whiteLayer = new OL.layer.Tile({
+        // (A) Base Map (VWorld Base - Gray/White style)
+        const baseLayer = new OL.layer.Tile({
             source: new OL.source.XYZ({
-                url: `https://api.vworld.kr/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/white/{z}/{y}/{x}.png`,
+                url: `https://api.vworld.kr/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/Base/{z}/{y}/{x}.png`,
                 attributions: 'VWorld',
                 crossOrigin: 'anonymous'
             }),
             zIndex: 1
         });
 
-        // (B) Combined Overlay: Zoning + Cadastral
-        // Layers: 
-        // lt_c_uq111: Urban Area
-        // lt_c_uq112: Management Area
-        // lt_c_uq113: Agri/Forest Area
-        // lt_c_uq114: Nature Conservation Area
-        // lp_pa_cbnd_bubun: Cadastral (Parcel Boundaries)
+        // (B) Overlay: Zoning (Bottom) -> Cadastral (Top)
+        // Order in WMS param: Left=Bottom, Right=Top
+        // We want Zoning below Cadastral Lines.
+        const wmsLayers = [
+            'lt_c_uq111', // Urban
+            'lt_c_uq112', // Management
+            'lt_c_uq113', // Agri/Forest
+            'lt_c_uq114', // Nature Conservation
+            'lp_pa_cbnd_bubun' // Cadastral (Lines)
+        ].join(',');
+
         const overlayLayer = new OL.layer.Tile({
             source: new OL.source.TileWMS({
                 url: 'https://api.vworld.kr/req/wms',
@@ -40,8 +44,8 @@ const MiniMap = ({ x, y, feature }) => {
                     SERVICE: 'WMS',
                     REQUEST: 'GetMap',
                     VERSION: '1.3.0',
-                    LAYERS: 'lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114,lp_pa_cbnd_bubun',
-                    STYLES: 'lt_c_uq111,lt_c_uq112,lt_c_uq113,lt_c_uq114,lp_pa_cbnd_bubun',
+                    LAYERS: wmsLayers,
+                    STYLES: wmsLayers, // Default styles
                     CRS: 'EPSG:3857',
                     FORMAT: 'image/png',
                     TRANSPARENT: 'TRUE',
@@ -50,10 +54,10 @@ const MiniMap = ({ x, y, feature }) => {
                 }
             }),
             zIndex: 10,
-            opacity: 0.8
+            opacity: 0.85
         });
 
-        // (C) Vector Layer (Polygon or Marker)
+        // (C) Vector Layer (Target Polygon)
         const vectorSource = new OL.source.Vector();
         vectorSourceRef.current = vectorSource;
         const vectorLayer = new OL.layer.Vector({
@@ -65,43 +69,37 @@ const MiniMap = ({ x, y, feature }) => {
                     width: 2
                 }),
                 fill: new OL.style.Fill({
-                    color: 'rgba(239, 68, 68, 0.2)' // Transparent Red
-                }),
-                image: new OL.style.Circle({
-                    radius: 5,
-                    fill: new OL.style.Fill({ color: '#ef4444' }),
-                    stroke: new OL.style.Stroke({ color: '#ffffff', width: 2 })
+                    color: 'rgba(239, 68, 68, 0.2)'
                 })
             })
         });
 
         // 2. View
-        // Zoom 14 (Requested: Max zoom-out where cadastral is visible)
-        // VWorld Cadastral usually visible 14+.
+        // Fixed at Zoom 14 as requested
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
             target: mapRef.current,
-            layers: [whiteLayer, overlayLayer, vectorLayer],
+            layers: [baseLayer, overlayLayer, vectorLayer],
             view: new OL.View({
                 center: center,
                 zoom: 14,
-                minZoom: 13,
-                maxZoom: 19,
+                minZoom: 14, // Lock zoom
+                maxZoom: 14, // Lock zoom
                 enableRotation: false
             }),
             controls: [] // No controls
+            // interactions: [] // Optional: disable interaction? Keep it for panning if needed.
         });
 
         mapInstance.current = map;
 
-        // Cleanup
         return () => {
             map.setTarget(null);
             mapInstance.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Init once
+    }, []);
 
     // Update Content
     useEffect(() => {
@@ -112,33 +110,29 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        map.getView().setZoom(14); // Force Zoom 14 on update
+        // Ensure zoom is 14
+        if (map.getView().getZoom() !== 14) map.getView().setZoom(14);
 
         src.clear();
 
         if (feature) {
-            // Render Polygon
             const format = new OL.format.GeoJSON();
-            const olFeature = format.readFeature(feature, {
-                featureProjection: 'EPSG:3857',
-                dataProjection: 'EPSG:4326'
-            });
-            src.addFeature(olFeature);
-        } else {
-            // Fallback: Point Marker
-            const pointFeature = new OL.Feature({
-                geometry: new OL.geom.Point(center)
-            });
-            src.addFeature(pointFeature);
+            try {
+                const olFeature = format.readFeature(feature, {
+                    featureProjection: 'EPSG:3857',
+                    dataProjection: 'EPSG:4326'
+                });
+                src.addFeature(olFeature);
+            } catch (e) {
+                // Feature might be invalid or not GeoJSON
+            }
         }
-
     }, [x, y, feature]);
 
     return (
         <div
             ref={mapRef}
             className="w-full h-full bg-white relative"
-            style={{ backgroundColor: '#ffffff' }}
         />
     );
 };
