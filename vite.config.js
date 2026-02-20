@@ -12,6 +12,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/eum/, ''),
         secure: false,
       },
+      '/api/molit': {
+        target: 'http://apis.data.go.kr',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/molit/, ''),
+        secure: false,
+      },
       '/api/vworld': {
         target: 'https://api.vworld.kr',
         changeOrigin: true,

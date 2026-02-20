@@ -39,7 +39,7 @@ const ConsultingDashboard = () => {
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.5, duration: 0.5 }}
                     >
-                        <BottomPanel />
+                        <BottomPanel selectedAddress={selectedAddress} />
                     </motion.div>
                 </div>
             </div>

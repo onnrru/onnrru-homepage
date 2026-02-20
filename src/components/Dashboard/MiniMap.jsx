@@ -25,11 +25,12 @@ const MiniMap = ({ x, y, feature }) => {
         });
 
         // 2. Zoning Layers (Middle)
-        // Urban, Management, Agri/Forest
+        // Urban, Management, Agri/Forest, Nature Conservation
         const zoningLayers = [
             'lt_c_uq111', // Urban Area
             'lt_c_uq112', // Management Area
-            'lt_c_uq113'  // Agri/Forest Area
+            'lt_c_uq113', // Agri/Forest Area
+            'lt_c_uq114'  // Nature Conservation
         ].join(',');
 
         const zoningWmsLayer = new OL.layer.Tile({
@@ -48,33 +49,11 @@ const MiniMap = ({ x, y, feature }) => {
                     DOMAIN: window.location.hostname
                 }
             }),
-            zIndex: 10, // Above Base
+            zIndex: 10,
             opacity: 0.7
         });
 
-        // 3. Cadastral Layer (Top of Map Layers)
-        // Separate layer to ensure lines render ON TOP of zoning colors
-        const cadastralLayer = new OL.layer.Tile({
-            source: new OL.source.TileWMS({
-                url: 'https://api.vworld.kr/req/wms',
-                params: {
-                    SERVICE: 'WMS',
-                    REQUEST: 'GetMap',
-                    VERSION: '1.3.0',
-                    LAYERS: 'lp_pa_cbnd_bubun',
-                    STYLES: 'lp_pa_cbnd_bubun',
-                    CRS: 'EPSG:3857',
-                    FORMAT: 'image/png',
-                    TRANSPARENT: 'TRUE',
-                    KEY: API_CONFIG.VWORLD_KEY,
-                    DOMAIN: window.location.hostname
-                }
-            }),
-            zIndex: 20, // Above Zoning
-            opacity: 1.0
-        });
-
-        // 4. Vector Selection (Highest Priority)
+        // 3. Vector Selection (Highest Priority)
         const vectorSource = new OL.source.Vector();
         vectorSourceRef.current = vectorSource;
         const vectorLayer = new OL.layer.Vector({
@@ -91,21 +70,21 @@ const MiniMap = ({ x, y, feature }) => {
             })
         });
 
-        // View: Zoom 10 (Max zoom-out where cadastral lines typically remain visible)
-        // VWorld Cadastral works 6-19, but 10 is a good "District" level view.
+        // View: Zoom 15 (Standard "Site View")
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
             target: mapRef.current,
-            layers: [baseLayer, zoningWmsLayer, cadastralLayer, vectorLayer],
+            layers: [baseLayer, zoningWmsLayer, vectorLayer], // No Cadastral
             view: new OL.View({
                 center: center,
-                zoom: 10,
-                minZoom: 6,
-                maxZoom: 19,
+                zoom: 15,
+                minZoom: 15, // Lock Zoom
+                maxZoom: 15, // Lock Zoom
                 enableRotation: false
             }),
-            controls: []
+            controls: [], // No Zoom/Attr controls
+            interactions: [] // Static (No Pan/Zoom/Drag)
         });
 
         mapInstance.current = map;
@@ -126,7 +105,8 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        map.getView().setZoom(10); // Force Zoom 10
+        // Force Zoom 15 just in case
+        map.getView().setZoom(15);
 
         src.clear();
 
@@ -147,7 +127,7 @@ const MiniMap = ({ x, y, feature }) => {
     return (
         <div
             ref={mapRef}
-            className="w-full h-full bg-white relative"
+            className="w-full h-full bg-white relative pointer-events-none" // Extra safety to disable interactions
         />
     );
 };
