@@ -66,12 +66,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             if (Array.isArray(candidate)) {
                 if (candidate.length > 0 && typeof candidate[0] === 'object') {
                     const item = candidate[0];
-                    if (item && (item.pnu || item.ldplc_ar || item.lndpcl_ar || item.indcgr_code_nm || item.jimok)) return item;
+                    if (item && (item.pnu || item.ldplc_ar || item.lndpcl_ar || item.indcgr_code_nm || item.jimok || item.parea || item.p_area)) return item;
                 }
                 continue;
             }
             if (typeof candidate === 'object') {
-                if (candidate.pnu || candidate.ldplc_ar || candidate.lndpcl_ar || candidate.indcgr_code_nm || candidate.jimok) return candidate;
+                if (candidate.pnu || candidate.ldplc_ar || candidate.lndpcl_ar || candidate.indcgr_code_nm || candidate.jimok || candidate.parea || candidate.p_area) return candidate;
             }
         }
         return null;
@@ -102,7 +102,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 pnu: selectedAddress.pnu,
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
                 jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, selectedAddress.lndcgr_code_nm, selectedAddress.lndcgr_nm, '-'),
-                area: Number(first(selectedAddress.area, selectedAddress.p_area, selectedAddress.parea, selectedAddress.ldplc_ar, 0)),
+                area: Number(first(selectedAddress.area, selectedAddress.parea, selectedAddress.p_area, selectedAddress.p_area, selectedAddress.ldplc_ar, 0)),
                 price: Number(first(selectedAddress.price, selectedAddress.jiga, selectedAddress.pblntf_pclnd, 0))
             }] : []);
 
@@ -158,7 +158,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
-    // --- Minimap (Zoom Level 19 + Cadastral) ---
+    // --- Minimap (Standard Image API with Cadastral + White Map) ---
     useEffect(() => {
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
@@ -169,8 +169,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const delta = 0.00045; // Approx Z19 for parcel boundary
         const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
 
-        // Layers: white (background) + LP_PA_CBND_BUBUN (cadastral)
-        const layers = 'white,LP_PA_CBND_BUBUN';
+        // Layers: white (background) + LP_PA_CBND_BUBUN (cadastral map)
+        const layers = 'white,lp_pa_cbnd_bubun';
         const url = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326` +
             `&bbox=${bbox}&width=${size}&height=${size}&layers=${layers}&domain=${encodeURIComponent(getVworldDomain())}`;
 
@@ -189,11 +189,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 try { d = await fetchLandCharacteristics(repPnu); }
                 catch (e) { d = await fetchLandCharacteristicsWFS(repPnu); }
 
+                const areaVal = first(d.ldplc_ar, d.ldplcAr, d.parea, d.p_area, d.lndpcl_ar, d.ar, d.area, picked.representative?.area);
+                const jimokVal = first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok, d.jimok_nm, picked.representative?.jimok);
+                const priceVal = first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, picked.representative?.price);
+
                 setData({
                     basic: {
-                        jimok: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok, d.jimok_nm, picked.representative?.jimok, '-'),
-                        area: Number(first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.ar, d.area, d.p_area, picked.representative?.area, null)),
-                        price: Number(first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, picked.representative?.price, 0)),
+                        jimok: jimokVal || '-',
+                        area: areaVal !== null ? Number(areaVal) : null,
+                        price: priceVal !== null ? Number(priceVal) : 0,
                         ladUse: first(d.lad_use_sittn_nm, d.ladUseSittnNm, '-'),
                         roadSide: first(d.road_side_code_nm, d.roadSideCodeNm, '-')
                     },
@@ -220,16 +224,18 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 w-[350px]">
 
+            {/* Minimap Section */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
                         <img
                             src={miniMapUrl}
-                            alt="민이맵"
+                            alt="Minimap"
                             className="w-full h-full object-cover"
                             onError={(e) => {
+                                // Dynamic layer fallback
                                 if (!e.target.src.includes('layers=Base')) {
-                                    e.target.src = e.target.src.replace('layers=white,LP_PA_CBND_BUBUN', 'layers=Base,LP_PA_CBND_BUBUN');
+                                    e.target.src = e.target.src.replace('layers=white,lp_pa_cbnd_bubun', 'layers=Base,lp_pa_cbnd_bubun');
                                 } else {
                                     setMiniMapUrl(null);
                                 }
@@ -258,6 +264,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     <>
                         {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] rounded border border-red-100">{error}</div>}
 
+                        {/* Regulation Info */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -271,11 +278,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         </span>
                                     ))
                                 ) : (
-                                    <div className="text-gray-400 text-xs italic">조회 중이거나 정보가 없습니다.</div>
+                                    <div className="text-gray-400 text-xs italic">정보 검색 중...</div>
                                 )}
                             </div>
                         </section>
 
+                        {/* Land Characteristics (Basic Info) */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -315,6 +323,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             )}
                         </section>
 
+                        {/* Parcel Specification Table (Detailed List) */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -353,7 +362,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                 {picked.list.map((p, idx) => {
                                                     const isRep = repParcel && normalizePnu(p.pnu) === normalizePnu(repParcel.pnu);
                                                     const dispJimok = (first(p.jimok, '-') === '-' && isRep) ? (data.basic?.jimok || '-') : p.jimok;
-                                                    const dispArea = (p.area === 0 && isRep && data.basic?.area) ? data.basic.area : p.area;
+
+                                                    // Fallback for area
+                                                    let dispArea = p.area;
+                                                    if (dispArea === 0 && isRep && data.basic?.area) {
+                                                        dispArea = data.basic.area;
+                                                    }
 
                                                     return (
                                                         <tr key={p.pnu || idx}>
@@ -371,6 +385,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </section>
                         )}
 
+                        {/* Land Use Plan (WMS Map) */}
                         {landUseWmsUrl && showLandUseWms && !specOpen && (
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
