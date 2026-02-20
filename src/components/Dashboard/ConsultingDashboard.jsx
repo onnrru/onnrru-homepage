@@ -42,12 +42,12 @@ const ConsultingDashboard = () => {
                     >
                         <button
                             onClick={() => setIsAnalysisOpen(!isAnalysisOpen)}
-                            className="bg-ink hover:bg-black text-white px-6 py-3.5 rounded-full shadow-[0_10px_25px_rgba(0,0,0,0.3)] font-bold flex items-center gap-2 border-[3px] border-white transition-colors"
+                            className="bg-ink hover:bg-black text-white px-4 py-2.5 text-sm rounded-full shadow-[0_6px_15px_rgba(0,0,0,0.25)] font-bold flex items-center gap-1.5 border-[2px] border-white transition-colors"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-300 ${isAnalysisOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform duration-300 ${isAnalysisOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={isAnalysisOpen ? "M19 9l-7 7-7-7" : "M5 15l7-7 7 7"} />
                             </svg>
-                            {isAnalysisOpen ? "분석 닫기" : "실거래 분석 표 펼치기"}
+                            {isAnalysisOpen ? "분석 닫기" : "실거래 분석표"}
                         </button>
                     </motion.div>
 

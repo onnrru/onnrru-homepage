@@ -104,9 +104,14 @@ export const processTransactionData = (rawData, targetDong, numMonths = 36) => {
     categorizedData.forEach(tx => {
         const cat = tx.category;
         const price = tx.price;
-        const isTargetDong = tx.dongName === targetDong;
-
         const periodIdx = getTrimesterIndex(tx.dealYear, tx.dealMonth, periods);
+
+        // Molit API `dongName` can sometimes just be '방이동' or '병산리'
+        // `targetDong` from our parser might be '강상면 병산리' or '방이동'
+        // To be safe, we check if one includes the other.
+        const txDong = String(tx.dongName || '').trim();
+        const tDong = String(targetDong || '').trim();
+        const isTargetDong = txDong.includes(tDong) || tDong.includes(txDong) || txDong === tDong;
 
         // Gu Trend (all transactions in the data are for the Gu)
         if (periodIdx !== -1) {

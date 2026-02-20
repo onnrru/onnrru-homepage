@@ -63,12 +63,14 @@ const CustomBarLabel = (props) => {
 
 const BottomPanel = ({ selectedAddress }) => {
     const [loading, setLoading] = useState(false);
-    const [analysisData, setAnalysisData] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(AREA_CATEGORIES[0]);
     const [selectedApartment, setSelectedApartment] = useState(null);
     const [regionLabels, setRegionLabels] = useState({ gu: '행정구', dong: '행정동' });
     const [selectedPeriod, setSelectedPeriod] = useState(36); // months
     const [trendDataType, setTrendDataType] = useState('avg'); // 'avg' or 'count'
+
+    const [rawTxData, setRawTxData] = useState([]);
+    const [targetUnitName, setTargetUnitName] = useState('');
 
     useEffect(() => {
         const loadData = async () => {
@@ -85,83 +87,138 @@ const BottomPanel = ({ selectedAddress }) => {
 
                 const addressParts = selectedAddress.roadAddr?.split(' ') || selectedAddress.jibunAddr?.split(' ') || [];
 
-                // 1. Identify broader unit (Gu or Gun/Si)
-                const sigunguPart = addressParts.find(part => part.endsWith('구') || part.endsWith('군') || part.endsWith('시')) || '행정구';
+                // Extract Si/Do precisely (First element)
+                const sidoPart = addressParts[0] || '시/도';
+
+                // 1. Identify Sigungu (행정구/군/시)
+                let sigunguPart = '';
+                const possibleSigungu = addressParts.filter((p, i) => i > 0 && (p.endsWith('구') || p.endsWith('군') || p.endsWith('시')));
+
+                if (possibleSigungu.length > 0) {
+                    sigunguPart = possibleSigungu[0];
+                } else if (addressParts.length >= 2) {
+                    sigunguPart = addressParts[1];
+                } else {
+                    sigunguPart = '행정구';
+                }
 
                 // 2. Identify minimum unit (Dong or Eup/Myeon + Ri)
                 let targetUnitName = '';
+                let primaryUnit = '';
+
                 const dongPart = addressParts.find(part => part.endsWith('동'));
                 const eupMyeonPart = addressParts.find(part => part.endsWith('읍') || part.endsWith('면'));
                 const riPart = addressParts.find(part => part.endsWith('리'));
 
                 if (dongPart) {
                     targetUnitName = dongPart;
+                    primaryUnit = dongPart;
                 } else if (eupMyeonPart) {
+                    // For Trend Comparison, we show the Primary Unit (e.g. 면/읍) as the 'Gu/Dong' equivalent line
+                    // and the 'Ri' as the specific local level if applicable.
+                    primaryUnit = eupMyeonPart;
                     targetUnitName = riPart ? `${eupMyeonPart} ${riPart}` : eupMyeonPart;
                 } else {
                     targetUnitName = addressParts[addressParts.length - 1] || '';
+                    primaryUnit = targetUnitName;
                 }
 
                 if (lawdCd && targetUnitName) {
-                    setRegionLabels({ gu: sigunguPart, dong: targetUnitName });
+                    // For the legend, we want:
+                    // Gu -> Sigungu (e.g., 송파구, 양평군)
+                    // Dong -> primaryUnit (e.g., 방이동, 강상면)
+                    setRegionLabels({ gu: sigunguPart, dong: primaryUnit, sido: sidoPart });
+                    setTargetUnitName(targetUnitName);
 
-                    const rawData = await fetchApartmentTransactions(lawdCd, selectedPeriod);
-                    const processed = processTransactionData(rawData, targetUnitName, selectedPeriod);
-                    setAnalysisData(processed);
-                    setSelectedApartment(null); // Reset selection on new area
+                    // Fetch 5 years explicitly ONCE for the trend chart
+                    const rawData = await fetchApartmentTransactions(lawdCd, 60);
+                    setRawTxData(rawData || []);
+                    setSelectedApartment(null);
                 } else {
-                    setAnalysisData(null);
+                    setRawTxData([]);
                 }
             } catch (error) {
                 console.error("Failed to load real estate data:", error);
-                setAnalysisData(null);
+                setRawTxData([]);
             } finally {
                 setLoading(false);
             }
         };
 
         loadData();
-    }, [selectedAddress, selectedPeriod]);
+    }, [selectedAddress]); // REMOVED selectedPeriod dependency so it doesn't refetch!
 
-    // Format data for Bar Chart
+    // Static 5 Year Analysis for Trend Chart
+    const analysisData = useMemo(() => {
+        if (!rawTxData || rawTxData.length === 0 || !targetUnitName) return null;
+        return processTransactionData(rawTxData, targetUnitName, 60); // 60 months fixed
+    }, [rawTxData, targetUnitName]);
+
+    // Local filter and calculate averages for dynamic Bar Chart
     const barChartData = useMemo(() => {
-        if (!analysisData) return [];
+        if (!rawTxData || rawTxData.length === 0 || !targetUnitName) return [];
 
-        const data = [];
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - selectedPeriod);
+        const cutoffAbsolute = cutoffDate.getFullYear() * 12 + (cutoffDate.getMonth() + 1);
 
-        // Add apartments
-        analysisData.apartments.forEach(apt => {
-            const catData = apt.categories[selectedCategory];
-            if (catData && catData.count > 0) {
-                data.push({
-                    name: apt.apartmentName,
-                    avg: catData.avg,
-                    count: catData.count,
-                    type: 'apartment'
-                });
-            }
+        // Filter transactions within the selectedPeriod
+        const filteredTx = rawTxData.filter(tx => {
+            const txAbsolute = Number(tx.dealYear) * 12 + Number(tx.dealMonth);
+            return txAbsolute >= cutoffAbsolute;
         });
 
-        // Add overall Dong average securely at the end
-        const dongAvg = analysisData.dongOverallAverages[selectedCategory];
-        if (dongAvg > 0) {
-            let totalCategoryCount = 0;
-            analysisData.apartments.forEach(apt => {
-                if (apt.categories[selectedCategory]) {
-                    totalCategoryCount += apt.categories[selectedCategory].count;
-                }
-            });
+        const aptStats = {};
+        let totalDongAmount = 0;
+        let totalDongCount = 0;
 
+        filteredTx.forEach(tx => {
+            const cat = processTransactionData.getAreaCategory ? processTransactionData.getAreaCategory(tx.area) : null;
+            // Hacky fallback if export is missing, reuse the logic:
+            let category = null;
+            if (tx.area >= 50 && tx.area < 80) category = "50-80㎡";
+            else if (tx.area >= 80 && tx.area < 85) category = "80-85㎡";
+            else if (tx.area >= 85 && tx.area < 110) category = "85-110㎡";
+            else if (tx.area >= 110 && tx.area < 130) category = "110-130㎡";
+            else if (tx.area >= 130) category = "130㎡+";
+
+            if (category !== selectedCategory) return;
+
+            const txDong = String(tx.dongName || '').trim();
+            const tDong = String(targetUnitName || '').trim();
+            const isTargetDong = txDong.includes(tDong) || tDong.includes(txDong) || txDong === tDong;
+
+            if (!isTargetDong) return;
+
+            // Apartment level
+            const aptName = tx.apartmentName;
+            if (!aptStats[aptName]) aptStats[aptName] = { total: 0, count: 0 };
+            aptStats[aptName].total += tx.price;
+            aptStats[aptName].count += 1;
+
+            // Dong level
+            totalDongAmount += tx.price;
+            totalDongCount += 1;
+        });
+
+        const data = Object.keys(aptStats).map(aptName => ({
+            name: aptName,
+            avg: Math.round(aptStats[aptName].total / aptStats[aptName].count),
+            count: aptStats[aptName].count,
+            type: 'apartment'
+        }));
+
+        if (totalDongCount > 0) {
             data.push({
                 name: `${regionLabels.dong} 전체 평균`,
-                avg: dongAvg,
-                count: totalCategoryCount,
+                avg: Math.round(totalDongAmount / totalDongCount),
+                count: totalDongCount,
                 type: 'average'
             });
         }
 
         return data;
-    }, [analysisData, selectedCategory, regionLabels]);
+    }, [rawTxData, targetUnitName, selectedCategory, selectedPeriod, regionLabels]);
 
     // Format data for Line Chart (Trend)
     const lineChartData = useMemo(() => {
@@ -218,10 +275,10 @@ const BottomPanel = ({ selectedAddress }) => {
         );
     }
 
-    if (analysisData && analysisData.apartments.length === 0) {
+    if (!rawTxData || rawTxData.length === 0) {
         return (
             <div className="h-64 bg-white border-t border-gray-200 flex items-center justify-center text-gray-400">
-                해당 지역에 3년간 아파트 실거래 내역이 없습니다.
+                해당 지역에 최근 5년간 아파트 실거래 내역이 없습니다. (API 응답 없음)
             </div>
         );
     }
@@ -262,6 +319,7 @@ const BottomPanel = ({ selectedAddress }) => {
                             </span>
                         </h3>
                         <div className="flex bg-gray-100 rounded-md p-0.5">
+                            <button onClick={() => setSelectedPeriod(6)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 6 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>6개월</button>
                             <button onClick={() => setSelectedPeriod(12)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 12 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>1년</button>
                             <button onClick={() => setSelectedPeriod(36)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 36 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>3년</button>
                             <button onClick={() => setSelectedPeriod(60)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 60 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>5년</button>
@@ -329,7 +387,7 @@ const BottomPanel = ({ selectedAddress }) => {
                     <div className="flex justify-between items-center mb-2 px-3">
                         <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            추이 비교 <span className="text-xs font-normal text-gray-500">(3개월 단위)</span>
+                            추이 비교 <span className="text-xs font-normal text-gray-500">(3개월 단위, 5년 고정)</span>
                         </h3>
                         <div className="flex bg-gray-100 rounded-md p-0.5">
                             <button onClick={() => setTrendDataType('avg')} className={`px-2 py-1 text-[10px] rounded ${trendDataType === 'avg' ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>평균매매가</button>

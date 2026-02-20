@@ -316,7 +316,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const hdrAddr = selectedAddress?.roadAddr || selectedAddress?.address || picked.representative?.addr || '-';
     const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
-    const activeFeature = picked.representative?.feature || (selectedParcels && selectedParcels[0]) || null;
+    // Fix MiniMap Sync: `picked.list` might lack the full full openlayers feature object depending on how it's mapped.
+    // Directly use the raw `selectedParcels` array which contains the core GeoJSON features.
+    // Fallback to the single selected address if no multi-parcels exist.
+    const activeFeaturesList = (selectedParcels && selectedParcels.length > 0)
+        ? selectedParcels
+        : (picked.representative?.feature ? [picked.representative.feature] : []);
+
     const mx = selectedAddress?.x || selectedAddress?.lon;
     const my = selectedAddress?.y || selectedAddress?.lat;
 
@@ -326,15 +332,18 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             <div className="p-4 bg-white">
                 <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
                     {(mx && my)
-                        ? <MiniMap x={mx} y={my} feature={activeFeature} />
-                        : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">위치 정보 없음</div>
+                        ? <MiniMap x={mx} y={my} features={activeFeaturesList} />
+                        : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs text-center px-4">대상을 선택하시면<br />미니맵이 활성화됩니다</div>
                     }
                 </div>
             </div>
 
-            <div className="p-6 pt-2 border-b border-gray-100 flex-shrink-0 bg-white">
-                <h2 className="text-xs font-bold text-ink uppercase tracking-wider mb-2">대상지 정보</h2>
-                <div className="text-xl font-bold text-gray-900 font-serif break-keep leading-tight">
+            <div className="p-5 pt-1 border-b border-gray-100 flex-shrink-0 bg-white">
+                <h2 className="text-[11px] font-bold text-gray-400 mb-1.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                    대상지번
+                </h2>
+                <div className="text-lg font-bold text-gray-900 font-serif break-keep leading-tight tracking-tight">
                     {picked.representative ? `${hdrAddr}${hdrExtra}` : '주소를 선택하세요'}
                 </div>
             </div>
@@ -349,8 +358,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] rounded border border-red-100">{error}</div>}
 
                         <section>
-                            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                            <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
+                                <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                                 국토계획법 및 타법령 지역·지구 등
                             </h4>
                             <div className="flex flex-wrap gap-2">
@@ -364,8 +373,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
                         {!specOpen && (
                             <section>
-                                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                    <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                                <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
+                                    <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                                     토지 기본특성
                                 </h4>
                                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
@@ -406,8 +415,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                                        <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                                    <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 tracking-tight">
+                                        <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                                         토지명세표
                                     </h4>
                                     <button onClick={toggleSpec} className="text-xs font-bold text-ink hover:underline">

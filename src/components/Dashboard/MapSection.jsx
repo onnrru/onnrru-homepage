@@ -821,6 +821,14 @@ const MapSection = ({
         };
     }, [mapObj, measureMode]);
 
+    const handleZoom = useCallback((delta) => {
+        if (!mapObj) return;
+        const view = mapObj.getView();
+        if (!view) return;
+        const z = view.getZoom();
+        if (Number.isFinite(z)) view.animate({ zoom: z + delta, duration: 250 });
+    }, [mapObj]);
+
     const clearAll = () => {
         measureSource.current?.clear?.();
         document.querySelectorAll('.ol-tooltip-static')?.forEach((el) => el.remove());
@@ -859,50 +867,7 @@ const MapSection = ({
                 )}
             </div>
 
-            {/* Measurement Tools (Left Vertical) */}
-            <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-2 p-1 pointer-events-auto">
-                <button
-                    onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }}
-                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
-            ${measureMode === 'distance'
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
-                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                    title="거리 재기"
-                >
-                    <span className="text-[9px] font-bold leading-none">거리</span>
-                </button>
-
-                <button
-                    onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }}
-                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
-            ${measureMode === 'area'
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
-                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                    title="면적 재기"
-                >
-                    <span className="text-[9px] font-bold leading-none">면적</span>
-                </button>
-
-                <button
-                    onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }}
-                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
-    ${parcelPickMode
-                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg scale-105'
-                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-                    title="지번 선택(추가/해제)"
-                >
-                    <span className="text-[9px] font-bold leading-none">지번</span>
-                    <span className="text-[9px] font-bold leading-none">추가</span>
-                </button>
-
-                <button
-                    onClick={clearAll}
-                    className="flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border border-white bg-white text-gray-500 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all duration-200"
-                    title="초기화"
-                >
-                    <span className="text-[9px] font-bold leading-none">지우기</span>
-                </button>
-            </div>
+            {/* Left Tools Removed - Moved to Right Horizontal Pill */}
 
             {/* Main Controls (Top Right) */}
             <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
@@ -972,6 +937,33 @@ const MapSection = ({
                 >
                     <span>전체 레이어</span>
                 </button>
+
+                {/* Map Utilities Pill */}
+                <div className="flex bg-white/95 backdrop-blur-sm rounded-full shadow-md border border-gray-100 overflow-hidden mt-1 pointer-events-auto h-9">
+                    <button onClick={() => handleZoom(1)} className="px-3 hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="확대">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    </button>
+                    <div className="w-px bg-gray-200 my-2"></div>
+                    <button onClick={() => handleZoom(-1)} className="px-3 hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="축소">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                    </button>
+                    <div className="w-px bg-gray-200 my-2"></div>
+                    <button onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }} className={`px-3 text-[11px] font-bold transition-colors ${measureMode === 'distance' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`} title="거리 재기">
+                        거리
+                    </button>
+                    <div className="w-px bg-gray-200 my-2"></div>
+                    <button onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }} className={`px-3 text-[11px] font-bold transition-colors ${measureMode === 'area' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`} title="면적 재기">
+                        면적
+                    </button>
+                    <div className="w-px bg-gray-200 my-2"></div>
+                    <button onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }} className={`px-3 text-[11px] font-bold transition-colors ${parcelPickMode ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`} title="지번 다중선택">
+                        다중지번
+                    </button>
+                    <div className="w-px bg-gray-200 my-2"></div>
+                    <button onClick={clearAll} className="px-3 text-[11px] font-bold transition-colors text-gray-500 hover:bg-red-50 hover:text-red-500" title="모두 지우기">
+                        지우기
+                    </button>
+                </div>
             </div>
 
             {/* Full Layer Modal */}
