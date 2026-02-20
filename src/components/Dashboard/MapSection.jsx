@@ -121,6 +121,10 @@ const MapSection = ({
     const [activeLayers, setActiveLayers] = useState([]);
     const [showLayerMenu, setShowLayerMenu] = useState(false);
 
+    // Sub-menu Toggles for Map Types and Zones
+    const [showMapTypes, setShowMapTypes] = useState(false);
+    const [showZones, setShowZones] = useState(false);
+
     // Filter
     const [selectedCategory, setSelectedCategory] = useState('전체');
 
@@ -445,7 +449,7 @@ const MapSection = ({
                         renderSingleFocus(fd);
 
                         const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
-                        map.getView().animate({ center: center3857, zoom: 19, duration: 350 });
+                        map.getView().animate({ center: center3857, zoom: 15, duration: 350 });
 
                         const props = fd.properties || {};
                         if (props.pnu) {
@@ -634,7 +638,7 @@ const MapSection = ({
             if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
             const center = OL.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-            mapObj.getView()?.animate({ center, duration: 500, zoom: 19 });
+            mapObj.getView()?.animate({ center, duration: 500, zoom: 15 });
         } catch (e) {
             console.error('Map Update Error:', e);
         }
@@ -873,89 +877,93 @@ const MapSection = ({
             <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
 
                 {/* Row 1: Base Map Types, Hybrid (명칭), and Cadastral (지적도) */}
-                <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10">
-                    {[
-                        { id: 'base', label: '일반지도' },
-                        { id: 'gray', label: '백지도' },
-                        { id: 'midnight', label: '야간' }
-                    ].map((type) => (
-                        <button
-                            key={type.id}
-                            onClick={() => setMapType(type.id)}
-                            className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
+                {showMapTypes && (
+                    <div className="flex items-center justify-between w-[370px] bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10 animate-fade-in-down">
+                        {[
+                            { id: 'base', label: '일반지도' },
+                            { id: 'gray', label: '백지도' },
+                            { id: 'midnight', label: '야간' }
+                        ].map((type) => (
+                            <button
+                                key={type.id}
+                                onClick={() => setMapType(type.id)}
+                                className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
                                 ${mapType === type.id
-                                    ? 'bg-gray-800 text-white shadow-sm'
-                                    : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            {type.label}
-                        </button>
-                    ))}
+                                        ? 'bg-gray-800 text-white shadow-sm'
+                                        : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
+                            >
+                                {type.label}
+                            </button>
+                        ))}
 
-                    <div className="w-px h-5 bg-gray-300 mx-2"></div>
+                        <div className="w-px h-5 bg-gray-300 mx-2"></div>
 
-                    <div className="flex bg-gray-100 rounded p-0.5 h-full">
-                        <button
-                            onClick={() => setMapType('satellite')}
-                            className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
+                        <div className="flex bg-gray-100 rounded p-0.5 h-full">
+                            <button
+                                onClick={() => setMapType('satellite')}
+                                className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
                                 ${mapType === 'satellite'
-                                    ? 'bg-gray-800 text-white shadow-sm'
-                                    : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
-                        >
-                            위성지도
-                        </button>
-                        <button
-                            onClick={() => setShowHybrid(!showHybrid)}
-                            className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
+                                        ? 'bg-gray-800 text-white shadow-sm'
+                                        : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
+                            >
+                                위성지도
+                            </button>
+                            <button
+                                onClick={() => setShowHybrid(!showHybrid)}
+                                className={`px-2.5 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
                                 ${showHybrid ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
+                            >
+                                명칭
+                            </button>
+                        </div>
+
+                        <div className="w-px h-5 bg-gray-300 mx-2"></div>
+
+                        <button
+                            onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
+                            className={`px-3 h-full text-[11px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
+                            ${activeLayers.includes('LP_PA_CBND_BUBUN')
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                         >
-                            명칭
+                            지적도
                         </button>
                     </div>
-
-                    <div className="w-px h-5 bg-gray-300 mx-2"></div>
-
-                    <button
-                        onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
-                        className={`px-3 h-full text-[11px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
-                            ${activeLayers.includes('LP_PA_CBND_BUBUN')
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                    >
-                        지적도
-                    </button>
-                </div>
+                )}
 
                 {/* Row 2: All Layers and Basic Area Layers */}
-                <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10">
-                    <button
-                        onClick={() => setShowLayerMenu(true)}
-                        className="px-3 h-full text-[11px] font-bold rounded shadow-sm border transition-all whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800 border-gray-800"
-                    >
-                        전체레이어
-                    </button>
+                {showZones && (
+                    <div className="flex items-center justify-between w-[370px] bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10 animate-fade-in-down">
+                        <button
+                            onClick={() => setShowLayerMenu(true)}
+                            className="px-3 h-full text-[11px] font-bold rounded shadow-sm border transition-all whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800 border-gray-800"
+                        >
+                            전체레이어
+                        </button>
 
-                    <div className="w-px h-5 bg-gray-300 mx-2"></div>
+                        <div className="w-px h-5 bg-gray-300 mx-2"></div>
 
-                    <div className="flex gap-1 h-full">
-                        {BASIC_LAYERS.map((id) => {
-                            const layer = ALL_LAYERS.find((l) => l.id === id);
-                            if (!layer) return null;
-                            const isActive = activeLayers.includes(id);
-                            return (
-                                <button
-                                    key={id}
-                                    onClick={() => toggleLayer(id)}
-                                    className={`px-2.5 h-full text-[11px] font-bold rounded transition-all whitespace-nowrap
+                        <div className="flex gap-1 h-full">
+                            {BASIC_LAYERS.map((id) => {
+                                const layer = ALL_LAYERS.find((l) => l.id === id);
+                                if (!layer) return null;
+                                const isActive = activeLayers.includes(id);
+                                return (
+                                    <button
+                                        key={id}
+                                        onClick={() => toggleLayer(id)}
+                                        className={`px-2.5 h-full text-[11px] font-bold rounded transition-all whitespace-nowrap
                                         ${isActive
-                                            ? 'bg-teal-600 text-white shadow-sm'
-                                            : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                                >
-                                    {layer.label}
-                                </button>
-                            );
-                        })}
+                                                ? 'bg-teal-600 text-white shadow-sm'
+                                                : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
+                                    >
+                                        {layer.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Row 3: Map Utilities (Zoom, Measure, Multi-select, Clear) */}
                 <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10">
@@ -983,6 +991,26 @@ const MapSection = ({
                     <button onClick={clearAll} className="px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap text-gray-500 hover:bg-red-50 hover:text-red-500" title="모두 지우기">
                         지우기
                     </button>
+
+                    <div className="w-px h-5 bg-gray-300 mx-2"></div>
+
+                    {/* UI Map Controls Toggles */}
+                    <div className="flex items-center gap-1 h-full bg-gray-100 rounded p-0.5">
+                        <button
+                            onClick={() => setShowMapTypes(!showMapTypes)}
+                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
+                                ${showMapTypes ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
+                        >
+                            지도종류
+                        </button>
+                        <button
+                            onClick={() => setShowZones(!showZones)}
+                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
+                                ${showZones ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
+                        >
+                            지역지구
+                        </button>
+                    </div>
                 </div>
             </div>
 
