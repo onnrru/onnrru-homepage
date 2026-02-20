@@ -4,12 +4,45 @@ import { API_CONFIG } from '../../config/api';
 
 const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [activeTab, setActiveTab] = useState('notice'); // 'notice', 'guide', 'devlist'
     const [specOpen, setSpecOpen] = useState(false);
+    const [miniMapUrl, setMiniMapUrl] = useState(null);
     const [landUseWmsUrl, setLandUseWmsUrl] = useState(null);
     const [showLandUseWms, setShowLandUseWms] = useState(true);
 
-    // [Multi-Selection] Representative Parcel & Total Area Summary
+    // --- Utility Functions ---
+    const first = (...vals) => {
+        for (const v of vals) {
+            if (v === 0) return 0;
+            if (v !== null && v !== undefined && String(v).trim() !== '') return v;
+        }
+        return null;
+    };
+
+    const normalizePnu = (pnu) => {
+        const s = String(pnu || '').replace(/[^\d]/g, '');
+        if (s.length >= 19) return s.slice(0, 19);
+        return s;
+    };
+
+    const unwrapNed = (data) => {
+        const r = data?.response?.result ?? data?.result ?? data;
+        if (Array.isArray(r)) return r[0] ?? null;
+        if (Array.isArray(r?.items)) return r.items[0] ?? null;
+        if (Array.isArray(r?.item)) return r.item[0] ?? null;
+        if (Array.isArray(r?.features)) return r.features[0]?.properties ?? r.features[0] ?? null;
+        if (r && typeof r === 'object') return r;
+        return null;
+    };
+
+    const extractDongRiBunji = (fullAddr = '') => {
+        const m = String(fullAddr).match(/([가-힣0-9]+(?:동|리|읍|면))\s+(\d+(?:-\d+)?)/);
+        if (m) return `${m[1]} ${m[2]}`;
+        const tokens = String(fullAddr).trim().split(/\s+/);
+        if (tokens.length >= 2) return `${tokens[tokens.length - 2]} ${tokens[tokens.length - 1]}`;
+        return fullAddr || '-';
+    };
+
+    // --- Memoized Values ---
     const picked = React.useMemo(() => {
         const list = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => ({
@@ -35,30 +68,19 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list, representative, totalArea };
     }, [selectedParcels, selectedAddress]);
 
-    // Data States
+    // --- State Management ---
     const [data, setData] = useState({
         basic: null,
         regulation: null,
-        notice: [],
-        guide: [],
-        devlist: []
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Helper: Precise Address extraction (Dong/Li/Eup/Myeon + Number)
-    const extractDongRiBunji = (fullAddr = '') => {
-        const m = String(fullAddr).match(/([가-힣0-9]+(?:동|리|읍|면))\s+(\d+(?:-\d+)?)/);
-        if (m) return `${m[1]} ${m[2]}`;
-        const tokens = String(fullAddr).trim().split(/\s+/);
-        if (tokens.length >= 2) return `${tokens[tokens.length - 2]} ${tokens[tokens.length - 1]}`;
-        return fullAddr || '-';
-    };
-
-    // Helper: VWorld Land Characteristics (JSON - Primary)
-    const fetchLandCharacteristics = async (pnu) => {
+    // --- Data Fetching Helpers ---
+    const fetchLandCharacteristics = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.hostname;
+        const domain = window.location.origin;
+        const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
 
         const res = await axios.get(url, {
@@ -66,55 +88,60 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             responseType: 'json'
         });
 
-        const d = res.data?.response?.result || res.data?.result || res.data;
-        if (!d) throw new Error('Data not found in NED JSON response');
+        const d = unwrapNed(res.data);
+        if (!d) {
+            console.log('NED raw:', res.data);
+            throw new Error('NED JSON record not found');
+        }
 
         return {
-            pnu: d?.pnu || pnu,
-            indcgr_code_nm: d?.indcgr_code_nm || d?.indcgrCodeNm || null,
-            ldplc_ar: d?.ldplc_ar || d?.ldplcAr || null,
-            pblntf_pclnd: d?.pblntf_pclnd || d?.pblntfPclnd || null,
-            prpos_area_1_nm: d?.prpos_area_1_nm || d?.prposArea1Nm || null,
-            prpos_area_2_nm: d?.prpos_area_2_nm || d?.prposArea2Nm || null,
-            lad_use_sittn_nm: d?.lad_use_sittn_nm || d?.ladUseSittnNm || null,
-            road_side_code_nm: d?.road_side_code_nm || d?.roadSideCodeNm || null
+            pnu: first(d.pnu, pnu),
+            indcgr_code_nm: first(
+                d.indcgr_code_nm, d.indcgrCodeNm,
+                d.lndcgr_code_nm, d.lndcgrCodeNm,
+                d.lndcgr_code_nm_nm, d.lndcgrCodeNmNm,
+                d.jimok, d.JIMOK
+            ),
+            ldplc_ar: first(
+                d.ldplc_ar, d.ldplcAr,
+                d.lndplc_ar, d.lndplcAr,
+                d.lndpcl_ar, d.lndpclAr,
+                d.lndpclArea,
+                d.indcgr_ar, d.indcgrAr,
+                d.ar, d.area
+            ),
+            pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.pblntf_pclnd_nm, d.jiga, d.JIGA),
+            prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
+            prpos_area_2_nm: first(d.prpos_area_2_nm, d.prposArea2Nm),
+            lad_use_sittn_nm: first(d.lad_use_sittn_nm, d.ladUseSittnNm),
+            road_side_code_nm: first(d.road_side_code_nm, d.roadSideCodeNm)
         };
     };
 
-    // Helper: VWorld Land Characteristics WFS (XML - Backup)
-    const fetchLandCharacteristicsWFS = async (pnu) => {
+    const fetchLandCharacteristicsWFS = async (pnuRaw) => {
         const key = API_CONFIG.VWORLD_KEY;
-        const domain = window.location.hostname;
-
+        const domain = window.location.origin;
+        const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
 
         const res = await axios.get(url, {
             params: {
-                key,
-                domain,
-                typename: 'dt_d194',
-                pnu,
-                maxFeatures: 1,
-                resultType: 'results',
-                srsName: 'EPSG:4326',
+                key, domain, typename: 'dt_d194', pnu,
+                maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326',
                 output: 'text/xml; subtype=gml/2.1.2'
             },
             responseType: 'text'
         });
 
         const text = String(res.data || '');
-        console.log('WFS raw head:', text.slice(0, 200));
-
         if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
-            throw new Error('VWorld WFS returned HTML instead of XML');
+            throw new Error('VWorld WFS returned HTML');
         }
 
         const xml = new DOMParser().parseFromString(text, 'text/xml');
-
         const ex1 = xml.getElementsByTagName('ServiceException')[0]?.textContent?.trim();
         const ex2 = xml.getElementsByTagName('ExceptionText')[0]?.textContent?.trim();
-        if (ex1) throw new Error(ex1);
-        if (ex2) throw new Error(ex2);
+        if (ex1 || ex2) throw new Error(ex1 || ex2);
 
         const pickLocal = (localName) => {
             const els = xml.getElementsByTagName('*');
@@ -136,12 +163,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
-    // Fetch Data Effect
+    // --- Effects ---
+    // Minimap Effect
+    useEffect(() => {
+        const x = Number(selectedAddress?.x);
+        const y = Number(selectedAddress?.y);
+        if (!x || !y) { setMiniMapUrl(null); return; }
+
+        const key = API_CONFIG.VWORLD_KEY;
+        const size = 320;
+        const delta = 0.0012;
+        const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
+
+        const layers = [
+            'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114',
+            'LP_PA_CBND_BUBUN'
+        ].join(',');
+
+        const url = `/api/vworld/req/image?service=image&request=getmap&key=${encodeURIComponent(key)}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(bbox)}&width=${size}&height=${size}&layers=${encodeURIComponent(layers)}`;
+        setMiniMapUrl(url);
+    }, [selectedAddress?.x, selectedAddress?.y]);
+
+    // Data Fetch Effect
     useEffect(() => {
         const run = async () => {
-            const 대표Pnu = picked.representative?.pnu || selectedAddress?.pnu;
+            const 대표Pnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
             if (!대표Pnu) {
-                setData({ basic: null, regulation: null, notice: [], guide: [], devlist: [] });
+                setData({ basic: null, regulation: null });
                 setLandUseWmsUrl(null);
                 return;
             }
@@ -150,50 +198,36 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             setError(null);
 
             try {
-                // Try JSON first, fallback to WFS
                 let c;
                 try {
                     c = await fetchLandCharacteristics(대표Pnu);
                 } catch (jsonErr) {
-                    console.warn("NED JSON failed, trying WFS fallback:", jsonErr);
+                    console.warn("NED JSON failed, trying WFS:", jsonErr);
                     c = await fetchLandCharacteristicsWFS(대표Pnu);
                 }
 
-                const area = c.ldplc_ar ? Number(c.ldplc_ar) : (picked.representative?.area || null);
-                const jimok = c.indcgr_code_nm || (picked.representative?.jimok || '-');
-                const price = c.pblntf_pclnd ? Number(c.pblntf_pclnd) : (picked.representative?.price || null);
+                const area = first(c.ldplc_ar, picked.representative?.area, null);
+                const jimok = first(c.indcgr_code_nm, picked.representative?.jimok, '-');
+                const price = first(c.pblntf_pclnd, picked.representative?.price, null);
 
-                setData(prev => ({
-                    ...prev,
+                setData({
                     basic: {
                         jimok,
-                        area,
-                        price,
+                        area: area ? Number(area) : null,
+                        price: price ? Number(price) : null,
                         ladUse: c.lad_use_sittn_nm || '-',
                         roadSide: c.road_side_code_nm || '-'
                     },
                     regulation: {
                         uses: [c.prpos_area_1_nm, c.prpos_area_2_nm].filter(Boolean)
                     }
-                }));
+                });
 
-                // 2. Land Use WMS Map
                 const key = API_CONFIG.VWORLD_KEY;
-                const domain = window.location.hostname;
+                const domain = window.location.origin;
                 const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(key)}&domain=${encodeURIComponent(domain)}&pnu=${encodeURIComponent(대표Pnu)}`;
                 setLandUseWmsUrl(url);
                 setShowLandUseWms(true);
-
-                // 3. Optional Eum Data (in background)
-                try {
-                    const noticeResponse = await axios.get(`${API_CONFIG.EUM_BASE_URL}${API_CONFIG.ENDPOINTS.NOTICE}`, { params: { pnu: 대표Pnu } });
-                    const nXml = new DOMParser().parseFromString(noticeResponse.data, "text/xml");
-                    const notices = Array.from(nXml.getElementsByTagName("Map")).map(item => ({
-                        summary: item.getElementsByTagName("NOTIFI_NM")[0]?.textContent || "-",
-                        date: item.getElementsByTagName("NOTIFI_DE")[0]?.textContent || "-"
-                    }));
-                    setData(prev => ({ ...prev, notice: notices }));
-                } catch (e) { }
 
             } catch (err) {
                 console.error("Sidebar Loading Error:", err);
@@ -206,17 +240,38 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    const hasValue = (val) => val !== null && val !== undefined && val !== '-';
-
-    // Address Formatting
+    // --- Rendering ---
     const 대표필지 = picked.representative;
     const 대표도로주소 = selectedAddress?.roadAddr || 대표필지?.addr || '-';
     const 외필지표시 = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
-            {/* 1. Target Site Info */}
-            <div className="p-6 border-b border-gray-100 flex-shrink-0 bg-white">
+
+            {/* 0. Mini Map (Square) */}
+            {miniMapUrl && (
+                <div className="p-4 bg-white">
+                    <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-gray-50 shadow-sm">
+                        <img
+                            src={miniMapUrl}
+                            alt="미니맵"
+                            className="w-full h-full object-cover"
+                            onError={() => setMiniMapUrl(null)}
+                        />
+                        {/* Target Marker (Center) */}
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                            <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow animate-pulse" />
+                            <div className="w-10 h-10 rounded-full border-2 border-red-500/30 -mt-6 -ml-3.5" />
+                        </div>
+                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
+                            VWorld
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 1. Header: Target Site Info */}
+            <div className="p-6 pt-2 border-b border-gray-100 flex-shrink-0 bg-white">
                 <h2 className="text-xs font-bold text-ink uppercase tracking-wider mb-2">대상지 정보</h2>
                 <div className="text-xl font-bold text-gray-900 font-serif break-keep leading-tight">
                     {대표필지 ? `${대표도로주소}${외필지표시}` : '주소 선택 필요'}
@@ -239,7 +294,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     <>
                         {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">{error}</div>}
 
-                        {/* 2. Zoning Section (MOVED UP) */}
+                        {/* 2. Zoning Section */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -274,13 +329,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         <tr>
                                             <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
                                             <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                {hasValue(data.basic?.area) ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
+                                                {data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
                                             </td>
                                         </tr>
                                         <tr>
                                             <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
                                             <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                {hasValue(data.basic?.price) ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
+                                                {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
                                             </td>
                                         </tr>
                                         <tr>
@@ -346,7 +401,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                         <td className="p-2 text-right">{p.area.toLocaleString()}</td>
                                                         <td className="p-2 text-center">{p.jimok || '-'}</td>
                                                         <td className="p-2 text-right text-gray-400">
-                                                            {hasValue(p.price) ? p.price.toLocaleString() : '-'}
+                                                            {p.price ? p.price.toLocaleString() : '-'}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -364,12 +419,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </section>
                         )}
 
-                        {/* 5. Land Use Map (Self-hiding) */}
+                        {/* 5. Land Use Plan Map */}
                         {landUseWmsUrl && showLandUseWms && (
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                     <span className="w-1.5 h-4 bg-ink rounded-full"></span>
-                                    토지이용계획도 (WFS)
+                                    토지이용계획도
                                 </h4>
                                 <div className="w-full aspect-video bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
                                     <img
@@ -378,64 +433,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         className="w-full h-full object-contain"
                                         onError={() => setShowLandUseWms(false)}
                                     />
-                                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">VWorld WMS</div>
+                                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">WMS</div>
                                 </div>
-                                <p className="mt-2 text-[10px] text-gray-400 text-right italic font-serif">* NED WMS 기반 (데이터 환경에 따라 미표시될 수 있음)</p>
+                                <p className="mt-2 text-[10px] text-gray-400 text-right italic font-serif">* 국계법/타법령 기반</p>
                             </section>
                         )}
                     </>
                 )}
             </div>
 
-            {/* 6. Bottom Collapsible: Analysis Info (Secondary) */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-                <div
-                    className="mb-4 flex justify-between items-center cursor-pointer group"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                >
-                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 group-hover:text-gray-600 transition-colors">
-                        토지이음 분석정보 →
-                        <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </h3>
-                    <div className="h-px flex-1 bg-gray-200 ml-4 group-hover:bg-gray-300 transition-colors"></div>
-                </div>
-
-                {isExpanded && (
-                    <div className="mb-6 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                        <div className="flex border-b border-gray-100">
-                            {[{ id: 'notice', label: '고시' }, { id: 'guide', label: '안내' }, { id: 'devlist', label: '개발' }].map(tab => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 py-3 text-xs font-bold transition-colors ${activeTab === tab.id ? 'bg-ink text-white' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="p-4 max-h-[250px] overflow-y-auto">
-                            {activeTab === 'notice' && (
-                                <div className="space-y-4">
-                                    {data.notice.length > 0 ? data.notice.map((item, i) => (
-                                        <div key={i} className="border-b border-gray-50 pb-2 last:border-0 hover:bg-gray-50/50 transition-colors rounded p-1">
-                                            <div className="font-bold text-[11px] text-gray-800 leading-snug">{item.summary}</div>
-                                            <div className="text-[10px] text-gray-400 mt-1">{item.date}</div>
-                                        </div>
-                                    )) : <div className="text-center text-gray-400 text-[11px] py-10 font-serif italic">데이터 로딩 중 또는 없음</div>}
-                                </div>
-                            )}
-                            {['guide', 'devlist'].includes(activeTab) && (
-                                <div className="text-center text-gray-400 text-[11px] py-10 px-4 font-serif">
-                                    해당 탭 정보는 상세분석 보고서에서<br />확인하실 수 있습니다.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {!isExpanded && (
-                    <button className="w-full py-4 bg-ink text-white rounded-xl font-bold shadow-xl hover:bg-black hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2">
-                        <span>📄 상세 분석 보고서 생성</span>
-                    </button>
-                )}
+            {/* 6. Footer Action */}
+            <div className="p-6 border-t border-gray-100 bg-gray-50/50 mt-auto">
+                <button className="w-full py-4 bg-ink text-white rounded-xl font-bold shadow-xl hover:bg-black hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2">
+                    <span>📄 상세 분석 보고서 생성</span>
+                </button>
             </div>
         </div>
     );
