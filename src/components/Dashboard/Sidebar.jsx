@@ -59,7 +59,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const fetchLandCharacteristicsWFS = async (pnu) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = window.location.hostname;
-        const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wfs/getLandCharacteristicsWFS`;
+
+        const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
 
         const res = await axios.get(url, {
             params: {
@@ -75,21 +76,37 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             responseType: 'text'
         });
 
-        const xml = new DOMParser().parseFromString(res.data, 'text/xml');
-        const errNode = xml.getElementsByTagName('ServiceException')[0];
-        if (errNode?.textContent) throw new Error(errNode.textContent);
+        const text = String(res.data || '');
+        console.log('WFS raw head:', text.slice(0, 200));
 
-        const pick = (tag) => xml.getElementsByTagName(tag)[0]?.textContent ?? null;
+        if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+            throw new Error('VWorld가 XML이 아닌 HTML을 반환했습니다. (key/domain/proxy 설정 확인)');
+        }
+
+        const xml = new DOMParser().parseFromString(text, 'text/xml');
+
+        const ex1 = xml.getElementsByTagName('ServiceException')[0]?.textContent?.trim();
+        const ex2 = xml.getElementsByTagName('ExceptionText')[0]?.textContent?.trim();
+        if (ex1) throw new Error(ex1);
+        if (ex2) throw new Error(ex2);
+
+        const pickLocal = (localName) => {
+            const els = xml.getElementsByTagName('*');
+            for (let i = 0; i < els.length; i++) {
+                if (els[i].localName === localName) return els[i].textContent?.trim() ?? null;
+            }
+            return null;
+        };
 
         return {
-            pnu: pick('ndsi:pnu') || pick('pnu') || pnu,
-            indcgr_code_nm: pick('ndsi:indcgr_code_nm') || pick('indcgr_code_nm'),
-            ldplc_ar: pick('ndsi:ldplc_ar') || pick('ldplc_ar'),
-            pblntf_pclnd: pick('ndsi:pblntf_pclnd') || pick('pblntf_pclnd'),
-            prpos_area_1_nm: pick('ndsi:prpos_area_1_nm') || pick('prpos_area_1_nm'),
-            prpos_area_2_nm: pick('ndsi:prpos_area_2_nm') || pick('prpos_area_2_nm'),
-            lad_use_sittn_nm: pick('ndsi:lad_use_sittn_nm') || pick('lad_use_sittn_nm'),
-            road_side_code_nm: pick('ndsi:road_side_code_nm') || pick('road_side_code_nm')
+            pnu: pickLocal('pnu') || pnu,
+            indcgr_code_nm: pickLocal('indcgr_code_nm'),
+            ldplc_ar: pickLocal('ldplc_ar'),
+            pblntf_pclnd: pickLocal('pblntf_pclnd'),
+            prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
+            prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
+            lad_use_sittn_nm: pickLocal('lad_use_sittn_nm'),
+            road_side_code_nm: pickLocal('road_side_code_nm')
         };
     };
 
