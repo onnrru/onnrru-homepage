@@ -16,14 +16,15 @@ export const AREA_CATEGORIES = ["50-80㎡", "80-85㎡", "85-110㎡", "110-130㎡
  * Get 3-month interval periods for the last 3 years.
  * Format: "YYYY.MM" start period
  */
-const getTrimesters = () => {
+const getTrimesters = (numMonths = 36) => {
+    const periodCount = Math.ceil(numMonths / 3);
     const periods = [];
     const date = new Date();
     // Start from current month
     let year = date.getFullYear();
     let month = date.getMonth() + 1;
 
-    for (let i = 0; i < 12; i++) { // 12 trimesters = 36 months
+    for (let i = 0; i < periodCount; i++) { // dynamic count
         // e.g. "2024.1" if month is 3, "2023.10" if month is 12
         const periodKey = `${year}.Q${Math.ceil(month / 3)}`; // Custom key like 2024.Q1
         // We can just use the start month of the trimester for the label
@@ -79,8 +80,9 @@ const getTrimesterIndex = (dealYear, dealMonth, periods) => {
  * @param {Array} rawData - Array of transactions from API
  * @param {string} targetDong - The selected Dong name
  */
-export const processTransactionData = (rawData, targetDong) => {
-    const periods = getTrimesters();
+export const processTransactionData = (rawData, targetDong, numMonths = 36) => {
+    const periodCount = Math.ceil(numMonths / 3);
+    const periods = getTrimesters(numMonths);
 
     // 1. Filter out areas under 50㎡ and categorize
     const categorizedData = rawData.map(t => ({
@@ -95,8 +97,8 @@ export const processTransactionData = (rawData, targetDong) => {
 
     // Initialize trend arrays
     AREA_CATEGORIES.forEach(cat => {
-        dongTrendStats[cat] = Array(12).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }));
-        guTrendStats[cat] = Array(12).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }));
+        dongTrendStats[cat] = Array(periodCount).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }));
+        guTrendStats[cat] = Array(periodCount).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }));
     });
 
     categorizedData.forEach(tx => {
@@ -129,7 +131,7 @@ export const processTransactionData = (rawData, targetDong) => {
                     totalAmount: 0,
                     count: 0,
                     // Store historical data for line chart
-                    history: Array(12).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }))
+                    history: Array(periodCount).fill(0).map(() => ({ totalAmount: 0, count: 0, avg: 0 }))
                 };
             }
 
@@ -147,7 +149,7 @@ export const processTransactionData = (rawData, targetDong) => {
 
     // Calculate averages
     AREA_CATEGORIES.forEach(cat => {
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < periodCount; i++) {
             if (guTrendStats[cat][i].count > 0) {
                 guTrendStats[cat][i].avg = Math.round(guTrendStats[cat][i].totalAmount / guTrendStats[cat][i].count);
             }

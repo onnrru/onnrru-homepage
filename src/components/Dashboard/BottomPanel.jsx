@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-    LineChart, Line, CartesianGrid, Legend
+    LineChart, Line, CartesianGrid, Legend, LabelList
 } from 'recharts';
 import { fetchApartmentTransactions } from '../../services/realEstateApi';
 import { processTransactionData, AREA_CATEGORIES } from '../../utils/apartmentAnalysis';
@@ -27,16 +27,21 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const TrendTooltip = ({ active, payload, label }) => {
+const TrendTooltip = ({ active, payload, label, trendDataType }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-white p-3 border border-gray-200 shadow-lg rounded-lg text-sm min-w-[150px]">
                 <p className="font-bold text-gray-800 mb-2">{label}</p>
                 {payload.map((entry, index) => (
-                    <div key={index} className="flex justify-between items-center text-xs mb-1">
+                    <div key={index} className="flex justify-between items-center text-xs mb-1 gap-4">
                         <span style={{ color: entry.color }}>{entry.name}:</span>
-                        <span>{(entry.value / 10000).toFixed(2)}억원
-                            {entry.payload[`${entry.dataKey.split('Avg')[0]}Count`] ? ` (${entry.payload[`${entry.dataKey.split('Avg')[0]}Count`]}건)` : ''}
+                        <span>
+                            {trendDataType === 'avg'
+                                ? `${(entry.value / 10000).toFixed(2)}억원`
+                                : `${entry.value}건`}
+                            {trendDataType === 'avg' && entry.payload[`${entry.dataKey.split('Avg')[0]}Count`] !== undefined
+                                ? ` (${entry.payload[`${entry.dataKey.split('Avg')[0]}Count`]}건)`
+                                : ''}
                         </span>
                     </div>
                 ))}
@@ -46,12 +51,24 @@ const TrendTooltip = ({ active, payload, label }) => {
     return null;
 };
 
+const CustomBarLabel = (props) => {
+    const { x, y, width, value } = props;
+    if (value === undefined || value === null || value === '-') return null;
+    return (
+        <text x={x + width / 2} y={y - 5} fill="#6b7280" fontSize="10" textAnchor="middle">
+            {value}건
+        </text>
+    );
+};
+
 const BottomPanel = ({ selectedAddress }) => {
     const [loading, setLoading] = useState(false);
     const [analysisData, setAnalysisData] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(AREA_CATEGORIES[0]);
     const [selectedApartment, setSelectedApartment] = useState(null);
     const [regionLabels, setRegionLabels] = useState({ gu: '행정구', dong: '행정동' });
+    const [selectedPeriod, setSelectedPeriod] = useState(36); // months
+    const [trendDataType, setTrendDataType] = useState('avg'); // 'avg' or 'count'
 
     useEffect(() => {
         const loadData = async () => {
@@ -88,8 +105,8 @@ const BottomPanel = ({ selectedAddress }) => {
                 if (lawdCd && targetUnitName) {
                     setRegionLabels({ gu: sigunguPart, dong: targetUnitName });
 
-                    const rawData = await fetchApartmentTransactions(lawdCd, 36); // 3 years
-                    const processed = processTransactionData(rawData, targetUnitName);
+                    const rawData = await fetchApartmentTransactions(lawdCd, selectedPeriod);
+                    const processed = processTransactionData(rawData, targetUnitName, selectedPeriod);
                     setAnalysisData(processed);
                     setSelectedApartment(null); // Reset selection on new area
                 } else {
@@ -104,7 +121,7 @@ const BottomPanel = ({ selectedAddress }) => {
         };
 
         loadData();
-    }, [selectedAddress]);
+    }, [selectedAddress, selectedPeriod]);
 
     // Format data for Bar Chart
     const barChartData = useMemo(() => {
@@ -128,10 +145,17 @@ const BottomPanel = ({ selectedAddress }) => {
         // Add overall Dong average securely at the end
         const dongAvg = analysisData.dongOverallAverages[selectedCategory];
         if (dongAvg > 0) {
+            let totalCategoryCount = 0;
+            analysisData.apartments.forEach(apt => {
+                if (apt.categories[selectedCategory]) {
+                    totalCategoryCount += apt.categories[selectedCategory].count;
+                }
+            });
+
             data.push({
                 name: `${regionLabels.dong} 전체 평균`,
                 avg: dongAvg,
-                count: '-', // we could calculate total count if needed
+                count: totalCategoryCount,
                 type: 'average'
             });
         }
@@ -160,14 +184,14 @@ const BottomPanel = ({ selectedAddress }) => {
         periods.forEach((periodLabel, i) => {
             const item = {
                 period: periodLabel,
-                dongAvg: dongTrend[i].avg || null,
+                dongAvg: trendDataType === 'avg' ? (dongTrend[i].avg || null) : dongTrend[i].count,
                 dongCount: dongTrend[i].count,
-                guAvg: guTrend[i].avg || null,
+                guAvg: trendDataType === 'avg' ? (guTrend[i].avg || null) : guTrend[i].count,
                 guCount: guTrend[i].count,
             };
 
             if (aptTrend) {
-                item.aptAvg = aptTrend[i].avg || null;
+                item.aptAvg = trendDataType === 'avg' ? (aptTrend[i].avg || null) : aptTrend[i].count;
                 item.aptCount = aptTrend[i].count;
             }
 
@@ -175,7 +199,7 @@ const BottomPanel = ({ selectedAddress }) => {
         });
 
         return data;
-    }, [analysisData, selectedCategory, selectedApartment]);
+    }, [analysisData, selectedCategory, selectedApartment, trendDataType]);
 
     if (loading) {
         return (
@@ -232,9 +256,16 @@ const BottomPanel = ({ selectedAddress }) => {
                     <div className="flex justify-between items-center mb-2 px-3">
                         <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            아파트별 평균 실거래가 <span className="text-xs font-normal text-gray-500">(3년)</span>
+                            아파트별 평균 실거래가
+                            <span className="text-xs font-normal text-gray-500">
+                                ({selectedPeriod === 12 ? '1년' : selectedPeriod === 36 ? '3년' : '5년'})
+                            </span>
                         </h3>
-                        <div className="text-[10px] text-gray-400">해당 면적형 기준</div>
+                        <div className="flex bg-gray-100 rounded-md p-0.5">
+                            <button onClick={() => setSelectedPeriod(12)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 12 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>1년</button>
+                            <button onClick={() => setSelectedPeriod(36)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 36 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>3년</button>
+                            <button onClick={() => setSelectedPeriod(60)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 60 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>5년</button>
+                        </div>
                     </div>
 
                     <div className="flex-1 w-full relative">
@@ -271,6 +302,7 @@ const BottomPanel = ({ selectedAddress }) => {
                                         }}
                                         className="cursor-pointer transition-opacity hover:opacity-80"
                                     >
+                                        <LabelList dataKey="count" content={<CustomBarLabel />} />
                                         {barChartData.map((entry, index) => (
                                             <Cell
                                                 key={`cell-${index}`}
@@ -297,8 +329,12 @@ const BottomPanel = ({ selectedAddress }) => {
                     <div className="flex justify-between items-center mb-2 px-3">
                         <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            3년 추이 비교 (3개월 단위)
+                            추이 비교 <span className="text-xs font-normal text-gray-500">(3개월 단위)</span>
                         </h3>
+                        <div className="flex bg-gray-100 rounded-md p-0.5">
+                            <button onClick={() => setTrendDataType('avg')} className={`px-2 py-1 text-[10px] rounded ${trendDataType === 'avg' ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>평균매매가</button>
+                            <button onClick={() => setTrendDataType('count')} className={`px-2 py-1 text-[10px] rounded ${trendDataType === 'count' ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>거래수</button>
+                        </div>
                     </div>
 
                     <div className="flex-1 w-full">
@@ -316,10 +352,12 @@ const BottomPanel = ({ selectedAddress }) => {
                                     tick={{ fontSize: 10, fill: '#6b7280' }}
                                     axisLine={false}
                                     tickLine={false}
-                                    tickFormatter={(value) => `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`}
+                                    tickFormatter={(value) => trendDataType === 'avg'
+                                        ? `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`
+                                        : `${value}건`}
                                     width={45}
                                 />
-                                <Tooltip content={<TrendTooltip />} />
+                                <Tooltip content={<TrendTooltip trendDataType={trendDataType} />} />
                                 <Legend wrapperStyle={{ fontSize: '11px', bottom: 0 }} />
 
                                 <Line
