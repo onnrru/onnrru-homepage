@@ -406,7 +406,58 @@ const MapSection = ({
                 const aptMarkerLayer = new OL.layer.Vector({
                     source: aptMarkerSrc,
                     zIndex: 30,
-                    declutter: false
+                    declutter: false,
+                    style: (feature) => {
+                        const map = window.map; // stored globally in init
+                        const zoom = map ? map.getView().getZoom() : 16;
+                        const isHovered = feature.get('hovered') === true;
+
+                        const aptName = feature.get('aptName');
+                        const ageStr = feature.get('ageStr');
+                        const areaDisp = feature.get('areaDisp');
+                        const priceInEok = feature.get('priceInEok');
+                        const count = feature.get('count');
+
+                        // Zoom cutoff threshold
+                        const isZoomedOut = zoom < 15.5;
+                        const showFull = !isZoomedOut || isHovered;
+
+                        let labelText;
+                        if (showFull) {
+                            labelText = `[ ${aptName} ]\n${ageStr}\n평균 ${areaDisp}㎡\n${priceInEok}억원 / ${count}건`;
+                        } else {
+                            labelText = `[ ${aptName} ]\n${priceInEok}억원`;
+                        }
+
+                        const radius = isHovered ? 32 : 25;
+                        const zIndex = isHovered ? 1000 : 30;
+                        const strokeWidth = isHovered ? 3 : 2;
+                        const bgColor = isHovered ? 'rgba(255, 69, 58, 0.8)' : 'rgba(255, 69, 58, 0.4)';
+
+                        return new OL.style.Style({
+                            zIndex: zIndex,
+                            image: new OL.style.Circle({
+                                radius: radius,
+                                fill: new OL.style.Fill({
+                                    color: bgColor
+                                }),
+                                stroke: new OL.style.Stroke({
+                                    color: 'rgba(255, 69, 58, 0.9)',
+                                    width: strokeWidth
+                                })
+                            }),
+                            text: new OL.style.Text({
+                                text: labelText,
+                                font: 'bold 12px "Pretendard", "Apple SD Gothic Neo", sans-serif',
+                                fill: new OL.style.Fill({ color: '#ffffff' }),
+                                stroke: new OL.style.Stroke({ color: '#000000', width: 3 }),
+                                offsetY: 0,
+                                textAlign: 'center',
+                                textBaseline: 'middle',
+                                padding: [5, 5, 5, 5]
+                            })
+                        });
+                    }
                 });
 
                 // Measure layer
@@ -605,35 +656,17 @@ const MapSection = ({
                         geometry: new OL.geom.Point(center3857)
                     });
 
-                    // Format Overlay Text
                     const priceInEok = (apt.avg / 10000).toFixed(2);
                     const areaDisp = apt.avgArea.toFixed(1);
-                    const labelText = `[ ${apt.name} ]\n${ageStr}\n평균 ${areaDisp}㎡\n${priceInEok}억원 / ${apt.count}건`;
 
-                    feature.setStyle(
-                        new OL.style.Style({
-                            image: new OL.style.Circle({
-                                radius: 25,
-                                fill: new OL.style.Fill({
-                                    color: 'rgba(255, 69, 58, 0.4)' // iOS Red with transparency
-                                }),
-                                stroke: new OL.style.Stroke({
-                                    color: 'rgba(255, 69, 58, 0.9)',
-                                    width: 2
-                                })
-                            }),
-                            text: new OL.style.Text({
-                                text: labelText,
-                                font: 'bold 12px "Pretendard", "Apple SD Gothic Neo", sans-serif',
-                                fill: new OL.style.Fill({ color: '#ffffff' }),
-                                stroke: new OL.style.Stroke({ color: '#000000', width: 3 }),
-                                offsetY: 0, // Center in circle
-                                textAlign: 'center',
-                                textBaseline: 'middle',
-                                padding: [5, 5, 5, 5]
-                            })
-                        })
-                    );
+                    feature.setProperties({
+                        aptName: apt.name,
+                        ageStr: ageStr,
+                        areaDisp: areaDisp,
+                        priceInEok: priceInEok,
+                        count: apt.count,
+                        layerType: 'aptMarker'
+                    });
 
                     src.addFeature(feature);
                 }
@@ -724,6 +757,48 @@ const MapSection = ({
             }
         });
     }, [mapObj, mapType, showHybrid, activeLayers]);
+
+    // ====== Layout Hover Interaction ======
+    useEffect(() => {
+        if (!mapObj) return;
+
+        const cursorHoverHandler = (e) => {
+            if (e.dragging) return;
+
+            const pixel = mapObj.getEventPixel(e.originalEvent);
+            const hitFeatures = [];
+
+            mapObj.forEachFeatureAtPixel(pixel, (feature, layer) => {
+                if (feature.get('layerType') === 'aptMarker') {
+                    hitFeatures.push(feature);
+                }
+            });
+
+            const targetFeature = hitFeatures.length > 0 ? hitFeatures[0] : null;
+
+            // Set hovered state
+            let changed = false;
+            const src = aptMarkerSourceRef.current;
+            if (src) {
+                src.getFeatures().forEach(f => {
+                    const isHovered = (f === targetFeature);
+                    if (f.get('hovered') !== isHovered) {
+                        f.set('hovered', isHovered);
+                        changed = true;
+                    }
+                });
+            }
+
+            // Change pointer styling
+            mapObj.getTargetElement().style.cursor = targetFeature ? 'pointer' : '';
+        };
+
+        mapObj.on('pointermove', cursorHoverHandler);
+
+        return () => {
+            mapObj.un('pointermove', cursorHoverHandler);
+        };
+    }, [mapObj]);
 
     // ====== Update map center on selectedAddress ======
     useEffect(() => {
