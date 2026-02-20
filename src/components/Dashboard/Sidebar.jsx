@@ -14,14 +14,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Sync Logic: Expanding bottom collapses top
     const toggleSpec = () => {
         const next = !specOpen;
         setSpecOpen(next);
         setCharOpen(!next);
     };
 
-    // --- Utility Functions ---
     const getVworldDomain = () => window.location.origin;
 
     const safeJson = (maybe) => {
@@ -87,7 +85,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // --- Memoized Calculations ---
+    // --- Memoized Logic ---
     const picked = React.useMemo(() => {
         const listData = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => {
@@ -108,13 +106,13 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 price: Number(first(selectedAddress.price, selectedAddress.jiga, selectedAddress.pblntf_pclnd, 0))
             }] : []);
 
-        const totalArea = listData.reduce((sum, item) => sum + item.area, 0);
+        const totalAreaValue = listData.reduce((sum, item) => sum + item.area, 0);
         const representative = [...listData].sort((a, b) => b.area - a.area)[0] || null;
 
-        return { list: listData, representative, totalArea };
+        return { list: listData, representative, totalArea: totalAreaValue };
     }, [selectedParcels, selectedAddress]);
 
-    // Derived values with fallbacks to fetched data
+    // Secondary Total Area (if picked is 0, use fetched)
     const displayTotalArea = picked.totalArea > 0 ? picked.totalArea : (data.basic?.area || 0);
 
     const fetchLandCharacteristics = async (pnuRaw) => {
@@ -124,7 +122,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const res = await axios.get(url, { params: { key, domain: getVworldDomain(), pnu, format: 'json' } });
         const payload = safeJson(res.data) ?? res.data;
         const d = unwrapNed(payload);
-        if (!d) throw new Error('Data not found');
+        if (!d) throw new Error('NED Error');
         return d;
     };
 
@@ -141,7 +139,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             responseType: 'text'
         });
         const text = String(res.data || '');
-        if (text.trim().startsWith('<html')) throw new Error('WFS Error');
+        if (text.trim().startsWith('<html')) throw new Error('WFS Failure');
         const xml = new DOMParser().parseFromString(text, 'text/xml');
         const pickLocal = (name) => {
             const els = xml.getElementsByTagName('*');
@@ -160,7 +158,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
-    // --- Minimap Logic (Switch to req/image for better reliability) ---
+    // --- Minimap (Zoom Level 19 + Cadastral) ---
     useEffect(() => {
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
@@ -168,30 +166,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         const key = API_CONFIG.VWORLD_KEY;
         const size = 400;
-        const delta = 0.00045; // Level 19 approx
+        const delta = 0.00045; // Approx Z19 for parcel boundary
         const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
+
+        // Layers: white (background) + LP_PA_CBND_BUBUN (cadastral)
+        const layers = 'white,LP_PA_CBND_BUBUN';
         const url = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326` +
-            `&bbox=${bbox}&width=${size}&height=${size}&layers=white&domain=${encodeURIComponent(getVworldDomain())}`;
+            `&bbox=${bbox}&width=${size}&height=${size}&layers=${layers}&domain=${encodeURIComponent(getVworldDomain())}`;
 
         setMiniMapUrl(url);
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
-    // Main Data Fetch
+    // Main Data Effect
     useEffect(() => {
         const run = async () => {
-            const representativePnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
-            if (!representativePnu) { setData({ basic: null, regulation: null }); setLandUseWmsUrl(null); return; }
+            const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
+            if (!repPnu) { setData({ basic: null, regulation: null }); setLandUseWmsUrl(null); return; }
 
             setLoading(true); setError(null);
             try {
                 let d;
-                try { d = await fetchLandCharacteristics(representativePnu); }
-                catch (e) { d = await fetchLandCharacteristicsWFS(representativePnu); }
+                try { d = await fetchLandCharacteristics(repPnu); }
+                catch (e) { d = await fetchLandCharacteristicsWFS(repPnu); }
 
                 setData({
                     basic: {
                         jimok: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok, d.jimok_nm, picked.representative?.jimok, '-'),
-                        area: Number(first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.ar, d.area, d.p_area, picked.representative?.area, 0)),
+                        area: Number(first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.ar, d.area, d.p_area, picked.representative?.area, null)),
                         price: Number(first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, picked.representative?.price, 0)),
                         ladUse: first(d.lad_use_sittn_nm, d.ladUseSittnNm, '-'),
                         roadSide: first(d.road_side_code_nm, d.roadSideCodeNm, '-')
@@ -201,35 +202,34 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     }
                 });
 
-                const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(key)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(representativePnu)}`;
+                const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
                 setLandUseWmsUrl(url);
                 setShowLandUseWms(true);
             } catch (err) {
-                console.error("Sidebar Loading:", err);
-                setError(`정보 조회 오류`);
+                console.error("Sidebar Load Error:", err);
+                setError(`로딩 실패`);
             } finally { setLoading(false); }
         };
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    const representativeParcel = picked.representative;
-    const roadAddressDisplay = selectedAddress?.roadAddr || representativeParcel?.addr || '-';
-    const otherParcelsCount = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
+    const repParcel = picked.representative;
+    const addrText = selectedAddress?.roadAddr || repParcel?.addr || '-';
+    const extraP = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
     return (
         <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 w-[350px]">
 
-            {/* Minimap (Image API, White Map) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
                         <img
                             src={miniMapUrl}
-                            alt="Minimap"
+                            alt="민이맵"
                             className="w-full h-full object-cover"
                             onError={(e) => {
                                 if (!e.target.src.includes('layers=Base')) {
-                                    e.target.src = e.target.src.replace('layers=white', 'layers=Base');
+                                    e.target.src = e.target.src.replace('layers=white,LP_PA_CBND_BUBUN', 'layers=Base,LP_PA_CBND_BUBUN');
                                 } else {
                                     setMiniMapUrl(null);
                                 }
@@ -245,7 +245,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             <div className="p-6 pt-2 border-b border-gray-100 flex-shrink-0 bg-white">
                 <h2 className="text-xs font-bold text-ink uppercase tracking-wider mb-2">대상지 정보</h2>
                 <div className="text-xl font-bold text-gray-900 font-serif break-keep leading-tight">
-                    {representativeParcel ? `${roadAddressDisplay}${otherParcelsCount}` : '주소를 선택하세요'}
+                    {repParcel ? `${addrText}${extraP}` : '주소를 선택하세요'}
                 </div>
             </div>
 
@@ -253,13 +253,11 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 {loading && !data.basic ? (
                     <div className="flex flex-col items-center justify-center py-20 opacity-30">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                        <div className="text-[10px] mt-4 font-bold">로딩 중...</div>
                     </div>
                 ) : (
                     <>
                         {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] rounded border border-red-100">{error}</div>}
 
-                        {/* Regulation Info */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -273,12 +271,11 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         </span>
                                     ))
                                 ) : (
-                                    <div className="text-gray-400 text-xs italic">정보를 불러오는 중이거나 없습니다.</div>
+                                    <div className="text-gray-400 text-xs italic">조회 중이거나 정보가 없습니다.</div>
                                 )}
                             </div>
                         </section>
 
-                        {/* Land Characteristics (Basic Info) */}
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -295,7 +292,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                             <tr>
                                                 <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
                                                 <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                    {data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
+                                                    {(data.basic?.area !== null && data.basic?.area !== undefined) ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
                                                 </td>
                                             </tr>
                                             <tr>
@@ -318,7 +315,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             )}
                         </section>
 
-                        {/* Parcel Specification Table (Detailed List) */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -355,10 +351,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {picked.list.map((p, idx) => {
-                                                    // Fallback for representative parcel in the list
-                                                    const isRep = representativeParcel && normalizePnu(p.pnu) === normalizePnu(representativeParcel.pnu);
-                                                    const dispJimok = (p.jimok === '-' && isRep) ? (data.basic?.jimok || '-') : p.jimok;
-                                                    const dispArea = (p.area === 0 && isRep) ? (data.basic?.area || 0) : p.area;
+                                                    const isRep = repParcel && normalizePnu(p.pnu) === normalizePnu(repParcel.pnu);
+                                                    const dispJimok = (first(p.jimok, '-') === '-' && isRep) ? (data.basic?.jimok || '-') : p.jimok;
+                                                    const dispArea = (p.area === 0 && isRep && data.basic?.area) ? data.basic.area : p.area;
 
                                                     return (
                                                         <tr key={p.pnu || idx}>
@@ -376,7 +371,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </section>
                         )}
 
-                        {/* Land Use Plan (WMS) */}
                         {landUseWmsUrl && showLandUseWms && !specOpen && (
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
