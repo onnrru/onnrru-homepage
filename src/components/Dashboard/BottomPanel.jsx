@@ -19,6 +19,11 @@ const CustomTooltip = ({ active, payload, label }) => {
                         {entry.payload.count !== undefined && (
                             <span className="text-gray-500">거래건수: {entry.payload.count}건</span>
                         )}
+                        {entry.payload.avgArea !== undefined && (
+                            <span className="text-gray-500">
+                                전용면적 평균: {entry.payload.avgArea.toFixed(1)}㎡ ({(entry.payload.avgArea * 0.3025).toFixed(1)} py)
+                            </span>
+                        )}
                     </div>
                 ))}
             </div>
@@ -71,82 +76,87 @@ const BottomPanel = ({ selectedAddress }) => {
 
     const [rawTxData, setRawTxData] = useState([]);
     const [targetUnitName, setTargetUnitName] = useState('');
+    const [analyzedAddressPnu, setAnalyzedAddressPnu] = useState(null);
+
+    const loadData = async () => {
+        if (!selectedAddress || !selectedAddress.pnu) {
+            setRawTxData([]);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+        setAnalyzedAddressPnu(selectedAddress.pnu);
+        try {
+            // pnu is 19 chars: 0-5 is Sigungu (LAWD_CD), 5-10 is Dong code
+            const lawdCd = selectedAddress.pnu.substring(0, 5);
+
+            const addressParts = selectedAddress.roadAddr?.split(' ') || selectedAddress.jibunAddr?.split(' ') || [];
+
+            // Extract Si/Do precisely (First element)
+            const sidoPart = addressParts[0] || '시/도';
+
+            // 1. Identify Sigungu (행정구/군/시)
+            let sigunguPart = '';
+            const possibleSigungu = addressParts.filter((p, i) => i > 0 && (p.endsWith('구') || p.endsWith('군') || p.endsWith('시')));
+
+            if (possibleSigungu.length > 0) {
+                sigunguPart = possibleSigungu[0];
+            } else if (addressParts.length >= 2) {
+                sigunguPart = addressParts[1];
+            } else {
+                sigunguPart = '행정구';
+            }
+
+            // 2. Identify minimum unit (Dong or Eup/Myeon + Ri)
+            let targetUnitName = '';
+            let primaryUnit = '';
+
+            const dongPart = addressParts.find(part => part.endsWith('동'));
+            const eupMyeonPart = addressParts.find(part => part.endsWith('읍') || part.endsWith('면'));
+            const riPart = addressParts.find(part => part.endsWith('리'));
+
+            if (dongPart) {
+                targetUnitName = dongPart;
+                primaryUnit = dongPart;
+            } else if (eupMyeonPart) {
+                // For Trend Comparison, we show the Primary Unit (e.g. 면/읍) as the 'Gu/Dong' equivalent line
+                // and the 'Ri' as the specific local level if applicable.
+                primaryUnit = eupMyeonPart;
+                targetUnitName = riPart ? `${eupMyeonPart} ${riPart}` : eupMyeonPart;
+            } else {
+                targetUnitName = addressParts[addressParts.length - 1] || '';
+                primaryUnit = targetUnitName;
+            }
+
+            if (lawdCd && targetUnitName) {
+                // For the legend, we want:
+                // Gu -> Sigungu (e.g., 송파구, 양평군)
+                // Dong -> primaryUnit (e.g., 방이동, 강상면)
+                setRegionLabels({ gu: sigunguPart, dong: primaryUnit, sido: sidoPart });
+                setTargetUnitName(targetUnitName);
+
+                // Fetch 5 years explicitly ONCE for the trend chart
+                const rawData = await fetchApartmentTransactions(lawdCd, 60);
+                setRawTxData(rawData || []);
+                setSelectedApartment(null);
+            } else {
+                setRawTxData([]);
+            }
+        } catch (error) {
+            console.error("Failed to load real estate data:", error);
+            setRawTxData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadData = async () => {
-            if (!selectedAddress || !selectedAddress.pnu) {
-                setAnalysisData(null);
-                setLoading(false);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                // pnu is 19 chars: 0-5 is Sigungu (LAWD_CD), 5-10 is Dong code
-                const lawdCd = selectedAddress.pnu.substring(0, 5);
-
-                const addressParts = selectedAddress.roadAddr?.split(' ') || selectedAddress.jibunAddr?.split(' ') || [];
-
-                // Extract Si/Do precisely (First element)
-                const sidoPart = addressParts[0] || '시/도';
-
-                // 1. Identify Sigungu (행정구/군/시)
-                let sigunguPart = '';
-                const possibleSigungu = addressParts.filter((p, i) => i > 0 && (p.endsWith('구') || p.endsWith('군') || p.endsWith('시')));
-
-                if (possibleSigungu.length > 0) {
-                    sigunguPart = possibleSigungu[0];
-                } else if (addressParts.length >= 2) {
-                    sigunguPart = addressParts[1];
-                } else {
-                    sigunguPart = '행정구';
-                }
-
-                // 2. Identify minimum unit (Dong or Eup/Myeon + Ri)
-                let targetUnitName = '';
-                let primaryUnit = '';
-
-                const dongPart = addressParts.find(part => part.endsWith('동'));
-                const eupMyeonPart = addressParts.find(part => part.endsWith('읍') || part.endsWith('면'));
-                const riPart = addressParts.find(part => part.endsWith('리'));
-
-                if (dongPart) {
-                    targetUnitName = dongPart;
-                    primaryUnit = dongPart;
-                } else if (eupMyeonPart) {
-                    // For Trend Comparison, we show the Primary Unit (e.g. 면/읍) as the 'Gu/Dong' equivalent line
-                    // and the 'Ri' as the specific local level if applicable.
-                    primaryUnit = eupMyeonPart;
-                    targetUnitName = riPart ? `${eupMyeonPart} ${riPart}` : eupMyeonPart;
-                } else {
-                    targetUnitName = addressParts[addressParts.length - 1] || '';
-                    primaryUnit = targetUnitName;
-                }
-
-                if (lawdCd && targetUnitName) {
-                    // For the legend, we want:
-                    // Gu -> Sigungu (e.g., 송파구, 양평군)
-                    // Dong -> primaryUnit (e.g., 방이동, 강상면)
-                    setRegionLabels({ gu: sigunguPart, dong: primaryUnit, sido: sidoPart });
-                    setTargetUnitName(targetUnitName);
-
-                    // Fetch 5 years explicitly ONCE for the trend chart
-                    const rawData = await fetchApartmentTransactions(lawdCd, 60);
-                    setRawTxData(rawData || []);
-                    setSelectedApartment(null);
-                } else {
-                    setRawTxData([]);
-                }
-            } catch (error) {
-                console.error("Failed to load real estate data:", error);
-                setRawTxData([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [selectedAddress]); // REMOVED selectedPeriod dependency so it doesn't refetch!
+        // Reset analyzedAddressPnu when selectedAddress changes to prompt re-analysis
+        setAnalyzedAddressPnu(null);
+        setRawTxData([]); // Clear previous data
+        setLoading(false); // Ensure loading is off if no address or new address
+    }, [selectedAddress]);
 
     // Static 5 Year Analysis for Trend Chart
     const analysisData = useMemo(() => {
@@ -171,6 +181,7 @@ const BottomPanel = ({ selectedAddress }) => {
         const aptStats = {};
         let totalDongAmount = 0;
         let totalDongCount = 0;
+        let totalDongArea = 0;
 
         filteredTx.forEach(tx => {
             const cat = processTransactionData.getAreaCategory ? processTransactionData.getAreaCategory(tx.area) : null;
@@ -192,19 +203,22 @@ const BottomPanel = ({ selectedAddress }) => {
 
             // Apartment level
             const aptName = tx.apartmentName;
-            if (!aptStats[aptName]) aptStats[aptName] = { total: 0, count: 0 };
+            if (!aptStats[aptName]) aptStats[aptName] = { total: 0, count: 0, totalArea: 0 };
             aptStats[aptName].total += tx.price;
             aptStats[aptName].count += 1;
+            aptStats[aptName].totalArea += tx.area;
 
             // Dong level
             totalDongAmount += tx.price;
             totalDongCount += 1;
+            totalDongArea += tx.area;
         });
 
         const data = Object.keys(aptStats).map(aptName => ({
             name: aptName,
             avg: Math.round(aptStats[aptName].total / aptStats[aptName].count),
             count: aptStats[aptName].count,
+            avgArea: aptStats[aptName].totalArea / aptStats[aptName].count,
             type: 'apartment'
         }));
 
@@ -213,6 +227,7 @@ const BottomPanel = ({ selectedAddress }) => {
                 name: `${regionLabels.dong} 전체 평균`,
                 avg: Math.round(totalDongAmount / totalDongCount),
                 count: totalDongCount,
+                avgArea: totalDongArea / totalDongCount,
                 type: 'average'
             });
         }
@@ -261,7 +276,7 @@ const BottomPanel = ({ selectedAddress }) => {
     if (loading) {
         return (
             <div className="h-64 bg-white border-t border-gray-200 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <span className="ml-3 text-sm text-gray-500">실거래가 데이터를 불러오는 중... (최대 10초)</span>
             </div>
         );
@@ -275,10 +290,28 @@ const BottomPanel = ({ selectedAddress }) => {
         );
     }
 
+    if (selectedAddress.pnu !== analyzedAddressPnu) {
+        const displayName = selectedAddress.roadAddr || selectedAddress.jibunAddr || selectedAddress.address || '선택된 대상지';
+        return (
+            <div className="h-64 bg-white border-t border-gray-200 flex flex-col gap-4 items-center justify-center">
+                <div className="text-gray-600 font-medium text-sm">
+                    <span className="text-blue-600 font-bold">[{displayName}]</span> 주변의 아파트 실거래가를 분석하시겠습니까?
+                </div>
+                <button
+                    onClick={loadData}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow font-bold transition-all text-sm flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    분석하기
+                </button>
+            </div>
+        );
+    }
+
     if (!rawTxData || rawTxData.length === 0) {
         return (
             <div className="h-64 bg-white border-t border-gray-200 flex items-center justify-center text-gray-400">
-                해당 지역에 최근 5년간 아파트 실거래 내역이 없습니다. (API 응답 없음)
+                해당 지역에 최근 실거래 내역이 없습니다.
             </div>
         );
     }
