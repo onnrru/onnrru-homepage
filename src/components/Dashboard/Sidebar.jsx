@@ -339,10 +339,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             </div>
 
             <div className="p-5 pt-1 border-b border-gray-100 flex-shrink-0 bg-white">
-                <h2 className="text-[11px] font-bold text-gray-400 mb-1.5 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
+                    <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                     대상지번
-                </h2>
+                </h4>
                 <div className="text-lg font-bold text-gray-900 font-serif break-keep leading-tight tracking-tight">
                     {picked.representative ? `${hdrAddr}${hdrExtra}` : '주소를 선택하세요'}
                 </div>
@@ -378,33 +378,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                     토지 기본특성
                                 </h4>
                                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[11px]">
                                         <tbody className="divide-y divide-gray-100">
                                             <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500 w-1/3">지목</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500 w-1/3">지목</th>
+                                                <td className="py-2 px-3 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold tracking-tight">
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">면적</th>
+                                                <td className="py-2 px-3 text-gray-800 font-bold tracking-tight">
                                                     {(data.basic?.area !== null && data.basic?.area !== undefined) ?
                                                         `${Number(data.basic.area).toLocaleString()} m² (${(Number(data.basic.area) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)`
                                                         : '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold">
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">공시지가</th>
+                                                <td className="py-2 px-3 text-gray-800 font-bold">
                                                     {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">이용상황</th>
-                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.ladUse || '-'}</td>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">이용상황</th>
+                                                <td className="py-2 px-3 text-gray-800">{data.basic?.ladUse || '-'}</td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">도로접면</th>
-                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.roadSide || '-'}</td>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">도로접면</th>
+                                                <td className="py-2 px-3 text-gray-800">{data.basic?.roadSide || '-'}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -413,35 +413,35 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         )}
 
                         {picked.list.length > 0 && (
-                            <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
-                                <div className="flex justify-between items-center mb-3">
+                            <section>
+                                <div className="flex justify-between items-center mb-2.5">
                                     <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 tracking-tight">
                                         <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                                         토지명세표
                                     </h4>
-                                    <button onClick={toggleSpec} className="text-xs font-bold text-ink hover:underline">
+                                    <button onClick={toggleSpec} className="text-[11px] font-bold text-ink hover:underline">
                                         {specOpen ? '간략히' : '상세보기'}
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                        <div className="text-[10px] text-gray-400 font-bold mb-1">총 필지수</div>
-                                        <div className="text-lg font-bold text-ink">{picked.list.length}</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center">
+                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">총 필지수</div>
+                                        <div className="text-[11px] font-bold text-ink">{picked.list.length}</div>
                                     </div>
-                                    <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                        <div className="text-[10px] text-gray-400 font-bold mb-1">합계 면적</div>
-                                        <div className="text-sm font-bold text-blue-700 tracking-tight">
-                                            {displayTotal.toLocaleString()} m² <span className="text-xs text-gray-500 font-normal">({(displayTotal * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</span>
+                                    <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center">
+                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">합계 면적</div>
+                                        <div className="text-[11px] font-bold text-blue-700 tracking-tight">
+                                            {displayTotal.toLocaleString()} m² <span className="text-[10px] text-gray-500 font-normal">({(displayTotal * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</span>
                                         </div>
                                     </div>
                                 </div>
                                 {specOpen && (
-                                    <div className="overflow-x-auto mt-4 bg-white rounded-lg border border-gray-100">
-                                        <table className="w-full text-[10px] text-left">
-                                            <thead className="bg-gray-50 text-gray-400 font-bold border-b border-gray-100">
+                                    <div className="overflow-x-auto mt-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                                        <table className="w-full text-[11px] text-left">
+                                            <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
                                                 <tr>
-                                                    <th className="p-2 text-center w-8">No</th>
-                                                    <th className="p-2">지번</th>
+                                                    <th className="py-2 px-2 text-center w-8">No</th>
+                                                    <th className="py-2 px-2">지번</th>
                                                     <th className="p-2 text-right">지목</th>
                                                     <th className="p-2 text-right">면적(m²)</th>
                                                 </tr>
@@ -456,10 +456,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
                                                     return (
                                                         <tr key={idx}>
-                                                            <td className="p-2 text-center text-gray-400">{idx + 1}</td>
-                                                            <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
-                                                            <td className="p-2 text-right">{dJimok}</td>
-                                                            <td className="p-2 text-right">
+                                                            <td className="py-2 px-2 text-center text-gray-400">{idx + 1}</td>
+                                                            <td className="py-2 px-2 font-medium">{extractDongRiBunji(p.addr)}</td>
+                                                            <td className="py-2 px-2 text-right">{dJimok}</td>
+                                                            <td className="py-2 px-2 text-right">
                                                                 <div className="font-bold">{displayArea}</div>
                                                                 {displayArea !== '-' && <div className="text-[9px] text-gray-400">({(Number(dArea) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</div>}
                                                             </td>

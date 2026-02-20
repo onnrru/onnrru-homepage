@@ -239,7 +239,7 @@ const AddressSearch = ({ onSelect }) => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={handleKeyDown}
                     onFocus={() => { if (results.length > 0) setIsOpen(true); }}
-                    placeholder="주소를 입력하세요 (예: 문정동 18)"
+                    placeholder="주소를 입력하세요"
                     className="w-full pl-12 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-ink focus:border-transparent transition-all shadow-inner text-sm"
                 />
 

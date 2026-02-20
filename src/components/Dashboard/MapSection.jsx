@@ -112,7 +112,11 @@ const MapSection = ({
     onAddressSelect,
     selectedParcels = [],
     onParcelsChange,
-    analyzedApartments = []
+    analyzedApartments = [],
+    isAnalysisOpen,
+    setIsAnalysisOpen,
+    isSidebarOpen,
+    setIsSidebarOpen
 }) => {
     const [mapObj, setMapObj] = useState(null);
 
@@ -478,6 +482,7 @@ const MapSection = ({
 
                 const map = new OL.Map({
                     target: 'vworld_map_target',
+                    controls: OL.control.defaults.defaults({ zoom: false, attribution: false }),
                     layers: [
                         baseLayer, grayLayer, midnightLayer, satelliteLayer,
                         hybridLayer, cadastralLayer, ...wmsLayers,
@@ -1050,6 +1055,16 @@ const MapSection = ({
 
                 {/* Main Row: Map Utilities (Zoom, Measure, Select, Clear) and Submenu Toggles */}
                 <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10 w-max relative z-20">
+                    {/* Toolbar Toggle Buttons */}
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isSidebarOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="사이드바 정보창 토글">
+                        {isSidebarOpen ? '정보 숨기기' : '대상지 정보'}
+                    </button>
+                    <button onClick={() => setIsAnalysisOpen(!isAnalysisOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isAnalysisOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="하단 실거래가 분석 패널 토글">
+                        {isAnalysisOpen ? '분석 숨기기' : '실거래가 분석'}
+                    </button>
+
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+
                     <button onClick={() => handleZoom(1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="확대">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                     </button>
