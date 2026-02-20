@@ -34,12 +34,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     };
 
     const unwrapNed = (data) => {
-        const r = data?.response?.result ?? data?.result ?? data;
-        if (Array.isArray(r)) return r[0] ?? null;
-        if (Array.isArray(r?.items)) return r.items[0] ?? null;
-        if (Array.isArray(r?.item)) return r.item[0] ?? null;
-        if (Array.isArray(r?.features)) return r.features[0]?.properties ?? r.features[0] ?? null;
-        if (r && typeof r === 'object' && !r.response) return r;
+        if (!data) return null;
+
+        // Try various common VWorld response paths
+        const paths = [
+            data?.response?.body?.items?.item?.[0],
+            data?.response?.body?.items?.[0],
+            data?.response?.result?.items?.[0],
+            data?.response?.result?.item?.[0],
+            data?.body?.items?.[0],
+            data?.result?.items?.[0],
+            data?.items?.[0],
+            data?.item?.[0],
+            data?.features?.[0]?.properties,
+            data?.features?.[0],
+            data?.response?.result,
+            data?.result,
+            data
+        ];
+
+        for (const p of paths) {
+            if (p && typeof p === 'object' && !Array.isArray(p)) {
+                // Check if this object contains any expected data keys
+                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
+                    return p;
+                }
+            }
+        }
         return null;
     };
 
@@ -179,7 +200,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const baseParams = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
             `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bbox4326)}` +
             `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
-            `&EXCEPTIONS=text/xml&KEY=${encodeURIComponent(key)}&DOMAIN=${encodeURIComponent(domain)}`;
+            `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
         // ✅ 4개 레이어(용도지역) 1장
         const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
@@ -187,6 +208,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         // ✅ 지적도 1장
         const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
+
+        console.log('Minimap Zoning URL:', zoningUrl);
+        console.log('Minimap Cadastral URL:', cadastralUrl);
 
         setMiniMapUrl({ zoningUrl, cadastralUrl });
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
@@ -255,23 +279,21 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
 
-            {/* 0. Mini Map (Square) */}
+            {/* 0. Mini Map (Square Overlays) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
-                        {/* zoning overlay */}
+                        {/* Zoning Layer */}
                         <img
                             src={miniMapUrl.zoningUrl}
                             alt="용도지역"
                             className="absolute inset-0 w-full h-full object-cover"
-                            onError={() => setMiniMapUrl(null)}
                         />
-                        {/* cadastral overlay */}
+                        {/* Cadastral Layer */}
                         <img
                             src={miniMapUrl.cadastralUrl}
                             alt="지적도"
                             className="absolute inset-0 w-full h-full object-cover"
-                            onError={() => setMiniMapUrl(null)}
                         />
 
                         {/* Target Marker (Center) */}
