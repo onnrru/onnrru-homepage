@@ -55,7 +55,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // Helper: VWorld Land Characteristics WFS
+    // Helper: VWorld Land Characteristics (JSON - Primary)
+    const fetchLandCharacteristics = async (pnu) => {
+        const key = API_CONFIG.VWORLD_KEY;
+        const domain = window.location.hostname;
+        const url = `/api/vworld/ned/data/getLandCharacteristics`;
+
+        const res = await axios.get(url, {
+            params: { key, domain, pnu, format: 'json' },
+            responseType: 'json'
+        });
+
+        const d = res.data?.response?.result || res.data?.result || res.data;
+        if (!d) throw new Error('Data not found in NED JSON response');
+
+        return {
+            pnu: d?.pnu || pnu,
+            indcgr_code_nm: d?.indcgr_code_nm || d?.indcgrCodeNm || null,
+            ldplc_ar: d?.ldplc_ar || d?.ldplcAr || null,
+            pblntf_pclnd: d?.pblntf_pclnd || d?.pblntfPclnd || null,
+            prpos_area_1_nm: d?.prpos_area_1_nm || d?.prposArea1Nm || null,
+            prpos_area_2_nm: d?.prpos_area_2_nm || d?.prposArea2Nm || null,
+            lad_use_sittn_nm: d?.lad_use_sittn_nm || d?.ladUseSittnNm || null,
+            road_side_code_nm: d?.road_side_code_nm || d?.roadSideCodeNm || null
+        };
+    };
+
+    // Helper: VWorld Land Characteristics WFS (XML - Backup)
     const fetchLandCharacteristicsWFS = async (pnu) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = window.location.hostname;
@@ -80,7 +106,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         console.log('WFS raw head:', text.slice(0, 200));
 
         if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
-            throw new Error('VWorld가 XML이 아닌 HTML을 반환했습니다. (key/domain/proxy 설정 확인)');
+            throw new Error('VWorld WFS returned HTML instead of XML');
         }
 
         const xml = new DOMParser().parseFromString(text, 'text/xml');
@@ -124,8 +150,14 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             setError(null);
 
             try {
-                // 1. VWorld NED Characteristics WFS
-                const c = await fetchLandCharacteristicsWFS(대표Pnu);
+                // Try JSON first, fallback to WFS
+                let c;
+                try {
+                    c = await fetchLandCharacteristics(대표Pnu);
+                } catch (jsonErr) {
+                    console.warn("NED JSON failed, trying WFS fallback:", jsonErr);
+                    c = await fetchLandCharacteristicsWFS(대표Pnu);
+                }
 
                 const area = c.ldplc_ar ? Number(c.ldplc_ar) : (picked.representative?.area || null);
                 const jimok = c.indcgr_code_nm || (picked.representative?.jimok || '-');
