@@ -133,6 +133,11 @@ const MapSection = ({
     const measureModeRef = useRef(null);
     useEffect(() => { measureModeRef.current = measureMode; }, [measureMode]);
 
+    // Parcel Select Mode (지번추가)
+    const [parcelPickMode, setParcelPickMode] = useState(false);
+    const parcelPickModeRef = useRef(false);
+    useEffect(() => { parcelPickModeRef.current = parcelPickMode; }, [parcelPickMode]);
+
     const measureTooltipElement = useRef(null);
     const measureTooltip = useRef(null);
     const helpTooltipElement = useRef(null);
@@ -423,9 +428,10 @@ const MapSection = ({
                     if (i instanceof OL.interaction.DoubleClickZoom) map.removeInteraction(i);
                 });
 
-                // dblclick: 단일 선택 + 줌 + 포커스
+                // dblclick: 단일 선택 + 줌 + 포커스 (지번추가 모드일 땐 무시)
                 map.on('dblclick', async (evt) => {
                     if (measureModeRef.current) return;
+                    if (parcelPickModeRef.current) return; // ✅ 지번추가 모드일 땐 더블클릭 무시
                     evt.preventDefault?.();
 
                     const [lon, lat] = OL.proj.transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
@@ -462,12 +468,11 @@ const MapSection = ({
                     }
                 });
 
-                // singleclick: Shift 누적 / 일반 단일
+                // singleclick: 지번추가 모드일 때만 누적/토글, 아니면 단일
                 map.on('singleclick', async (evt) => {
                     if (measureModeRef.current) return;
 
                     const [lon, lat] = OL.proj.transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
-                    const isShift = !!evt.originalEvent?.shiftKey;
 
                     try {
                         const fd = await fetchParcelByLonLat(lon, lat, apiKey);
@@ -476,8 +481,9 @@ const MapSection = ({
                         const pnu = getPnu(fd);
                         if (!pnu) return;
 
-                        // 좌측 상세(단일 포커스)는 항상 갱신
                         const props = fd.properties || {};
+
+                        // ✅ 좌측 주소/기본정보 갱신은 "항상" 수행 (요구 유지)
                         onAddressSelect?.({
                             address: props.addr || '',
                             roadAddr: props.road || props.addr || '',
@@ -491,18 +497,24 @@ const MapSection = ({
                             zone: props.unm
                         });
 
-                        // 선택 로직
                         const current = Array.isArray(selectedParcels) ? selectedParcels : [];
 
-                        let next;
-                        if (!isShift) {
-                            next = [fd];
-                        } else {
+                        // ✅ 지번추가 모드일 때: 토글(추가/해제)
+                        if (parcelPickModeRef.current) {
                             const exists = current.some((x) => getPnu(x) === pnu);
-                            next = exists ? current.filter((x) => getPnu(x) !== pnu) : [...current, fd];
+                            const next = exists
+                                ? current.filter((x) => getPnu(x) !== pnu)
+                                : [...current, fd];
+
+                            commitSelectedParcels(next);
+                            // (선택) 멀티 선택 중에는 단일 포커스 마커는 굳이 안 바꿔도 됨
+                            // renderSingleFocus(fd); 
+                            return;
                         }
 
-                        commitSelectedParcels(next);
+                        // ✅ 지번추가 모드 OFF일 때: 단일 선택
+                        commitSelectedParcels([fd]);
+                        renderSingleFocus(fd);
                     } catch (e) {
                         console.error('singleclick error:', e);
                     }
@@ -801,10 +813,14 @@ const MapSection = ({
         };
     }, [mapObj, measureMode]);
 
-    const clearMeasurements = () => {
+    const clearAll = () => {
         measureSource.current?.clear?.();
         document.querySelectorAll('.ol-tooltip-static')?.forEach((el) => el.remove());
         setMeasureMode(null);
+        renderSingleFocus(null);
+        markerSourceRef.current?.clear?.();
+        commitSelectedParcels([]);
+        setParcelPickMode(false);
     };
 
     // Categories for Filter
@@ -838,7 +854,7 @@ const MapSection = ({
             {/* Measurement Tools (Left Vertical) */}
             <div className="absolute top-[80px] left-4 z-20 flex flex-col gap-2 p-1 pointer-events-auto">
                 <button
-                    onClick={() => setMeasureMode(measureMode === 'distance' ? null : 'distance')}
+                    onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }}
                     className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
             ${measureMode === 'distance'
                             ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
@@ -849,7 +865,7 @@ const MapSection = ({
                 </button>
 
                 <button
-                    onClick={() => setMeasureMode(measureMode === 'area' ? null : 'area')}
+                    onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }}
                     className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
             ${measureMode === 'area'
                             ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105'
@@ -860,7 +876,19 @@ const MapSection = ({
                 </button>
 
                 <button
-                    onClick={clearMeasurements}
+                    onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }}
+                    className={`flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border transition-all duration-200
+    ${parcelPickMode
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg scale-105'
+                            : 'bg-white border-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+                    title="지번 선택(추가/해제)"
+                >
+                    <span className="text-[9px] font-bold leading-none">지번</span>
+                    <span className="text-[9px] font-bold leading-none">추가</span>
+                </button>
+
+                <button
+                    onClick={clearAll}
                     className="flex flex-col items-center justify-center w-11 h-11 rounded-lg shadow-md border border-white bg-white text-gray-500 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all duration-200"
                     title="초기화"
                 >
