@@ -111,7 +111,8 @@ const MapSection = ({
     selectedAddress,
     onAddressSelect,
     selectedParcels = [],
-    onParcelsChange
+    onParcelsChange,
+    analyzedApartments = []
 }) => {
     const [mapObj, setMapObj] = useState(null);
 
@@ -163,6 +164,7 @@ const MapSection = ({
 
     const markerSourceRef = useRef(null);     // 단일 포커스(검색/더블클릭 등)
     const selectionSourceRef = useRef(null);  // 멀티 선택(Shift 누적)
+    const aptMarkerSourceRef = useRef(null);  // 아파트 분석 마커
 
     const getPnu = (fd) => fd?.properties?.pnu;
 
@@ -398,6 +400,15 @@ const MapSection = ({
                 selectionSourceRef.current = selectionSrc;
                 const selectionLayer = new OL.layer.Vector({ source: selectionSrc, zIndex: 21 });
 
+                // Apartment markers (analytics)
+                const aptMarkerSrc = new OL.source.Vector();
+                aptMarkerSourceRef.current = aptMarkerSrc;
+                const aptMarkerLayer = new OL.layer.Vector({
+                    source: aptMarkerSrc,
+                    zIndex: 30,
+                    declutter: false
+                });
+
                 // Measure layer
                 const measureSrc = new OL.source.Vector();
                 measureSource.current = measureSrc;
@@ -419,7 +430,7 @@ const MapSection = ({
                     layers: [
                         baseLayer, grayLayer, midnightLayer, satelliteLayer,
                         hybridLayer, cadastralLayer, ...wmsLayers,
-                        markerLayer, selectionLayer, measureLayer
+                        markerLayer, selectionLayer, aptMarkerLayer, measureLayer
                     ],
                     view: new OL.View({
                         center: [14151740, 4511257],
@@ -545,6 +556,92 @@ const MapSection = ({
         initMap();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // ====== Apartment Analytical Markers Rendering ======
+    useEffect(() => {
+        if (!mapObj || !aptMarkerSourceRef.current) return;
+        const src = aptMarkerSourceRef.current;
+        const OL = window.ol;
+
+        src.clear(); // remove previous analytics markers
+
+        if (!analyzedApartments || analyzedApartments.length === 0) return;
+
+        const currentYear = new Date().getFullYear();
+        const apiKey = API_CONFIG.VWORLD_KEY;
+        const proxyBase = '/api/vworld';
+
+        analyzedApartments.forEach(async (apt) => {
+            if (!apt.jibun || !apt.dongName) return;
+
+            // Format address for Geocoding: Jibun includes Sido/Sigungu typically?
+            // "dongName jibun" works well for VWorld Search API
+            const searchStr = `${apt.dongName} ${apt.jibun}`.trim();
+
+            try {
+                // Determine building age
+                let ageStr = '- 년차';
+                if (apt.buildYear && apt.buildYear.length === 4) {
+                    const bYear = parseInt(apt.buildYear, 10);
+                    if (!isNaN(bYear)) {
+                        ageStr = `${currentYear - bYear + 1}년차`;
+                    }
+                }
+
+                const url = `${proxyBase}/req/search?service=search&request=search&version=2.0` +
+                    `&crs=EPSG:4326&size=1&page=1&query=${encodeURIComponent(searchStr)}` +
+                    `&type=ADDRESS&category=parcel&format=json&errorformat=json` +
+                    `&key=${apiKey}&domain=${window.location.hostname}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data?.response?.status === 'OK' && data.response.result?.items?.length > 0) {
+                    const item = data.response.result.items[0];
+                    const [lon, lat] = [parseFloat(item.point.x), parseFloat(item.point.y)];
+
+                    const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
+                    const feature = new OL.Feature({
+                        geometry: new OL.geom.Point(center3857)
+                    });
+
+                    // Format Overlay Text
+                    const priceInEok = (apt.avg / 10000).toFixed(2);
+                    const areaDisp = apt.avgArea.toFixed(1);
+                    const labelText = `[ ${apt.name} ]\n${ageStr}\n평균 ${areaDisp}㎡\n${priceInEok}억원 / ${apt.count}건`;
+
+                    feature.setStyle(
+                        new OL.style.Style({
+                            image: new OL.style.Circle({
+                                radius: 25,
+                                fill: new OL.style.Fill({
+                                    color: 'rgba(255, 69, 58, 0.4)' // iOS Red with transparency
+                                }),
+                                stroke: new OL.style.Stroke({
+                                    color: 'rgba(255, 69, 58, 0.9)',
+                                    width: 2
+                                })
+                            }),
+                            text: new OL.style.Text({
+                                text: labelText,
+                                font: 'bold 12px "Pretendard", "Apple SD Gothic Neo", sans-serif',
+                                fill: new OL.style.Fill({ color: '#ffffff' }),
+                                stroke: new OL.style.Stroke({ color: '#000000', width: 3 }),
+                                offsetY: 0, // Center in circle
+                                textAlign: 'center',
+                                textBaseline: 'middle',
+                                padding: [5, 5, 5, 5]
+                            })
+                        })
+                    );
+
+                    src.addFeature(feature);
+                }
+            } catch (e) {
+                console.error('Map marker geocoding failed for:', searchStr, e);
+            }
+        });
+    }, [analyzedApartments, mapObj]);
 
     // ====== Cadastral stabilization ======
     useEffect(() => {

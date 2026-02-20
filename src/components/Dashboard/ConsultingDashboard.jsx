@@ -9,6 +9,7 @@ const ConsultingDashboard = () => {
     const [selectedAddress, setSelectedAddress] = useState(null);
     const [selectedParcels, setSelectedParcels] = useState([]);
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+    const [analyzedApartments, setAnalyzedApartments] = useState([]);
 
     return (
         <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
@@ -30,6 +31,7 @@ const ConsultingDashboard = () => {
                             onAddressSelect={setSelectedAddress}
                             selectedParcels={selectedParcels}
                             onParcelsChange={setSelectedParcels}
+                            analyzedApartments={analyzedApartments}
                         />
                     </div>
 
@@ -58,7 +60,10 @@ const ConsultingDashboard = () => {
                         transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
                         className="absolute bottom-0 left-0 right-0 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] rounded-t-2xl overflow-hidden will-change-transform"
                     >
-                        <BottomPanel selectedAddress={selectedAddress} />
+                        <BottomPanel
+                            selectedAddress={selectedAddress}
+                            onAnalyzedDataChange={setAnalyzedApartments}
+                        />
                     </motion.div>
                 </div>
             </div>

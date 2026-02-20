@@ -66,7 +66,7 @@ const CustomBarLabel = (props) => {
     );
 };
 
-const BottomPanel = ({ selectedAddress }) => {
+const BottomPanel = ({ selectedAddress, onAnalyzedDataChange }) => {
     const [loading, setLoading] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(AREA_CATEGORIES[0]);
     const [selectedApartment, setSelectedApartment] = useState(null);
@@ -203,7 +203,16 @@ const BottomPanel = ({ selectedAddress }) => {
 
             // Apartment level
             const aptName = tx.apartmentName;
-            if (!aptStats[aptName]) aptStats[aptName] = { total: 0, count: 0, totalArea: 0 };
+            if (!aptStats[aptName]) {
+                aptStats[aptName] = {
+                    total: 0,
+                    count: 0,
+                    totalArea: 0,
+                    jibun: tx.jibun,
+                    buildYear: tx.buildYear,
+                    dongName: tx.dongName
+                };
+            }
             aptStats[aptName].total += tx.price;
             aptStats[aptName].count += 1;
             aptStats[aptName].totalArea += tx.area;
@@ -219,6 +228,9 @@ const BottomPanel = ({ selectedAddress }) => {
             avg: Math.round(aptStats[aptName].total / aptStats[aptName].count),
             count: aptStats[aptName].count,
             avgArea: aptStats[aptName].totalArea / aptStats[aptName].count,
+            jibun: aptStats[aptName].jibun,
+            buildYear: aptStats[aptName].buildYear,
+            dongName: aptStats[aptName].dongName,
             type: 'apartment'
         }));
 
@@ -234,6 +246,15 @@ const BottomPanel = ({ selectedAddress }) => {
 
         return data;
     }, [rawTxData, targetUnitName, selectedCategory, selectedPeriod, regionLabels]);
+
+    // Expose data to parent for Map Rendering
+    useEffect(() => {
+        if (onAnalyzedDataChange) {
+            // Forward only the apartment items (exclude the average row)
+            const apartmentsOnly = barChartData.filter(d => d.type === 'apartment');
+            onAnalyzedDataChange(apartmentsOnly);
+        }
+    }, [barChartData, onAnalyzedDataChange]);
 
     // Format data for Line Chart (Trend)
     const lineChartData = useMemo(() => {
