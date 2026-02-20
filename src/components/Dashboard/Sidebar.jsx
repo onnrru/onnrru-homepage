@@ -14,7 +14,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Metadata cache for all selected parcels
     const [parcelMeta, setParcelMeta] = useState({}); // { [pnu]: { area, jimok } }
 
     const toggleSpec = () => {
@@ -64,11 +63,22 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         ];
         for (const candidate of candidates) {
             if (!candidate) continue;
+
+            // Critical: Only return if it contains actual land data fields
             if (Array.isArray(candidate)) {
-                if (candidate.length > 0) return candidate[0];
+                if (candidate.length > 0 && typeof candidate[0] === 'object') {
+                    const item = candidate[0];
+                    if (item && (item.pnu || item.ladAr || item.lad_ar || item.ldplc_ar || item.indcgr_code_nm || item.jimok || item.parea)) {
+                        return item;
+                    }
+                }
                 continue;
             }
-            if (typeof candidate === 'object') return candidate;
+            if (typeof candidate === 'object') {
+                if (candidate.pnu || candidate.ladAr || candidate.lad_ar || candidate.ldplc_ar || candidate.indcgr_code_nm || candidate.jimok || candidate.parea) {
+                    return candidate;
+                }
+            }
         }
         return null;
     };
@@ -92,7 +102,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const res = await axios.get(url, { params: { key, domain, pnu, format: 'json' } });
         const payload = safeJson(res.data) ?? res.data;
         const d = unwrapNed(payload);
-        if (!d) throw new Error('Area Data not found');
+        if (!d) throw new Error('Area data not found');
 
         return {
             ladAr: Number(first(d.ladAr, d.lad_ar, d.ldplc_ar, d.area, 0)),
@@ -105,7 +115,9 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/data/getLandCharacteristics`;
         const res = await axios.get(url, { params: { key, domain: getVworldDomain(), pnu, format: 'json' } });
-        return unwrapNed(safeJson(res.data) ?? res.data);
+        const d = unwrapNed(safeJson(res.data) ?? res.data);
+        if (!d) throw new Error('Characteristics not found');
+        return d;
     };
 
     const fetchLandCharacteristicsWFS = async (pnuRaw) => {
@@ -126,23 +138,26 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             for (let i = 0; i < els.length; i++) if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
             return null;
         };
+        const pnuFetched = pick('pnu');
+        if (!pnuFetched && !pick('indcgr_code_nm')) throw new Error('WFS Empty');
         return {
             prpos_area_1_nm: pick('prpos_area_1_nm'),
             prpos_area_2_nm: pick('prpos_area_2_nm'),
             lad_use_sittn_nm: pick('lad_use_sittn_nm'),
             road_side_code_nm: pick('road_side_code_nm'),
-            pblntf_pclnd: pick('pblntf_pclnd')
+            pblntf_pclnd: pick('pblntf_pclnd'),
+            indcgr_code_nm: pick('indcgr_code_nm')
         };
     };
 
-    // --- Memoized List ---
+    // --- Memoized Logic ---
     const picked = React.useMemo(() => {
         const listData = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => ({
                 pnu: normalizePnu(p?.properties?.pnu),
                 addr: p?.properties?.addr || p?.properties?.address || '',
-                jimok: '-', // Will be updated by parcelMeta
-                area: 0     // Will be updated by parcelMeta
+                jimok: '-',
+                area: 0
             }))
             : (selectedAddress?.pnu ? [{
                 pnu: normalizePnu(selectedAddress.pnu),
@@ -165,17 +180,22 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         const delta = 0.00035;
         const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
-        const params = new URLSearchParams({
-            service: 'image', request: 'getmap',
-            key: API_CONFIG.VWORLD_KEY, domain: getVworldDomain(),
-            crs: 'EPSG:4326', format: 'png', width: 420, height: 420,
-            bbox, transparent: 'false', bgcolor: '0xFFFFFF',
-            layers: 'LP_PA_CBND_BUBUN'
-        });
-        setMiniMapUrl(`/api/vworld/req/image?${params.toString()}`);
+        const key = API_CONFIG.VWORLD_KEY;
+        const domain = getVworldDomain();
+        const size = 420;
+        const layers = 'LP_PA_CBND_BUBUN';
+
+        const url = `/api/vworld/req/image?service=image&request=getmap` +
+            `&key=${encodeURIComponent(key)}` +
+            `&domain=${encodeURIComponent(domain)}` +
+            `&crs=EPSG:4326&bbox=${encodeURIComponent(bbox)}` +
+            `&width=${size}&height=${size}` +
+            `&format=png&transparent=false&bgcolor=0xFFFFFF` +
+            `&layers=${encodeURIComponent(layers)}`;
+        setMiniMapUrl(url);
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
-    // 2. Main Data Loading (2-Step)
+    // 2. Main Data Loading
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -183,10 +203,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                // (A) Area/Jimok - Definitive
+                // (A) Area/Jimok
                 const areaPack = await fetchAreaOfLandCategory(repPnu);
 
-                // (B) Other Characteristics
+                // (B) Characteristics
                 let d;
                 try { d = await fetchLandCharacteristics(repPnu); }
                 catch { d = await fetchLandCharacteristicsWFS(repPnu); }
@@ -204,30 +224,29 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     }
                 });
 
-                const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
-                setLandUseWmsUrl(url);
+                const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
+                setLandUseWmsUrl(wmsUrl);
                 setShowLandUseWms(true);
             } catch (err) {
-                console.error("Sidebar Loading:", err);
+                console.error("Sidebar Error:", err);
                 setError('정보 조회 실패');
             } finally { setLoading(false); }
         };
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // 3. Parcel Meta (Batch update for List)
+    // 3. Parcel Meta (List)
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
 
-        let alive = true;
+        let active = true;
         (async () => {
             try {
                 const pairs = await Promise.all(
                     list.map(async (p) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
-                        // Reuse main data if it's the rep parcel
                         if (normalizePnu(picked.representative?.pnu) === pnu && data.basic?.area) {
                             return [pnu, { area: data.basic.area, jimok: data.basic.jimok }];
                         }
@@ -237,21 +256,22 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         } catch { return [pnu, { area: 0, jimok: '-' }]; }
                     })
                 );
-                if (!alive) return;
+                if (!active) return;
                 const next = {};
                 for (const [pnu, v] of pairs) if (pnu && v) next[pnu] = v;
                 setParcelMeta(next);
-            } catch (e) { console.warn('parcelMeta error:', e); }
+            } catch (e) {
+                console.warn('Meta fill fail:', e);
+            }
         })();
-        return () => { alive = false; };
+        return () => { active = false; };
     }, [picked.list.map(x => x.pnu).join('|'), data.basic?.area, data.basic?.jimok]);
 
-    // Derived Summary
-    const totalAreaCalculated = Object.values(parcelMeta).reduce((sum, v) => sum + (v.area || 0), 0);
-    const displayTotalArea = totalAreaCalculated > 0 ? totalAreaCalculated : (data.basic?.area || 0);
+    const totalAr = Object.values(parcelMeta).reduce((sum, v) => sum + (v.area || 0), 0);
+    const displayTotal = totalAr > 0 ? totalAr : (data.basic?.area || 0);
 
-    const addrHeader = selectedAddress?.roadAddr || picked.representative?.addr || '-';
-    const extraP = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
+    const hdrAddr = selectedAddress?.roadAddr || picked.representative?.addr || '-';
+    const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
 
     return (
         <div className="bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 w-[350px]">
@@ -269,7 +289,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             <div className="p-6 pt-2 border-b border-gray-100 flex-shrink-0 bg-white">
                 <h2 className="text-xs font-bold text-ink uppercase tracking-wider mb-2">대상지 정보</h2>
                 <div className="text-xl font-bold text-gray-900 font-serif break-keep leading-tight">
-                    {picked.representative ? `${addrHeader}${extraP}` : '주소를 선택하세요'}
+                    {picked.representative ? `${hdrAddr}${hdrExtra}` : '주소를 선택하세요'}
                 </div>
             </div>
 
@@ -301,38 +321,36 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                 <span className="w-1.5 h-4 bg-ink rounded-full"></span>
                                 토지 기본특성
                             </h4>
-                            {charOpen && (
-                                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                                    <table className="w-full text-sm">
-                                        <tbody className="divide-y divide-gray-100">
-                                            <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500 w-1/3">지목</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                    {data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
-                                                <td className="py-3.5 px-4 text-gray-800 font-bold">
-                                                    {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">이용상황</th>
-                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.ladUse || '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">도로접면</th>
-                                                <td className="py-3.5 px-4 text-gray-800">{data.basic?.roadSide || '-'}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                                <table className="w-full text-sm">
+                                    <tbody className="divide-y divide-gray-100">
+                                        <tr>
+                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500 w-1/3">지목</th>
+                                            <td className="py-3.5 px-4 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">면적</th>
+                                            <td className="py-3.5 px-4 text-gray-800 font-bold">
+                                                {data.basic?.area ? `${Number(data.basic.area).toLocaleString()} m²` : '-'}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">공시지가</th>
+                                            <td className="py-3.5 px-4 text-gray-800 font-bold">
+                                                {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">이용상황</th>
+                                            <td className="py-3.5 px-4 text-gray-800">{data.basic?.ladUse || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <th className="bg-gray-50/50 py-3.5 px-4 text-left font-medium text-gray-500">도로접면</th>
+                                            <td className="py-3.5 px-4 text-gray-800">{data.basic?.roadSide || '-'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </section>
 
                         {picked.list.length > 0 && (
@@ -353,7 +371,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                                         <div className="text-[10px] text-gray-400 font-bold mb-1">합계 면적</div>
-                                        <div className="text-lg font-bold text-blue-700">{displayTotalArea.toLocaleString()} m²</div>
+                                        <div className="text-lg font-bold text-blue-700">{displayTotal.toLocaleString()} m²</div>
                                     </div>
                                 </div>
                                 {specOpen && (
@@ -370,14 +388,14 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                             <tbody className="divide-y divide-gray-50">
                                                 {picked.list.map((p, idx) => {
                                                     const meta = parcelMeta[normalizePnu(p.pnu)] || {};
-                                                    const dispJimok = first(meta.jimok, p.jimok, '-');
-                                                    const dispArea = first(meta.area, p.area, null);
+                                                    const dJimok = first(meta.jimok, p.jimok, '-');
+                                                    const dArea = first(meta.area, p.area, null);
                                                     return (
                                                         <tr key={idx}>
                                                             <td className="p-2 text-center text-gray-400">{idx + 1}</td>
                                                             <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
-                                                            <td className="p-2 text-right">{dispJimok}</td>
-                                                            <td className="p-2 text-right font-bold">{dispArea != null ? Number(dispArea).toLocaleString() : '-'}</td>
+                                                            <td className="p-2 text-right">{dJimok}</td>
+                                                            <td className="p-2 text-right font-bold">{dArea != null ? Number(dArea).toLocaleString() : '-'}</td>
                                                         </tr>
                                                     );
                                                 })}
