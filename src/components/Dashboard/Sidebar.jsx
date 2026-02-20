@@ -65,6 +65,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             if (!candidate) continue;
 
             // Critical: Only return if it contains actual land data fields
+            // Checking logic restored as requested in v4.1
             if (Array.isArray(candidate)) {
                 if (candidate.length > 0 && typeof candidate[0] === 'object') {
                     const item = candidate[0];
@@ -91,23 +92,33 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
-    // --- Definitive APIs ---
+    // --- Definitive APIs (with fallback support) ---
 
+    // Note: If this fails, we return null so the main loop can fallback
     const fetchAreaOfLandCategory = async (pnuRaw) => {
-        const key = API_CONFIG.VWORLD_KEY;
-        const pnu = normalizePnu(pnuRaw);
-        const domain = getVworldDomain();
-        const url = `/api/vworld/ned/data/getAreaOfLandCategory`;
+        try {
+            const key = API_CONFIG.VWORLD_KEY;
+            const pnu = normalizePnu(pnuRaw);
+            const domain = getVworldDomain();
+            const url = `/api/vworld/ned/data/getAreaOfLandCategory`;
 
-        const res = await axios.get(url, { params: { key, domain, pnu, format: 'json' } });
-        const payload = safeJson(res.data) ?? res.data;
-        const d = unwrapNed(payload);
-        if (!d) throw new Error('Area data not found');
+            // Timeout to prevent hanging if proxy is bad
+            const res = await axios.get(url, { params: { key, domain, pnu, format: 'json' }, timeout: 3000 });
+            const payload = safeJson(res.data) ?? res.data;
+            const d = unwrapNed(payload);
 
-        return {
-            ladAr: Number(first(d.ladAr, d.lad_ar, d.ldplc_ar, d.area, 0)),
-            indcgrCodeNm: first(d.indcgrCodeNm, d.indcgr_code_nm, d.lndcgrCodeNm, d.jimok, '-')
-        };
+            // If the specific API returns data, use it. If not, return null.
+            if (!d) return null;
+
+            const ar = Number(first(d.ladAr, d.lad_ar, d.ldplc_ar, d.area, 0));
+            const ji = first(d.indcgrCodeNm, d.indcgr_code_nm, d.lndcgrCodeNm, d.jimok, '-');
+
+            if (ar === 0 && ji === '-') return null; // Treat empty as fail
+            return { ladAr: ar, indcgrCodeNm: ji };
+        } catch (e) {
+            console.warn("fetchAreaOfLandCategory failed, using standard fallback", e);
+            return null;
+        }
     };
 
     const fetchLandCharacteristics = async (pnuRaw) => {
@@ -146,7 +157,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             lad_use_sittn_nm: pick('lad_use_sittn_nm'),
             road_side_code_nm: pick('road_side_code_nm'),
             pblntf_pclnd: pick('pblntf_pclnd'),
-            indcgr_code_nm: pick('indcgr_code_nm')
+            indcgr_code_nm: pick('indcgr_code_nm'),
+            ldplc_ar: pick('ldplc_ar')
         };
     };
 
@@ -185,6 +197,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const size = 420;
         const layers = 'LP_PA_CBND_BUBUN';
 
+        // NOTE: Manual construction to ensure correct encoding of VWorld params
         const url = `/api/vworld/req/image?service=image&request=getmap` +
             `&key=${encodeURIComponent(key)}` +
             `&domain=${encodeURIComponent(domain)}` +
@@ -203,18 +216,27 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
             try {
-                // (A) Area/Jimok
-                const areaPack = await fetchAreaOfLandCategory(repPnu);
-
-                // (B) Characteristics
+                // (A) Characteristics First (most reliable standard API)
                 let d;
                 try { d = await fetchLandCharacteristics(repPnu); }
                 catch { d = await fetchLandCharacteristicsWFS(repPnu); }
 
+                // (B) Try Area/Jimok Definitive (Optional Enforcer)
+                const areaPack = await fetchAreaOfLandCategory(repPnu);
+
+                // Merge Data: Prefer AreaPack if available, otherwise use Standard Characteristics
+                const finalJimok = areaPack?.indcgrCodeNm
+                    ? areaPack.indcgrCodeNm
+                    : first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgrCodeNm, d.jimok, '-');
+
+                const finalArea = areaPack?.ladAr
+                    ? areaPack.ladAr
+                    : Number(first(d.ldplc_ar, d.ldplcAr, d.lad_ar, d.ladAr, d.area, 0));
+
                 setData({
                     basic: {
-                        jimok: areaPack.indcgrCodeNm || '-',
-                        area: areaPack.ladAr,
+                        jimok: finalJimok || '-',
+                        area: finalArea,
                         price: Number(first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, 0)),
                         ladUse: first(d.lad_use_sittn_nm, d.ladUseSittnNm, '-'),
                         roadSide: first(d.road_side_code_nm, d.roadSideCodeNm, '-')
@@ -235,7 +257,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // 3. Parcel Meta (List)
+    // 3. Parcel Meta (List) - with similar resiliency
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -247,22 +269,34 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     list.map(async (p) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
+
+                        // Try Main Data Reuse
                         if (normalizePnu(picked.representative?.pnu) === pnu && data.basic?.area) {
                             return [pnu, { area: data.basic.area, jimok: data.basic.jimok }];
                         }
-                        try {
-                            const a = await fetchAreaOfLandCategory(pnu);
-                            return [pnu, { area: a.ladAr, jimok: a.indcgrCodeNm }];
-                        } catch { return [pnu, { area: 0, jimok: '-' }]; }
+
+                        // Try Cache Fetch
+                        let ar = 0;
+                        let ji = '-';
+                        const aPack = await fetchAreaOfLandCategory(pnu);
+                        if (aPack) {
+                            ar = aPack.ladAr;
+                            ji = aPack.indcgrCodeNm;
+                        } else {
+                            // If definitive fails, try standard (lightweight fallback if possible, or just accept currently no data)
+                            // For list items, we might skip the heavy standard fetch to save requests, 
+                            // OR we assume if definitive failed globally, it fails here too.
+                            // Let's try standard WFS as a lightweight backup for list items if needed? 
+                            // Only if essential. For now, trust aPack or 0 (to avoid N+1 heavy calls).
+                        }
+                        return [pnu, { area: ar, jimok: ji }];
                     })
                 );
                 if (!active) return;
                 const next = {};
                 for (const [pnu, v] of pairs) if (pnu && v) next[pnu] = v;
                 setParcelMeta(next);
-            } catch (e) {
-                console.warn('Meta fill fail:', e);
-            }
+            } catch (e) { console.warn('Meta fill fail:', e); }
         })();
         return () => { active = false; };
     }, [picked.list.map(x => x.pnu).join('|'), data.basic?.area, data.basic?.jimok]);
