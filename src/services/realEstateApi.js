@@ -39,32 +39,48 @@ const parseXmlToJSON = (xmlText) => {
         const item = items[i];
 
         // Helper to get text content safely
-        const getText = (tag) => item.getElementsByTagName(tag)[0]?.textContent?.trim() || '';
+        const getText = (tag) => {
+            const el = item.getElementsByTagName(tag)[0];
+            return el ? el.textContent.trim() : '';
+        };
 
-        // The price comes with commas, remove them and convert to Number
-        const priceStr = getText('dealAmount').replace(/,/g, '');
-        const price = Number(priceStr);
+        try {
+            // The price comes with commas, remove them and convert to Number
+            const priceStr = getText('dealAmount').replace(/,/g, '');
+            const price = Number(priceStr);
 
-        result.push({
-            // Core identifiers
-            apartmentName: getText('aptNm'),
-            dongName: getText('umdNm').trim(), // Often contains leading space in API
-            jibun: getText('jibun'),
+            const aptNm = getText('aptNm');
+            const dongNm = getText('umdNm');
 
-            // Transaction Details
-            dealYear: getText('dealYear'),
-            dealMonth: getText('dealMonth'),
-            dealDay: getText('dealDay'),
-            dealDate: `${getText('dealYear')}-${getText('dealMonth').padStart(2, '0')}-${getText('dealDay').padStart(2, '0')}`,
-            price: price, // in 10,000 KRW
+            if (!aptNm || !dongNm) {
+                console.warn(`Missing aptNm or umdNm in item ${i}`);
+                continue;
+            }
 
-            // Property details
-            area: Number(getText('excluUseAr')),
-            floor: Number(getText('floor')),
-            buildYear: getText('buildYear')
-        });
+            result.push({
+                // Core identifiers
+                apartmentName: aptNm,
+                dongName: dongNm, // e.g. "잠실동"
+                jibun: getText('jibun'),
+
+                // Transaction Details
+                dealYear: getText('dealYear'),
+                dealMonth: getText('dealMonth'),
+                dealDay: getText('dealDay'),
+                dealDate: `${getText('dealYear')}-${getText('dealMonth').padStart(2, '0')}-${getText('dealDay').padStart(2, '0')}`,
+                price: price, // in 10,000 KRW
+
+                // Property details
+                area: Number(getText('excluUseAr')),
+                floor: Number(getText('floor')),
+                buildYear: getText('buildYear')
+            });
+        } catch (e) {
+            console.error("Error parsing item", i, e);
+        }
     }
 
+    console.log(`Parsed ${result.length} valid transactions out of ${items.length} items.`);
     return result;
 };
 

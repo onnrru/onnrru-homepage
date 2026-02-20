@@ -70,8 +70,12 @@ const BottomPanel = ({ selectedAddress }) => {
                 const dongName = addressParts.find(part => part.endsWith('동') || part.endsWith('읍') || part.endsWith('면')) || '';
 
                 if (lawdCd && dongName) {
+                    console.log("Fetching API for:", { lawdCd, dongName });
                     const rawData = await fetchApartmentTransactions(lawdCd, 36); // 3 years
+                    console.log("Raw Data Sample:", rawData.slice(0, 3));
+                    console.log("All Unique Dongs in Raw Data:", [...new Set(rawData.map(d => d.dongName))]);
                     const processed = processTransactionData(rawData, dongName);
+                    console.log("Processed Data:", processed);
                     setAnalysisData(processed);
                     setSelectedApartment(null); // Reset selection on new area
                 } else {
@@ -196,8 +200,8 @@ const BottomPanel = ({ selectedAddress }) => {
                             setSelectedApartment(null);
                         }}
                         className={`px-4 py-1.5 text-xs font-medium rounded-full transition-colors ${selectedCategory === cat
-                                ? 'bg-primary text-white shadow-sm'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                     >
                         {cat}
