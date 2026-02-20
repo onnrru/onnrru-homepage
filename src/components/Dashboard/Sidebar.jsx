@@ -35,18 +35,32 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const unwrapNed = (data) => {
         if (!data) return null;
-        const r = data?.response?.result ?? data?.result ?? data;
-        if (Array.isArray(r)) return r[0] ?? null;
-        if (Array.isArray(r?.items)) return r.items[0] ?? null;
-        if (Array.isArray(r?.item)) return r.item[0] ?? null;
 
-        // Deep body search
-        const deepBody = data?.response?.body?.items?.item;
-        if (Array.isArray(deepBody)) return deepBody[0] ?? null;
-        if (deepBody && typeof deepBody === 'object') return deepBody;
+        // Try various common VWorld response paths
+        const paths = [
+            data?.response?.body?.items?.item?.[0],
+            data?.response?.body?.items?.[0],
+            data?.response?.result?.items?.[0],
+            data?.response?.result?.item?.[0],
+            data?.body?.items?.[0],
+            data?.result?.items?.[0],
+            data?.items?.[0],
+            data?.item?.[0],
+            data?.features?.[0]?.properties,
+            data?.features?.[0],
+            data?.response?.result,
+            data?.result,
+            data
+        ];
 
-        if (Array.isArray(r?.features)) return r.features[0]?.properties ?? r.features[0] ?? null;
-        if (r && typeof r === 'object' && !r.response) return r;
+        for (const p of paths) {
+            if (p && typeof p === 'object' && !Array.isArray(p)) {
+                // Check if this object contains any expected data keys
+                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok) {
+                    return p;
+                }
+            }
+        }
         return null;
     };
 
@@ -61,19 +75,22 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     // --- Memoized Values ---
     const picked = React.useMemo(() => {
         const list = Array.isArray(selectedParcels) && selectedParcels.length > 0
-            ? selectedParcels.map(p => ({
-                pnu: p?.properties?.pnu,
-                addr: p?.properties?.addr || '',
-                jimok: p?.properties?.jimok || '',
-                area: Number(p?.properties?.parea || 0),
-                price: Number(p?.properties?.jiga || 0),
-            }))
+            ? selectedParcels.map(p => {
+                const props = p?.properties || {};
+                return {
+                    pnu: props.pnu,
+                    addr: props.addr || '',
+                    jimok: first(props.jimok, props.indcgr_code_nm, props.lndcgr_code_nm, props.lndcgr_nm, props.jimok_nm, ''),
+                    area: Number(first(props.area, props.parea, props.ldplc_ar, props.lndpcl_ar, 0)),
+                    price: Number(first(props.jiga, props.price, props.pblntf_pclnd, 0)),
+                };
+            })
             : (selectedAddress?.pnu ? [{
                 pnu: selectedAddress.pnu,
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
-                jimok: selectedAddress.jimok || '',
-                area: Number(selectedAddress.area || 0),
-                price: Number(selectedAddress.price || 0)
+                jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, ''),
+                area: Number(first(selectedAddress.area, selectedAddress.parea, 0)),
+                price: Number(first(selectedAddress.price, selectedAddress.jiga, 0))
             }] : []);
 
         if (list.length === 0) return { list: [], representative: null, totalArea: 0 };
@@ -104,25 +121,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         });
 
         const payload = safeJson(res.data) ?? res.data;
-        console.log('NED raw response:', payload);
-
         const d = unwrapNed(payload);
         if (!d) throw new Error('NED JSON record not found');
 
-        console.log('NED discovered fields:', Object.keys(d));
+        console.log('NED full record:', d);
 
         return {
             pnu: first(d.pnu, pnu),
             indcgr_code_nm: first(
                 d.indcgr_code_nm, d.indcgrCodeNm,
                 d.lndcgr_code_nm, d.lndcgrCodeNm,
-                d.jimok_nm, d.jimok, d.JIMOK, d.lndcgr_nm, d.lndcgrNm
+                d.jimok_nm, d.jimok_name, d.jimok, d.JIMOK, d.lndcgr_nm, d.indcgr_nm
             ),
             ldplc_ar: first(
                 d.ldplc_ar, d.ldplcAr,
                 d.lndpcl_ar, d.lndpclAr,
                 d.lndplc_ar, d.lndplcAr,
-                d.ar, d.area, d.PAREA, d.parea
+                d.ar, d.area, d.parea, d.PAREA, d.lndcl_ar
             ),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
@@ -153,10 +168,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         }
 
         const xml = new DOMParser().parseFromString(text, 'text/xml');
-        const ex1 = xml.getElementsByTagName('ServiceException')[0]?.textContent?.trim();
-        const ex2 = xml.getElementsByTagName('ExceptionText')[0]?.textContent?.trim();
-        if (ex1 || ex2) throw new Error(ex1 || ex2);
-
         const pickLocal = (localName) => {
             const els = xml.getElementsByTagName('*');
             for (let i = 0; i < els.length; i++) {
@@ -167,8 +178,8 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
         return {
             pnu: pickLocal('pnu') || pnu,
-            indcgr_code_nm: pickLocal('indcgr_code_nm'),
-            ldplc_ar: pickLocal('ldplc_ar'),
+            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm'), pickLocal('jimok_nm')),
+            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('lndpcl_ar'), pickLocal('ar'), pickLocal('area')),
             pblntf_pclnd: pickLocal('pblntf_pclnd'),
             prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
             prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
@@ -189,25 +200,23 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const size = 400;
         const delta = 0.0015;
 
-        // BBOX for Image API (xmin, ymin, xmax, ymax)
-        const bboxImage = `${x - delta},${y - delta},${x + delta},${y + delta}`;
-        // BBOX for WMS 1.3.0 (ymin, xmin, ymax, xmax)
+        // BBOX order for version 1.3.0 is (ymin, xmin, ymax, xmax)
         const bboxWMS = `${y - delta},${x - delta},${y + delta},${x + delta}`;
-
-        const wmsBase = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
+        const baseParams = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
             `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bboxWMS)}` +
             `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=TRUE` +
             `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
 
-        // 1. Base Map (VWorld Image API - more stable for base)
-        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326&bbox=${encodeURIComponent(bboxImage)}&width=${size}&height=${size}&layers=base&domain=${encodeURIComponent(domain)}`;
+        // 1. Base Map (VWorld image API - Standard BBOX xmin,ymin)
+        const baseUrl = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326` +
+            `&bbox=${x - delta},${y - delta},${x + delta},${y + delta}&width=${size}&height=${size}&layers=base&domain=${encodeURIComponent(domain)}`;
 
-        // 2. Zoning Overlay (WMS)
+        // 2. Zoning (4 layers)
         const zoningLayers = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'].join(',');
-        const zoningUrl = `/api/vworld/req/wms?${wmsBase}&LAYERS=${encodeURIComponent(zoningLayers)}`;
+        const zoningUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent(zoningLayers)}`;
 
-        // 3. Cadastral Overlay (WMS)
-        const cadastralUrl = `/api/vworld/req/wms?${wmsBase}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
+        // 3. Cadastral
+        const cadastralUrl = `/api/vworld/req/wms?${baseParams}&LAYERS=${encodeURIComponent('LP_PA_CBND_BUBUN')}`;
 
         setMiniMapUrl({ baseUrl, zoningUrl, cadastralUrl });
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
@@ -280,30 +289,30 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
-                        {/* 1. Base Map Layer */}
+                        {/* 1. Base Map */}
                         <img
                             src={miniMapUrl.baseUrl}
                             alt="배경지도"
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover z-0"
                         />
-                        {/* 2. Zoning Layer */}
+                        {/* 2. Zoning */}
                         <img
                             src={miniMapUrl.zoningUrl}
                             alt="용도지역"
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover z-10"
                         />
-                        {/* 3. Cadastral Layer */}
+                        {/* 3. Cadastral */}
                         <img
                             src={miniMapUrl.cadastralUrl}
                             alt="지적도"
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover z-20"
                         />
 
                         {/* Target Marker */}
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-30">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
                         </div>
-                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">
+                        <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm z-40">
                             VWorld
                         </div>
                     </div>
@@ -328,7 +337,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 {loading ? (
                     <div className="flex flex-col items-center justify-center h-full py-10">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-4"></div>
-                        <p className="text-xs text-gray-400">데이터 추출 중...</p>
+                        <p className="text-xs text-gray-400">데이터 처리 중...</p>
                     </div>
                 ) : (
                     <>
@@ -391,7 +400,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </div>
                         </section>
 
-                        {/* 4. Land Specification (Collapsible) */}
+                        {/* 4. Land Specification */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -409,73 +418,40 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                         </svg>
                                     </button>
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 tracking-tighter">총 필지수</div>
-                                        <div className="text-lg font-bold text-ink">{picked.list.length} <span className="text-xs font-normal text-gray-400">필지</span></div>
+                                        <div className="text-lg font-bold text-ink">{picked.list.length}</div>
                                     </div>
                                     <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
                                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 tracking-tighter">합계 면적</div>
-                                        <div className="text-lg font-bold text-blue-700">{picked.totalArea.toLocaleString()} <span className="text-xs font-normal text-gray-400">m²</span></div>
+                                        <div className="text-lg font-bold text-blue-700">{picked.totalArea.toLocaleString()} m²</div>
                                     </div>
                                 </div>
-
                                 {specOpen && (
                                     <div className="overflow-x-auto mt-4 bg-white rounded-lg border border-gray-100">
                                         <table className="w-full text-[10px] text-left">
                                             <thead className="bg-gray-50 text-gray-400 font-bold border-b border-gray-100">
                                                 <tr>
-                                                    <th className="p-2 text-center w-8 text-[9px]">No</th>
+                                                    <th className="p-2 text-center w-8">No</th>
                                                     <th className="p-2">지번</th>
                                                     <th className="p-2 text-right">면적</th>
                                                     <th className="p-2 text-center">지목</th>
-                                                    <th className="p-2 text-right">지가</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {picked.list.map((p, idx) => (
-                                                    <tr key={p.pnu || idx} className="hover:bg-gray-50 transition-colors">
+                                                    <tr key={p.pnu || idx}>
                                                         <td className="p-2 text-center text-gray-400">{idx + 1}</td>
-                                                        <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
+                                                        <td className="p-2">{extractDongRiBunji(p.addr)}</td>
                                                         <td className="p-2 text-right">{p.area.toLocaleString()}</td>
                                                         <td className="p-2 text-center">{p.jimok || '-'}</td>
-                                                        <td className="p-2 text-right text-gray-400">
-                                                            {p.price ? p.price.toLocaleString() : '-'}
-                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
-                                            <tfoot className="bg-blue-50/30 font-bold border-t border-blue-100">
-                                                <tr>
-                                                    <td className="p-2 text-center" colSpan={2}>합계</td>
-                                                    <td className="p-2 text-right text-blue-700">{picked.totalArea.toLocaleString()}</td>
-                                                    <td className="p-2" colSpan={2}></td>
-                                                </tr>
-                                            </tfoot>
                                         </table>
                                     </div>
                                 )}
-                            </section>
-                        )}
-
-                        {/* 5. Land Use Plan Map */}
-                        {landUseWmsUrl && showLandUseWms && (
-                            <section>
-                                <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                    <span className="w-1.5 h-4 bg-ink rounded-full"></span>
-                                    토지이용계획도
-                                </h4>
-                                <div className="w-full aspect-video bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
-                                    <img
-                                        src={landUseWmsUrl}
-                                        alt="토지이용계획도"
-                                        className="w-full h-full object-contain"
-                                        onError={() => setShowLandUseWms(false)}
-                                    />
-                                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/40 text-white text-[9px] rounded backdrop-blur-sm">WMS</div>
-                                </div>
-                                <p className="mt-2 text-[10px] text-gray-400 text-right italic font-serif">* 국계법/타법령 기반</p>
                             </section>
                         )}
                     </>
