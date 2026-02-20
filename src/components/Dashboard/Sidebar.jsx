@@ -36,7 +36,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         for (const v of vals) {
             if (v === 0) return 0;
             const sv = String(v || '').trim();
-            if (sv !== '' && sv !== 'null' && sv !== 'undefined' && sv !== '지정되지않음' && sv !== '지정되지 않음') return v;
+            if (sv !== '' && sv !== 'null' && sv !== 'undefined' && sv !== '지정되지않음' && sv !== '지정되지 않음' && sv !== 'NaN') return v;
         }
         return null;
     };
@@ -55,22 +55,22 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return s;
     };
 
-    const unwrapNed = (data) => {
-        if (!data) return null;
-        if (data.pnu || data.lndpclAr || data.lndpcl_ar || data.ladAr) return data;
-        const candidates = [
-            data?.response?.body?.items?.item,
-            data?.response?.body?.items,
-            data?.response?.result?.items,
-            data?.response?.result?.featureCollection?.features,
-            data?.landCharacteristics
-        ];
-        for (const c of candidates) {
-            if (!c) continue;
-            if (Array.isArray(c)) {
-                return c.length > 0 ? c[0] : null;
+    // DEEP SEARCH to find keys in any structure
+    const findInJson = (obj, keyRegex) => {
+        if (!obj) return null;
+        if (typeof obj !== 'object') return null;
+
+        // Exact or current level match
+        for (const key of Object.keys(obj)) {
+            if (keyRegex.test(key)) return obj[key];
+        }
+
+        // Recursive
+        for (const key of Object.keys(obj)) {
+            if (typeof obj[key] === 'object') {
+                const found = findInJson(obj[key], keyRegex);
+                if (found) return found;
             }
-            if (typeof c === 'object') return c;
         }
         return null;
     };
@@ -93,11 +93,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
                 timeout: 2000
             });
-            const d = unwrapNed(safeJson(res.data) ?? res.data);
-            if (d) return {
-                jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-'),
-                area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0))
-            };
+            const d = safeJson(res.data) ?? res.data;
+            if (d) {
+                const jimok = findInJson(d, /^(lndcgrCodeNm|lndcgr_code_nm|jimok)$/);
+                const area = findInJson(d, /^(lndpclAr|lndpcl_ar|ladAr|lad_ar)$/);
+                if (jimok || area) return { jimok, area: parseNum(area) };
+            }
         } catch (e) { /* ignore */ }
         return null;
     };
@@ -112,8 +113,49 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                 params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
                 timeout: 3000
             });
-            const d = unwrapNed(safeJson(res.data) ?? res.data);
-            if (d) return d;
+            const d = safeJson(res.data) ?? res.data;
+            // Use findInJson for flat extraction
+            return d;
+        } catch (e) { /* ignore */ }
+        return null;
+    };
+
+    // API 3: WFS (XML Fallback)
+    const fetchLandCharacteristicsWFS = async (pnu) => {
+        const key = API_CONFIG.VWORLD_KEY;
+        // WFS proxy endpoint assumed or direct usage
+        const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
+        try {
+            const res = await axios.get(url, {
+                params: {
+                    key, domain: getVworldDomain(), typename: 'dt_d194', pnu,
+                    maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326'
+                },
+                responseType: 'text',
+                timeout: 4000
+            });
+            const xml = new DOMParser().parseFromString(String(res.data || ''), 'text/xml');
+            const pick = (name) => {
+                const els = xml.getElementsByTagName('*');
+                for (let i = 0; i < els.length; i++) {
+                    if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
+                }
+                return null;
+            };
+
+            // Check success
+            if (pick('pnu') || pick('lad_ar') || pick('lndpcl_ar')) {
+                return {
+                    isWfs: true,
+                    jimok: pick('lndcgr_code_nm') || pick('indcgr_code_nm'),
+                    area: pick('lndpcl_ar') || pick('lad_ar') || pick('ldplc_ar'),
+                    price: pick('pblntf_pclnd') || pick('jiga'),
+                    usage: pick('lad_use_sittn_nm') || pick('lad_use'),
+                    road: pick('road_side_code_nm') || pick('road_side'),
+                    use1: pick('prpos_area_1_nm'),
+                    use2: pick('prpos_area_2_nm')
+                };
+            }
         } catch (e) { /* ignore */ }
         return null;
     };
@@ -135,7 +177,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return { list: listData, representative };
     }, [selectedParcels, selectedAddress]);
 
-    // MAIN DATA FETCH (Sequential Fail-safe)
+    // MAIN DATA FETCH (Sequential REST -> WFS)
     useEffect(() => {
         const run = async () => {
             const repPnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -143,26 +185,54 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             setLoading(true); setError(null);
 
-            // 1. Try Main API
+            // 1. Try Main REST
             let d = await fetchLandCharacteristics(repPnu);
+            let source = 'main';
 
-            // 2. If Main failed or critical data missing, try secondary
+            // 2. Try Backup Ladfrl if main empty
             let lad = null;
-            if (!d || !d.lndpclAr && !d.lndpcl_ar && !d.ladAr) {
+            if (!findInJson(d, /^(lndpclAr|lndpcl_ar|ladAr)$/)) {
                 lad = await fetchLadfrl(repPnu);
+                if (lad) source = 'lad';
             }
 
-            // Construct Final Data Object
-            const finalJimok = lad?.jimok || first(d?.lndcgrCodeNm, d?.lndcgr_code_nm, d?.indcgrCodeNm, d?.jimok, '-');
-            const finalArea = lad?.area || parseNum(first(d?.lndpclAr, d?.lndpcl_ar, d?.ldplc_ar, d?.ladAr, 0));
-            const finalPrice = parseNum(first(d?.pblntfPclnd, d?.pblntf_pclnd, d?.jiga, 0));
-            const finalUsage = first(d?.ladUseSittnNm, d?.lad_use_sittn_nm, d?.ladUse, '-');
-            const finalRoad = first(d?.roadSideCodeNm, d?.road_side_code_nm, d?.roadSide, '-');
+            // 3. Try WFS if ALL else fails
+            let wfs = null;
+            if (source === 'main' && !lad && !findInJson(d, /^(lndpclAr|lndpcl_ar|ladAr)$/)) {
+                wfs = await fetchLandCharacteristicsWFS(repPnu);
+                if (wfs) source = 'wfs';
+            }
 
-            const uses = [
-                first(d?.prposArea1Nm, d?.prpos_area_1_nm),
-                first(d?.prposArea2Nm, d?.prpos_area_2_nm)
-            ].filter(v => v && !/지정되지\s*않음/.test(v));
+            // EXTRACT with Deep Search or Direct Use
+            let finalJimok, finalArea, finalPrice, finalUsage, finalRoad, uses = [];
+
+            if (source === 'wfs' && wfs) {
+                finalJimok = wfs.jimok;
+                finalArea = parseNum(wfs.area);
+                finalPrice = parseNum(wfs.price);
+                finalUsage = wfs.usage;
+                finalRoad = wfs.road;
+                uses = [wfs.use1, wfs.use2];
+            } else {
+                // Combine Main + Lad
+                // Main D extraction
+                const dJimok = findInJson(d, /^(lndcgrCodeNm|lndcgr_code_nm|indcgrCodeNm|jimok)$/);
+                const dArea = findInJson(d, /^(lndpclAr|lndpcl_ar|ldplc_ar|ladAr|lad_ar|parea)$/);
+                const dPrice = findInJson(d, /^(pblntfPclnd|pblntf_pclnd|jiga)$/);
+                const dUsage = findInJson(d, /^(ladUseSittnNm|lad_use_sittn_nm|ladUse)$/);
+                const dRoad = findInJson(d, /^(roadSideCodeNm|road_side_code_nm|roadSide)$/);
+                const dPrpos1 = findInJson(d, /^(prposArea1Nm|prpos_area_1_nm|prposArea1)$/);
+                const dPrpos2 = findInJson(d, /^(prposArea2Nm|prpos_area_2_nm|prposArea2)$/);
+
+                finalJimok = lad?.jimok || dJimok || '-';
+                finalArea = lad?.area || parseNum(dArea);
+                finalPrice = parseNum(dPrice);
+                finalUsage = dUsage || '-';
+                finalRoad = dRoad || '-';
+                uses = [dPrpos1, dPrpos2];
+            }
+
+            uses = uses.filter(v => v && !/지정되지\s*않음/.test(v) && v !== '-');
 
             setData({
                 basic: {
@@ -185,7 +255,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         run();
     }, [picked.representative?.pnu, selectedAddress?.pnu]);
 
-    // META FETCH (Simple Sequential)
+    // META FETCH
     useEffect(() => {
         const list = picked.list || [];
         if (list.length === 0) { setParcelMeta({}); return; }
@@ -198,22 +268,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                         const pnu = normalizePnu(p.pnu);
                         if (!pnu) return [null, null];
 
-                        // Try Main
-                        let d = await fetchLandCharacteristics(pnu);
-
-                        // Try Backup if needed
+                        let d = await fetchLadfrl(pnu);
                         if (!d) {
-                            const l = await fetchLadfrl(pnu);
-                            if (l) return [pnu, l];
+                            // Try simple characteristics logic if lad fails
+                            const c = await fetchLandCharacteristics(pnu);
+                            const cJimok = findInJson(c, /^(lndcgrCodeNm|lndcgr_code_nm|jimok)$/);
+                            const cArea = findInJson(c, /^(lndpclAr|lndpcl_ar|ladAr)$/);
+                            if (cJimok || cArea) {
+                                d = { jimok: cJimok, area: parseNum(cArea) };
+                            }
                         }
 
                         if (d) {
-                            return [pnu, {
-                                area: parseNum(first(d.lndpclAr, d.lndpcl_ar, 0)),
-                                jimok: first(d.lndcgrCodeNm, d.lndcgr_code_nm, '-')
-                            }];
+                            return [pnu, d];
                         }
-
                         return [pnu, { area: 0, jimok: '-' }];
                     })
                 );

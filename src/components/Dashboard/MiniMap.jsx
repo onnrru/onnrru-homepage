@@ -64,16 +64,16 @@ const MiniMap = ({ x, y, feature }) => {
             style: new OL.style.Style({
                 stroke: new OL.style.Stroke({
                     color: '#ef4444', // Red
-                    width: 3 // Thicker for Zoom 9
+                    width: 3
                 }),
                 fill: new OL.style.Fill({
-                    color: 'rgba(239, 68, 68, 0.4)' // Stronger fill for Zoom 9
+                    color: 'rgba(239, 68, 68, 0.4)'
                 })
             })
         });
 
         // 2. View
-        // Fixed at Zoom 9 as requested (Very Wide View)
+        // Fixed at Zoom 11 as requested
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
 
         const map = new OL.Map({
@@ -81,7 +81,7 @@ const MiniMap = ({ x, y, feature }) => {
             layers: [baseLayer, overlayLayer, vectorLayer],
             view: new OL.View({
                 center: center,
-                zoom: 9,
+                zoom: 11,
                 minZoom: 6,
                 maxZoom: 19,
                 enableRotation: false
@@ -107,7 +107,7 @@ const MiniMap = ({ x, y, feature }) => {
 
         const center = OL.proj.fromLonLat([Number(x), Number(y)]);
         map.getView().setCenter(center);
-        map.getView().setZoom(9); // Force Zoom 9
+        map.getView().setZoom(11); // Force Zoom 11
 
         src.clear();
 
