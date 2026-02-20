@@ -11,18 +11,14 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     const [landUseWmsUrl, setLandUseWmsUrl] = useState(null);
     const [showLandUseWms, setShowLandUseWms] = useState(true);
 
+    // Sync Logic: Bottom interaction controls both
     const toggleSpec = () => {
         const next = !specOpen;
         setSpecOpen(next);
         setCharOpen(!next);
     };
 
-    const toggleChar = () => {
-        const next = !charOpen;
-        setCharOpen(next);
-        setSpecOpen(!next);
-    };
-
+    // --- Utility Functions ---
     const getVworldDomain = () => window.location.origin;
 
     const safeJson = (maybe) => {
@@ -48,28 +44,11 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
     const unwrapNed = (data) => {
         if (!data) return null;
-        const paths = [
-            data?.response?.body?.items?.item?.[0],
-            data?.response?.body?.items?.[0],
-            data?.response?.result?.items?.[0],
-            data?.response?.result?.item?.[0],
-            data?.body?.items?.[0],
-            data?.result?.items?.[0],
-            data?.items?.[0],
-            data?.item?.[0],
-            data?.features?.[0]?.properties,
-            data?.features?.[0],
-            data?.response?.result,
-            data?.result,
-            data
-        ];
-        for (const p of paths) {
-            if (p && typeof p === 'object' && !Array.isArray(p)) {
-                if (p.pnu || p.pblntf_pclnd || p.ldplc_ar || p.lndcgr_code_nm || p.indcgr_code_nm || p.jimok || p.lndpcl_ar || p.parea || p.area) {
-                    return p;
-                }
-            }
-        }
+        const b = data?.response?.body?.items?.item;
+        if (Array.isArray(b)) return b[0] || null;
+        const r = data?.response?.result?.items?.[0] ?? data?.response?.result ?? data?.result ?? data;
+        if (Array.isArray(r)) return r[0] ?? null;
+        if (r && typeof r === 'object' && !r.response) return r;
         return null;
     };
 
@@ -81,6 +60,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         return fullAddr || '-';
     };
 
+    // --- Memoized Values ---
     const picked = React.useMemo(() => {
         const listData = Array.isArray(selectedParcels) && selectedParcels.length > 0
             ? selectedParcels.map(p => {
@@ -96,9 +76,10 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             : (selectedAddress?.pnu ? [{
                 pnu: selectedAddress.pnu,
                 addr: selectedAddress.parcelAddr || selectedAddress.address || '',
-                jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, selectedAddress.lndcgr_code_nm, '-'),
-                area: Number(first(selectedAddress.area, selectedAddress.parea, selectedAddress.ldplc_ar, 0)),
-                price: Number(first(selectedAddress.price, selectedAddress.jiga, 0))
+                // Improved fallback for props coming from AddressSearch
+                jimok: first(selectedAddress.jimok, selectedAddress.indcgr_code_nm, selectedAddress.lndcgr_code_nm, selectedAddress.lndcgr_nm, '-'),
+                area: Number(first(selectedAddress.area, selectedAddress.parea, selectedAddress.p_area, selectedAddress.ldplc_ar, 0)),
+                price: Number(first(selectedAddress.price, selectedAddress.jiga, selectedAddress.pblntf_pclnd, 0))
             }] : []);
 
         const totalArea = listData.reduce((sum, item) => sum + item.area, 0);
@@ -120,11 +101,11 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const res = await axios.get(url, { params: { key, domain, pnu, format: 'json' } });
         const payload = safeJson(res.data) ?? res.data;
         const d = unwrapNed(payload);
-        if (!d) throw new Error('NED JSON record not found');
+        if (!d) throw new Error('NED Error');
 
         return {
             pnu: first(d.pnu, pnu),
-            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok_nm, d.jimok, d.lndcgr_nm),
+            indcgr_code_nm: first(d.indcgr_code_nm, d.indcgrCodeNm, d.lndcgr_code_nm, d.jimok_nm, d.jimok),
             ldplc_ar: first(d.ldplc_ar, d.ldplcAr, d.lndpcl_ar, d.lndpclAr, d.ar, d.area, d.parea, d.PAREA, d.lndcl_ar),
             pblntf_pclnd: first(d.pblntf_pclnd, d.pblntfPclnd, d.jiga, d.JIGA),
             prpos_area_1_nm: first(d.prpos_area_1_nm, d.prposArea1Nm),
@@ -139,7 +120,6 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const domain = getVworldDomain();
         const pnu = normalizePnu(pnuRaw);
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
-
         const res = await axios.get(url, {
             params: {
                 key, domain, typename: 'dt_d194', pnu,
@@ -148,21 +128,18 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             },
             responseType: 'text'
         });
-
         const text = String(res.data || '');
-        if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) throw new Error('HTML returned');
-
+        if (text.trim().startsWith('<html')) throw new Error('WFS Failure');
         const xml = new DOMParser().parseFromString(text, 'text/xml');
         const pickLocal = (name) => {
             const els = xml.getElementsByTagName('*');
             for (let i = 0; i < els.length; i++) if (els[i].localName === name) return els[i].textContent?.trim() ?? null;
             return null;
         };
-
         return {
             pnu: pickLocal('pnu') || pnu,
-            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm'), pickLocal('jimok_nm')),
-            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('lndpcl_ar'), pickLocal('ar'), pickLocal('area')),
+            indcgr_code_nm: first(pickLocal('indcgr_code_nm'), pickLocal('lndcgr_code_nm')),
+            ldplc_ar: first(pickLocal('ldplc_ar'), pickLocal('ar'), pickLocal('area')),
             pblntf_pclnd: pickLocal('pblntf_pclnd'),
             prpos_area_1_nm: pickLocal('prpos_area_1_nm'),
             prpos_area_2_nm: pickLocal('prpos_area_2_nm'),
@@ -171,6 +148,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         };
     };
 
+    // --- Minimap Logic (Zoom Level 19 fix) ---
     useEffect(() => {
         const x = Number(selectedAddress?.x || selectedAddress?.lon);
         const y = Number(selectedAddress?.y || selectedAddress?.lat);
@@ -179,21 +157,20 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
         const key = API_CONFIG.VWORLD_KEY;
         const domain = getVworldDomain();
         const size = 400;
-        const delta = 0.0008;
-        const bboxWMS = `${y - delta},${x - delta},${y + delta},${x + delta}`;
 
-        const params = `SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0` +
-            `&CRS=EPSG:4326&BBOX=${encodeURIComponent(bboxWMS)}` +
-            `&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/png&TRANSPARENT=FALSE` +
-            `&EXCEPTIONS=text/xml&KEY=${key}&DOMAIN=${encodeURIComponent(domain)}`;
+        // Approx Zoom Level 19 (High detail, approx 50-100m span)
+        const delta = 0.00045;
 
-        // 'white' for White Map (백지도)
-        const layers = ['white', 'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LP_PA_CBND_BUBUN'].join(',');
-        const url = `/api/vworld/req/wms?${params}&LAYERS=${encodeURIComponent(layers)}`;
+        const bbox = `${x - delta},${y - delta},${x + delta},${y + delta}`;
+
+        // Single Image request with 'white' layer
+        const url = `/api/vworld/req/image?service=image&request=getmap&key=${key}&format=png&crs=EPSG:4326` +
+            `&bbox=${bbox}&width=${size}&height=${size}&layers=white&domain=${encodeURIComponent(domain)}`;
 
         setMiniMapUrl(url);
     }, [selectedAddress?.x, selectedAddress?.y, selectedAddress?.lon, selectedAddress?.lat]);
 
+    // Data Fetch Effect
     useEffect(() => {
         const run = async () => {
             const 대표Pnu = normalizePnu(picked.representative?.pnu || selectedAddress?.pnu);
@@ -218,13 +195,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                     }
                 });
 
-                const key = API_CONFIG.VWORLD_KEY;
-                const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(key)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(대표Pnu)}`;
+                const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(대표Pnu)}`;
                 setLandUseWmsUrl(url);
                 setShowLandUseWms(true);
             } catch (err) {
-                console.error("Sidebar Error:", err);
-                setError(`정보 로딩 오류`);
+                console.error("Sidebar Loading:", err);
+                setError(`로딩 오류`);
             } finally { setLoading(false); }
         };
         run();
@@ -237,17 +213,21 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
     return (
         <div className={`bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto z-10 transition-all duration-300 ease-in-out ${isExpanded ? 'w-[800px]' : 'w-[350px]'}`}>
 
+            {/* Minimap (Zoom Level 19 Focus) */}
             {miniMapUrl && (
                 <div className="p-4 bg-white">
                     <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative bg-white shadow-inner">
                         <img
                             src={miniMapUrl}
-                            alt="민이맵"
+                            alt="배경지도"
                             className="w-full h-full object-cover"
                             onError={() => setMiniMapUrl(null)}
                         />
                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
                             <div className="w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white shadow-lg animate-pulse" />
+                        </div>
+                        <div className="absolute bottom-2 right-2 px-1 py-0.5 bg-black/40 text-[8px] text-white rounded">
+                            VWorld Image (Z19)
                         </div>
                     </div>
                 </div>
@@ -262,12 +242,12 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
 
             <div className="flex-1 p-6 space-y-8 bg-white overflow-y-auto">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center h-full py-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <div className="flex flex-col items-center justify-center h-full py-10 scale-75 opacity-50">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
                     </div>
                 ) : (
                     <>
-                        {error && <div className="p-3 bg-red-50 text-red-600 text-xs rounded border border-red-100">{error}</div>}
+                        {error && <div className="p-3 bg-red-50 text-red-600 text-[10px] rounded">{error}</div>}
 
                         <section>
                             <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -287,19 +267,15 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </div>
                         </section>
 
+                        {/* Basic Info (Auto compacts when Spec is Detailed) */}
                         <section>
-                            <div className="flex justify-between items-center mb-3">
-                                <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                                    <span className="w-1.5 h-4 bg-ink rounded-full"></span>
-                                    토지 기본특성
-                                </h4>
-                                <button onClick={toggleChar} className="text-[10px] font-bold text-gray-400 hover:text-ink">
-                                    {charOpen ? '간략히' : '상세히'}
-                                </button>
-                            </div>
+                            <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                <span className="w-1.5 h-4 bg-ink rounded-full"></span>
+                                토지 기본특성
+                            </h4>
 
                             {charOpen && (
-                                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm transition-all">
+                                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                                     <table className="w-full text-sm">
                                         <tbody className="divide-y divide-gray-100">
                                             <tr>
@@ -332,6 +308,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             )}
                         </section>
 
+                        {/* Parcel Specification table with data fixes */}
                         {picked.list.length > 0 && (
                             <section className="bg-gray-50/50 rounded-xl border border-gray-200 p-4">
                                 <div className="flex justify-between items-center mb-3">
@@ -341,7 +318,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                     </h4>
                                     <button
                                         onClick={toggleSpec}
-                                        className="text-xs font-bold text-ink hover:underline flex items-center gap-1"
+                                        className="text-xs font-bold text-ink hover:underline"
                                     >
                                         {specOpen ? '간략히' : '상세보기'}
                                     </button>
@@ -374,7 +351,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                                                     <tr key={p.pnu || idx}>
                                                         <td className="p-2 text-center text-gray-400">{idx + 1}</td>
                                                         <td className="p-2 font-medium">{extractDongRiBunji(p.addr)}</td>
-                                                        <td className="p-2 text-right">{p.jimok || '-'}</td>
+                                                        <td className="p-2 text-right">{p.jimok}</td>
                                                         <td className="p-2 text-right font-bold">{p.area.toLocaleString()}</td>
                                                     </tr>
                                                 ))}
@@ -385,7 +362,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
                             </section>
                         )}
 
-                        {landUseWmsUrl && showLandUseWms && (
+                        {landUseWmsUrl && showLandUseWms && !specOpen && (
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                     <span className="w-1.5 h-4 bg-ink rounded-full"></span>
@@ -406,7 +383,7 @@ const Sidebar = ({ selectedAddress, selectedParcels }) => {
             </div>
 
             <div className="p-6 border-t border-gray-100 bg-gray-50/50 mt-auto">
-                <button className="w-full py-4 bg-ink text-white rounded-xl font-bold">
+                <button className="w-full py-4 bg-ink text-white rounded-xl font-bold shadow-xl hover:bg-black transition-all">
                     📄 상세 분석 보고서 생성
                 </button>
             </div>
