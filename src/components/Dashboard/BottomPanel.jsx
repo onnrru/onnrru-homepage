@@ -277,7 +277,7 @@ const BottomPanel = ({ selectedAddress }) => {
         return (
             <div className="h-64 bg-white border-t border-gray-200 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-sm text-gray-500">실거래가 데이터를 불러오는 중... (최대 10초)</span>
+                <span className="ml-3 text-sm text-gray-500">실거래가 데이터를 불러오는 중...</span>
             </div>
         );
     }
