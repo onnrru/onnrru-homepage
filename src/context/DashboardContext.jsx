@@ -16,6 +16,7 @@ export const DashboardProvider = ({ children }) => {
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [analyzedApartments, setAnalyzedApartments] = useState([]);
+    const [parcelPickMode, setParcelPickMode] = useState(false);
 
     // Auto-open sidebar on selection
     useEffect(() => {
@@ -34,7 +35,9 @@ export const DashboardProvider = ({ children }) => {
         isSidebarOpen,
         setIsSidebarOpen,
         analyzedApartments,
-        setAnalyzedApartments
+        setAnalyzedApartments,
+        parcelPickMode,
+        setParcelPickMode
     };
 
     return (

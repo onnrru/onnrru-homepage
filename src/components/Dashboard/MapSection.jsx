@@ -18,7 +18,9 @@ const MapSection = () => {
         isAnalysisOpen,
         setIsAnalysisOpen,
         isSidebarOpen,
-        setIsSidebarOpen
+        setIsSidebarOpen,
+        parcelPickMode,
+        setParcelPickMode
     } = useDashboard();
 
     const onAddressSelect = setSelectedAddress;
@@ -43,6 +45,12 @@ const MapSection = () => {
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
 
+    // Measurement & Radius States
+    const [measureMode, setMeasureMode] = useState(null); // null, 'length', 'area'
+    const [radiusMode, setRadiusMode] = useState(false);
+
+    const toggleRadiusMode = () => setRadiusMode(!radiusMode);
+
     // Cadastral stabilization
     const cadastralLayerRef = useRef(null);
     const cadastralPendingRef = useRef(false);
@@ -55,9 +63,24 @@ const MapSection = () => {
     const activeLayersRef = useRef([]);
     useEffect(() => { activeLayersRef.current = activeLayers; }, [activeLayers]);
 
+    const measureModeRef = useRef(measureMode);
+    useEffect(() => { measureModeRef.current = measureMode; }, [measureMode]);
+
+    const parcelPickModeRef = useRef(parcelPickMode);
+    useEffect(() => { parcelPickModeRef.current = parcelPickMode; }, [parcelPickMode]);
+
     const markerSourceRef = useRef(null);     // 단일 포커스(검색/더블클릭 등)
     const selectionSourceRef = useRef(null);  // 멀티 선택(Shift 누적)
     const aptMarkerSourceRef = useRef(null);  // 아파트 분석 마커
+    const radiusSourceRef = useRef(null);     // 방경 레이어 소스
+
+    // ====== Hooks ======
+    const { clearMeasurements } = useMapMeasurements(mapObj, measureMode);
+    const { toggleRadius, clearRadius } = useRadiusDrawing(mapObj, radiusMode, selectedAddress, selectedParcels);
+
+    useEffect(() => {
+        toggleRadius(radiusMode);
+    }, [radiusMode, toggleRadius]);
 
     const getPnu = (fd) => fd?.properties?.pnu;
 
@@ -374,7 +397,7 @@ const MapSection = () => {
                     layers: [
                         baseLayer, grayLayer, midnightLayer, satelliteLayer,
                         hybridLayer, cadastralLayer, ...wmsLayers,
-                        markerLayer, selectionLayer, aptMarkerLayer, radiusLayer, measureLayer
+                        markerLayer, selectionLayer, aptMarkerLayer, radiusLayer
                     ],
                     view: new OL.View({
                         center: [14151740, 4511257],
