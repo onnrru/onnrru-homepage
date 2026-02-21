@@ -17,47 +17,18 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
     }, []);
 
     const navLinks = [
-        { name: 'Home', href: '#home' },
-        { name: 'About', href: '#about' },
-        { name: 'Menu', href: '#menu' },
-        { name: 'Locations', href: '#locations' },
+        { name: 'ABOUT', href: '/about' },
+        { name: 'PapavalleyPizza\nX OnnRRu', href: '/', isBrand: true },
+        { name: 'Consulting', href: '/consulting' },
         { name: 'Test', href: '/test' },
     ];
 
     const handleNavigation = (e, href) => {
+        if (href.startsWith('#')) return; // ignore hashes for now as they are on different routes
         e.preventDefault();
         setMobileOpen(false);
-
-        if (href.startsWith('#')) {
-            // Hash Navigation
-            if (location.pathname !== '/') {
-                // If not on home page, go to home
-                navigate('/');
-                // Optional: Store hash to scroll after navigation if needed
-                // For now, just going to home is good enough, usually #home is top
-                if (href !== '#home') {
-                    setTimeout(() => {
-                        const el = document.querySelector(href);
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }, 500);
-                }
-            } else {
-                // On Home Page
-                if (activeGroup === 1 && setActiveGroup) {
-                    setActiveGroup(0);
-                    setTimeout(() => {
-                        const el = document.querySelector(href);
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                } else {
-                    const el = document.querySelector(href);
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }
-            }
-        } else {
-            // Page Navigation (e.g., /test)
-            navigate(href);
-        }
+        navigate(href);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     return (
@@ -76,16 +47,23 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                 </a>
 
                 {/* Desktop Menu */}
-                <div className="hidden md:flex space-x-8 items-center">
+                <div className="hidden md:flex space-x-10 items-center">
                     {navLinks.map((link) => (
                         <a
                             key={link.name}
                             href={link.href}
                             onClick={(e) => handleNavigation(e, link.href)}
-                            className="text-sm uppercase tracking-wider text-ink/70 hover:text-ink font-medium transition-colors relative group cursor-pointer"
+                            className={`uppercase tracking-wider hover:text-ink transition-colors relative group cursor-pointer leading-tight
+                                ${link.isBrand ? 'text-[11px] font-black text-ink bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm' : 'text-xs text-ink/70 font-bold'}
+                                ${location.pathname === link.href ? 'text-ink' : ''}
+                            `}
                         >
-                            {link.name}
-                            <span className="absolute left-0 bottom-[-4px] w-0 h-[1px] bg-ink transition-all group-hover:w-full"></span>
+                            <span className="whitespace-pre-line text-center block">
+                                {link.name}
+                            </span>
+                            {!link.isBrand && (
+                                <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
+                            )}
                         </a>
                     ))}
 
@@ -99,14 +77,7 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                         </a>
                     </div>
 
-                    {/* Consulting Dashboard Link */}
-                    <a
-                        href="/consulting"
-                        onClick={(e) => handleNavigation(e, '/consulting')}
-                        className="px-5 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 border bg-transparent text-ink border-ink hover:bg-ink hover:text-white cursor-pointer"
-                    >
-                        Consulting Access
-                    </a>
+
                 </div>
 
                 {/* Mobile Toggle */}

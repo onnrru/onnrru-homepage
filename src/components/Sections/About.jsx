@@ -32,7 +32,7 @@ const About = () => {
     ];
 
     return (
-        <section id="about" className="scroll-mt-20 py-16 bg-paper relative overflow-hidden">
+        <section id="about" className="scroll-mt-20 pt-32 pb-16 min-h-screen bg-paper relative overflow-hidden flex flex-col justify-center">
             <div className="container mx-auto px-6">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}

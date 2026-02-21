@@ -14,10 +14,12 @@ const MiniMap = ({ x, y, features }) => {
             return;
         }
 
+        const proxyUrl = API_CONFIG.VWORLD_BASE_URL; // '/api/vworld'
+
         // 1. Base Layer: White Map (Background)
         const baseLayer = new OL.layer.Tile({
             source: new OL.source.XYZ({
-                url: `https://api.vworld.kr/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/white/{z}/{y}/{x}.png`,
+                url: `${proxyUrl}/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/white/{z}/{y}/{x}.png`,
                 attributions: 'VWorld',
                 crossOrigin: 'anonymous'
             }),
@@ -35,7 +37,7 @@ const MiniMap = ({ x, y, features }) => {
 
         const zoningWmsLayer = new OL.layer.Tile({
             source: new OL.source.TileWMS({
-                url: 'https://api.vworld.kr/req/wms',
+                url: `${proxyUrl}/req/wms`,
                 params: {
                     SERVICE: 'WMS',
                     REQUEST: 'GetMap',

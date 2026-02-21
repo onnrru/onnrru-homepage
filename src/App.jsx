@@ -6,48 +6,80 @@ import Navbar from './components/Layout/Navbar';
 import Hero from './components/Sections/Hero';
 import About from './components/Sections/About';
 import Menu from './components/Sections/Menu';
-import Reviews from './components/Sections/Reviews';
 import Locations from './components/Sections/Locations';
 import Footer from './components/Layout/Footer';
 import ConsultingDashboard from './components/Dashboard/ConsultingDashboard';
 import TestPage from './components/TestPage';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// Landing Page Component (Original Website)
-const Website = () => {
+// Page Wrapper for transitions
+const PageWrapper = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, x: 20 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: -20 }}
+    transition={{ duration: 0.5, ease: "easeInOut" }}
+    className="min-h-screen w-full"
+  >
+    {children}
+  </motion.div>
+);
+
+// Pizza Group (Hero + Menu + Locations)
+const PizzaPage = () => (
+  <PageWrapper>
+    <Hero />
+    <Menu />
+    <Locations />
+  </PageWrapper>
+);
+
+const AboutPage = () => (
+  <PageWrapper>
+    <About />
+  </PageWrapper>
+);
+
+const ConsultingPage = () => (
+  <PageWrapper>
+    <ConsultingDashboard />
+  </PageWrapper>
+);
+
+const TestPageView = () => (
+  <PageWrapper>
+    <TestPage />
+  </PageWrapper>
+);
+
+function AppContent() {
+  const location = useLocation();
+
   return (
-    <div className="font-sans text-ink bg-paper min-h-screen">
+    <div className="font-sans text-ink bg-paper min-h-screen overflow-x-hidden">
       <Navbar />
-      <main>
-        <Hero />
-        <About />
-        <Menu />
-        <Locations />
-      </main>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<PizzaPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/consulting" element={<ConsultingPage />} />
+          <Route path="/test" element={<TestPageView />} />
+          <Route path="/game" element={
+            <GameProvider>
+              <MainGameLayout />
+            </GameProvider>
+          } />
+        </Routes>
+      </AnimatePresence>
       <Footer />
     </div>
   );
-};
+}
 
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Main Website Route */}
-        <Route path="/" element={<Website />} />
-
-        {/* Consulting Dashboard (New) */}
-        <Route path="/consulting" element={<ConsultingDashboard />} />
-
-        {/* Test Page */}
-        <Route path="/test" element={<TestPage />} />
-
-        {/* Legacy Game Route (Hidden/Optional) */}
-        <Route path="/game" element={
-          <GameProvider>
-            <MainGameLayout />
-          </GameProvider>
-        } />
-      </Routes>
+      <AppContent />
     </Router>
   );
 }
