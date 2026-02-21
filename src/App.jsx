@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
 import MainGameLayout from './components/Layout/MainGameLayout';
 import Navbar from './components/Layout/Navbar';
