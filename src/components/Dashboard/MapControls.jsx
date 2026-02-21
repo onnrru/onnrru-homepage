@@ -1,5 +1,8 @@
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useDashboard } from '../../context/DashboardContext';
 import { ALL_LAYERS, QUICK_LAYER_IDS, BASIC_LAYERS } from '../../config/layers';
+import AddressSearch from './AddressSearch';
 
 const MapControls = ({
     handleZoom,
@@ -19,66 +22,102 @@ const MapControls = ({
     const {
         isSidebarOpen, setIsSidebarOpen,
         isAnalysisOpen, setIsAnalysisOpen,
-        parcelPickMode, setParcelPickMode
+        parcelPickMode, setParcelPickMode,
+        setSelectedAddress
     } = useDashboard();
+
+    const [showOptions, setShowOptions] = useState(false);
     return (
-        <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
-            {/* Main Row: Map Utilities (Zoom, Measure, Select, Clear) and Submenu Toggles */}
-            <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10 w-max relative z-20">
-                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isSidebarOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="사이드바 정보창 토글">
-                    {isSidebarOpen ? '정보 숨기기' : '대상지 정보'}
-                </button>
-                <button onClick={() => setIsAnalysisOpen(!isAnalysisOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isAnalysisOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="하단 실거래가 분석 패널 토글">
-                    {isAnalysisOpen ? '분석 숨기기' : '실거래가 분석'}
-                </button>
+        <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end max-w-[90vw]">
+            <div className="flex items-center gap-2">
+                {/* Search Bar: Occupies 1/3 when relevant or just fixed size for compact look */}
+                <div className="w-[300px] md:w-[400px]">
+                    <AddressSearch onSelect={setSelectedAddress} />
+                </div>
 
-                <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                <button onClick={() => handleZoom(1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="확대">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                </button>
-                <button onClick={() => handleZoom(-1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="축소">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-                </button>
-
-                <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                <button onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'distance' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="거리 재기">
-                    거리
-                </button>
-                <button onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'area' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="면적 재기">
-                    면적
-                </button>
-                <button onClick={() => { setMeasureMode(null); setParcelPickMode(false); toggleRadiusMode(); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${radiusMode ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="반경 그리기">
-                    반경
-                </button>
-                <button onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${parcelPickMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="지번 다중선택">
-                    멀티지번
-                </button>
-
-                <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                <button onClick={clearAll} className="px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap text-gray-500 hover:bg-red-50 hover:text-red-500" title="모두 지우기">
-                    지우기
-                </button>
-
-                <div className="w-px h-5 bg-gray-300 mx-2"></div>
-
-                <div className="flex items-center gap-1 h-full bg-gray-100 rounded p-0.5">
+                {/* Options Toggle and Controls Area */}
+                <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 p-1 h-11 relative z-20 transition-all">
+                    {/* Toggle Button */}
                     <button
-                        onClick={() => setShowMapTypes(!showMapTypes)}
-                        className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
-                            ${showMapTypes ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
+                        onClick={() => setShowOptions(!showOptions)}
+                        className={`h-full px-4 rounded-full text-[12px] font-bold transition-all flex items-center gap-2 shadow-sm
+                            ${showOptions ? 'bg-ink text-white' : 'bg-gray-50 text-ink hover:bg-gray-100'}`}
                     >
-                        지도종류
+                        <span>옵션보기</span>
+                        <svg className={`w-3 h-3 transition-transform duration-300 ${showOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    <button
-                        onClick={() => setShowZones(!showZones)}
-                        className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
-                            ${showZones ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
-                    >
-                        지역지구
-                    </button>
+
+                    {/* Extended Controls: Shown only when showOptions is true */}
+                    <AnimatePresence>
+                        {showOptions && (
+                            <motion.div
+                                initial={{ opacity: 0, width: 0, x: 20 }}
+                                animate={{ opacity: 1, width: 'auto', x: 0 }}
+                                exit={{ opacity: 0, width: 0, x: 20 }}
+                                transition={{ duration: 0.3, ease: "easeOut" }}
+                                className="flex items-center overflow-hidden h-full"
+                            >
+                                <div className="w-px h-5 bg-gray-300 mx-2 flex-shrink-0"></div>
+                                <div className="flex items-center h-full px-1">
+                                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isSidebarOpen ? 'text-ink bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`} title="사이드바 정보창 토글">
+                                        대상지 정보
+                                    </button>
+                                    <button onClick={() => setIsAnalysisOpen(!isAnalysisOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isAnalysisOpen ? 'text-ink bg-gray-100' : 'text-gray-600 hover:bg-gray-100'}`} title="하단 실거래가 분석 패널 토글">
+                                        실거래가 분석
+                                    </button>
+
+                                    <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0"></div>
+
+                                    <button onClick={() => handleZoom(1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="확대">
+                                        +
+                                    </button>
+                                    <button onClick={() => handleZoom(-1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="축소">
+                                        -
+                                    </button>
+
+                                    <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0"></div>
+
+                                    <button onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'distance' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="거리 재기">
+                                        거리
+                                    </button>
+                                    <button onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'area' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="면적 재기">
+                                        면적
+                                    </button>
+                                    <button onClick={() => { setMeasureMode(null); setParcelPickMode(false); toggleRadiusMode(); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${radiusMode ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="반경 그리기">
+                                        반경
+                                    </button>
+                                    <button onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${parcelPickMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="지번 다중선택">
+                                        멀티지번
+                                    </button>
+
+                                    <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0"></div>
+
+                                    <button onClick={clearAll} className="px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap text-gray-500 hover:bg-red-50 hover:text-red-500" title="모두 지우기">
+                                        지우기
+                                    </button>
+
+                                    <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0"></div>
+
+                                    <div className="flex items-center gap-1 h-full bg-gray-50 rounded p-0.5">
+                                        <button
+                                            onClick={() => setShowMapTypes(!showMapTypes)}
+                                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
+                                                ${showMapTypes ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:bg-gray-200'}`}
+                                        >
+                                            지도종류
+                                        </button>
+                                        <button
+                                            onClick={() => setShowZones(!showZones)}
+                                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap
+                                                ${showZones ? 'bg-white text-gray-800 shadow-sm' : 'bg-transparent text-gray-500 hover:bg-gray-200'}`}
+                                        >
+                                            지역지구
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
 
