@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_CONFIG } from '../../config/api';
-import { VWorldService } from '../../services/vworldService';
 import MiniMap from './MiniMap';
-import { useDashboard } from '../../context/DashboardContext';
 
-const Sidebar = ({ onClose }) => {
-    const { selectedAddress, selectedParcels } = useDashboard();
+const Sidebar = ({ selectedAddress, selectedParcels, onClose }) => {
     const [specOpen, setSpecOpen] = useState(false);
     const [charOpen, setCharOpen] = useState(true);
 
@@ -27,12 +24,19 @@ const Sidebar = ({ onClose }) => {
 
     const getVworldDomain = () => window.location.hostname;
 
+    const safeJson = (maybe) => {
+        if (typeof maybe === 'string') {
+            try { return JSON.parse(maybe); } catch { return null; }
+        }
+        return maybe;
+    };
+
     // Helper to find first non-empty value
     const first = (...vals) => {
         for (const v of vals) {
             if (v === 0) return 0;
             const sv = String(v || '').trim();
-            if (sv !== '' && sv !== 'null' && sv !== 'undefined' && sv !== '지정되지않음' && sv !== '지정되지 않음' && sv !== 'NaN') return v;
+            if (sv !== '' && sv !== 'null' && sv !== 'undefined' && sv !== '吏?뺣릺吏?딆쓬' && sv !== '吏?뺣릺吏 ?딆쓬' && sv !== 'NaN') return v;
         }
         return null;
     };
@@ -72,7 +76,7 @@ const Sidebar = ({ onClose }) => {
     };
 
     const extractDongRiBunji = (fullAddr = '') => {
-        const m = String(fullAddr).match(/([가-힣0-9]+(?:동|리|읍|면))\s+(\d+(?:-\d+)?)/);
+        const m = String(fullAddr).match(/([媛-??-9]+(?:??由???硫?)\s+(\d+(?:-\d+)?)/);
         if (m) return `${m[1]} ${m[2]}`;
         const tokens = String(fullAddr).trim().split(/\s+/);
         if (tokens.length >= 2) return `${tokens[tokens.length - 2]} ${tokens[tokens.length - 1]}`;
@@ -81,8 +85,15 @@ const Sidebar = ({ onClose }) => {
 
     // API 1: LadfrlList (Backup Area/Jimok)
     const fetchLadfrl = async (pnu) => {
+        const key = API_CONFIG.VWORLD_KEY;
+        const domain = getVworldDomain();
+        const url = `/api/vworld/ned/data/ladfrlList`;
         try {
-            const d = await VWorldService.fetchLadfrl(pnu);
+            const res = await axios.get(url, {
+                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
+                timeout: 2000
+            });
+            const d = safeJson(res.data) ?? res.data;
             if (d) {
                 const jimok = findInJson(d, /^(lndcgrCodeNm|lndcgr_code_nm|jimok)$/);
                 const area = findInJson(d, /^(lndpclAr|lndpcl_ar|ladAr|lad_ar)$/);
@@ -94,8 +105,17 @@ const Sidebar = ({ onClose }) => {
 
     // API 2: LandCharacteristics (Main)
     const fetchLandCharacteristics = async (pnu) => {
+        const key = API_CONFIG.VWORLD_KEY;
+        const domain = getVworldDomain();
+        const url = `/api/vworld/ned/data/getLandCharacteristics`;
         try {
-            return await VWorldService.fetchLandCharacteristics(pnu);
+            const res = await axios.get(url, {
+                params: { key, domain, pnu, format: 'json', numOfRows: 10, pageNo: 1 },
+                timeout: 3000
+            });
+            const d = safeJson(res.data) ?? res.data;
+            // Use findInJson for flat extraction
+            return d;
         } catch (e) { /* ignore */ }
         return null;
     };
@@ -103,6 +123,7 @@ const Sidebar = ({ onClose }) => {
     // API 3: WFS (XML Fallback)
     const fetchLandCharacteristicsWFS = async (pnu) => {
         const key = API_CONFIG.VWORLD_KEY;
+        // WFS proxy endpoint assumed or direct usage
         const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
         try {
             const res = await axios.get(url, {
@@ -122,6 +143,7 @@ const Sidebar = ({ onClose }) => {
                 return null;
             };
 
+            // Check success
             if (pick('pnu') || pick('lad_ar') || pick('lndpcl_ar')) {
                 return {
                     isWfs: true,
@@ -210,7 +232,7 @@ const Sidebar = ({ onClose }) => {
                 uses = [dPrpos1, dPrpos2];
             }
 
-            uses = uses.filter(v => v && !/지정되지\s*않음/.test(v) && v !== '-');
+            uses = uses.filter(v => v && !/吏?뺣릺吏\s*?딆쓬/.test(v) && v !== '-');
 
             setData({
                 basic: {
@@ -289,10 +311,10 @@ const Sidebar = ({ onClose }) => {
     Object.values(parcelMeta).forEach(v => {
         if (v.uses) v.uses.forEach(u => allUsesSet.add(u));
     });
-    const finalCombinedUses = Array.from(allUsesSet).filter(v => v && !/지정되지\s*않음/.test(v) && v !== '-');
+    const finalCombinedUses = Array.from(allUsesSet).filter(v => v && !/吏?뺣릺吏\s*?딆쓬/.test(v) && v !== '-');
 
     const hdrAddr = selectedAddress?.roadAddr || selectedAddress?.address || picked.representative?.addr || '-';
-    const hdrExtra = picked.list.length > 1 ? ` 외 ${picked.list.length - 1}필지` : '';
+    const hdrExtra = picked.list.length > 1 ? ` ??${picked.list.length - 1}?꾩?` : '';
 
     // Fix MiniMap Sync: `picked.list` might lack the full full openlayers feature object depending on how it's mapped.
     // Directly use the raw `selectedParcels` array which contains the core GeoJSON features.
@@ -311,7 +333,7 @@ const Sidebar = ({ onClose }) => {
                 <button
                     onClick={onClose}
                     className="md:hidden absolute top-4 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-md border border-gray-100 text-gray-600 hover:text-black hover:bg-gray-50 flex items-center justify-center transition-colors"
-                    aria-label="닫기"
+                    aria-label="?リ린"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -324,7 +346,7 @@ const Sidebar = ({ onClose }) => {
                 <div className="w-full aspect-square rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
                     {(mx && my)
                         ? <MiniMap x={mx} y={my} features={activeFeaturesList} />
-                        : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs text-center px-4">대상을 선택하시면<br />미니맵이 활성화됩니다</div>
+                        : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs text-center px-4">??곸쓣 ?좏깮?섏떆硫?br />誘몃땲留듭씠 ?쒖꽦?붾맗?덈떎</div>
                     }
                 </div>
             </div>
@@ -332,10 +354,9 @@ const Sidebar = ({ onClose }) => {
             <div className="p-5 pt-1 border-b border-gray-100 flex-shrink-0 bg-white">
                 <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
                     <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
-                    대상지번
-                </h4>
+                    ??곸?踰?                </h4>
                 <div className="text-lg font-bold text-gray-900 font-serif break-keep leading-tight tracking-tight">
-                    {picked.representative ? `${hdrAddr}${hdrExtra}` : '주소를 선택하세요'}
+                    {picked.representative ? `${hdrAddr}${hdrExtra}` : '二쇱냼瑜??좏깮?섏꽭??}
                 </div>
             </div>
 
@@ -351,14 +372,13 @@ const Sidebar = ({ onClose }) => {
                         <section>
                             <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
                                 <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
-                                국토계획법 및 타법령 지역·지구 등
-                            </h4>
+                                援?넗怨꾪쉷踰?諛??踰뺣졊 吏??룹?援???                            </h4>
                             <div className="flex flex-wrap gap-2">
                                 {finalCombinedUses.length > 0 ? (
                                     finalCombinedUses.map((use, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-100">{use}</span>
                                     ))
-                                ) : <div className="text-gray-400 text-xs italic">정보 없음</div>}
+                                ) : <div className="text-gray-400 text-xs italic">?뺣낫 ?놁쓬</div>}
                             </div>
                         </section>
 
@@ -366,35 +386,35 @@ const Sidebar = ({ onClose }) => {
                             <section>
                                 <h4 className="font-bold text-gray-800 text-sm mb-2.5 flex items-center gap-2 tracking-tight">
                                     <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
-                                    토지 기본특성
+                                    ?좎? 湲곕낯?뱀꽦
                                 </h4>
                                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                                     <table className="w-full text-[11px]">
                                         <tbody className="divide-y divide-gray-100">
                                             <tr>
-                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500 w-1/3">지목</th>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500 w-1/3">吏紐?/th>
                                                 <td className="py-2 px-3 text-gray-800 font-bold">{data.basic?.jimok || '-'}</td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">면적</th>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">硫댁쟻</th>
                                                 <td className="py-2 px-3 text-gray-800 font-bold tracking-tight">
                                                     {(data.basic?.area !== null && data.basic?.area !== undefined) ?
-                                                        `${Number(data.basic.area).toLocaleString()} m² (${(Number(data.basic.area) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)`
+                                                        `${Number(data.basic.area).toLocaleString()} m짼 (${(Number(data.basic.area) * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)`
                                                         : '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">공시지가</th>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">怨듭떆吏媛</th>
                                                 <td className="py-2 px-3 text-gray-800 font-bold">
-                                                    {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} 원/m²` : '-'}
+                                                    {data.basic?.price ? `${Number(data.basic.price).toLocaleString()} ??m짼` : '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">이용상황</th>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">?댁슜?곹솴</th>
                                                 <td className="py-2 px-3 text-gray-800">{data.basic?.ladUse || '-'}</td>
                                             </tr>
                                             <tr>
-                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">도로접면</th>
+                                                <th className="bg-gray-50/50 py-2 px-3 text-left font-medium text-gray-500">?꾨줈?묐㈃</th>
                                                 <td className="py-2 px-3 text-gray-800">{data.basic?.roadSide || '-'}</td>
                                             </tr>
                                         </tbody>
@@ -408,21 +428,20 @@ const Sidebar = ({ onClose }) => {
                                 <div className="flex justify-between items-center mb-2.5">
                                     <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 tracking-tight">
                                         <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
-                                        토지명세표
-                                    </h4>
+                                        ?좎?紐낆꽭??                                    </h4>
                                     <button onClick={toggleSpec} className="text-[11px] font-bold text-ink hover:underline">
-                                        {specOpen ? '간략히' : '상세보기'}
+                                        {specOpen ? '媛꾨왂?? : '?곸꽭蹂닿린'}
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center">
-                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">총 필지수</div>
+                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">珥??꾩???/div>
                                         <div className="text-[11px] font-bold text-ink">{picked.list.length}</div>
                                     </div>
                                     <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm flex flex-col items-center justify-center">
-                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">합계 면적</div>
+                                        <div className="text-[10px] text-gray-400 font-bold mb-0.5">?⑷퀎 硫댁쟻</div>
                                         <div className="text-[11px] font-bold text-blue-700 tracking-tight">
-                                            {displayTotal.toLocaleString()} m² <span className="text-[10px] text-gray-500 font-normal">({(displayTotal * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</span>
+                                            {displayTotal.toLocaleString()} m짼 <span className="text-[10px] text-gray-500 font-normal">({(displayTotal * 0.3025).toLocaleString(undefined, { maximumFractionDigits: 2 })} py)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -432,9 +451,9 @@ const Sidebar = ({ onClose }) => {
                                             <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
                                                 <tr>
                                                     <th className="py-2 px-2 text-center w-8">No</th>
-                                                    <th className="py-2 px-2">지번</th>
-                                                    <th className="p-2 text-right">지목</th>
-                                                    <th className="p-2 text-right">면적(m²)</th>
+                                                    <th className="py-2 px-2">吏踰?/th>
+                                                    <th className="p-2 text-right">吏紐?/th>
+                                                    <th className="p-2 text-right">硫댁쟻(m짼)</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
@@ -468,8 +487,7 @@ const Sidebar = ({ onClose }) => {
                             <section>
                                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                                     <span className="w-1.5 h-4 bg-ink rounded-full"></span>
-                                    토지이용계획도
-                                </h4>
+                                    ?좎??댁슜怨꾪쉷??                                </h4>
                                 <div className="w-full aspect-video bg-gray-50 rounded-xl overflow-hidden border border-gray-200 relative shadow-inner">
                                     <img src={landUseWmsUrl} alt="Plan" className="w-full h-full object-contain" onError={() => setShowLandUseWms(false)} />
                                 </div>

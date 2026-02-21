@@ -1,11 +1,8 @@
-import { useNavigate } from 'react-router-dom';
-import AddressSearch from './AddressSearch';
-import { useDashboard } from '../../context/DashboardContext';
+﻿import { useNavigate } from 'react-router-dom';
+import AddressSearch from './AddressSearch'; // Import new component
 
-const TopBar = () => {
-    const { setSelectedAddress } = useDashboard();
+const TopBar = ({ onAddressSelect }) => {
     const navigate = useNavigate();
-    const onAddressSelect = setSelectedAddress;
 
     return (
         <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 md:px-6 shadow-sm z-20">
@@ -15,7 +12,7 @@ const TopBar = () => {
                 className="flex items-center gap-2 md:gap-4 hover:opacity-80 transition-opacity whitespace-nowrap"
             >
                 <div className="text-lg md:text-xl font-bold text-ink font-serif tracking-tight cursor-pointer">
-                    한결같이 온류
+                    ?쒓껐媛숈씠 ?⑤쪟
                 </div>
                 <span className="text-gray-300 hidden sm:inline">|</span>
                 <div className="text-xs md:text-sm text-gray-500 hidden sm:block">Professional Analysis</div>

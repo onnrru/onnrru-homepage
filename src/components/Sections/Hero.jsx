@@ -117,24 +117,89 @@ const Hero = () => {
                         </div>
                     </motion.div>
 
-                    {[
-                        { title: 'Square Special', img: '/imgs/web-2.jpg', desc: 'Deep dish delight.' },
-                        { title: 'Family Set', img: '/imgs/branding-1.jpg', desc: 'Share the joy.' }
-                    ].map((item, index) => (
-                        <motion.div
-                            key={index + 1}
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.8, delay: 0.5 + ((index + 1) * 0.2) }}
-                            className="relative h-auto min-h-[400px] md:h-full rounded-3xl overflow-hidden bg-white shadow-lg cursor-pointer group"
-                        >
-                            <img src={item.img} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
-                                <h3 className="text-white text-2xl font-bold mb-1">{item.title}</h3>
-                                <p className="text-white/80 font-light">{item.desc}</p>
-                            </div>
-                        </motion.div>
-                    ))}
+                    {/* Column 2: Square Special Card */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.7 }}
+                        className="relative h-auto min-h-[400px] md:h-full rounded-3xl overflow-hidden bg-white shadow-lg cursor-pointer group"
+                    >
+                        <img src="/imgs/web-2.jpg" alt="Square Special" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex flex-col justify-end p-8">
+                            <h3 className="text-white text-2xl font-bold mb-1">Square Special</h3>
+                            <p className="text-white/80 font-light">Deep dish delight.</p>
+                        </div>
+                    </motion.div>
+
+                    {/* Column 3: Two Store Cards Stacked */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 50 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 0.9 }}
+                        className="flex flex-col gap-4 h-full"
+                    >
+                        {[
+                            {
+                                name: "파파밸리피자 파크하비오점",
+                                addr: "서울 송파구 송파대로 111",
+                                rating: "4.87",
+                                visit: "782",
+                                blog: "45",
+                                tag: "맛있어요",
+                                percent: "95%",
+                                url: "https://m.place.naver.com/restaurant/1649363852/review/visitor"
+                            },
+                            {
+                                name: "파파밸리피자 잠실롯데마트점",
+                                addr: "서울 송파구 올림픽로 240",
+                                rating: "4.92",
+                                visit: "1,204",
+                                blog: "312",
+                                tag: "가성비 좋아요",
+                                percent: "98%",
+                                url: "https://m.place.naver.com/restaurant/1050556556/review/visitor"
+                            }
+                        ].map((store, idx) => (
+                            <a
+                                key={idx}
+                                href={store.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 bg-white rounded-3xl p-5 shadow-lg border border-gray-100 flex flex-col justify-between hover:border-ink-light/30 transition-all group/store"
+                            >
+                                <div className="flex items-center space-x-3 mb-3">
+                                    <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center p-2 text-ink">
+                                        <svg fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-ink group-hover/store:text-ink-light transition-colors">{store.name}</h4>
+                                        <p className="text-[10px] text-gray-400 font-light">{store.addr}</p>
+                                    </div>
+                                </div>
+
+                                <div className="text-center py-2 border-t border-b border-gray-50 my-2">
+                                    <div className="flex justify-center items-center space-x-1 mb-1">
+                                        <svg className="w-4 h-4 text-[#03C75A]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+                                        <span className="text-xl font-bold text-ink">{store.rating}</span>
+                                        <span className="text-[10px] text-gray-400 font-light">/ 5</span>
+                                    </div>
+                                    <div className="flex justify-center gap-3 text-[10px] text-gray-400">
+                                        <span>방문자 <b className="text-ink font-bold">{store.visit}</b></span>
+                                        <span className="w-[1px] h-2 bg-gray-200 self-center"></span>
+                                        <span>블로그 <b className="text-ink font-bold">{store.blog}</b></span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 px-3 py-2 rounded-xl text-[10px] text-gray-500 flex items-center">
+                                    <span className="font-bold text-ink mr-2">"{store.tag}"</span>
+                                    <div className="flex-1 bg-gray-200 h-1 rounded-full overflow-hidden">
+                                        <div className="h-full bg-[#03C75A]" style={{ width: store.percent }}></div>
+                                    </div>
+                                    <span className="ml-2">{store.percent}</span>
+                                </div>
+                            </a>
+                        ))}
+                    </motion.div>
                 </div>
             </div>
         </section>

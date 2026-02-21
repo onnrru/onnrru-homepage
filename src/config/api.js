@@ -2,12 +2,12 @@ export const API_CONFIG = {
     // Base URLs
     EUM_BASE_URL: '/api/eum', // Use Proxy for Mixed Content & CORS
     VWORLD_BASE_URL: '/api/vworld', // Keep proxy for Data API (CORS)
-    VWORLD_MAP_URL: 'https://api.vworld.kr', // Revert to Direct URL for Tiles
+    VWORLD_MAP_URL: '/api/vworld', // Route through Proxy for key injection
     MOLIT_BASE_URL: '/api/molit',
 
     // Keys
-    VWORLD_KEY: 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
-    MOLIT_KEY: '63c2acbe859fe2a894c6d25935c040f3418a6080952bd0b7c275c06b7a16b39d',
+    VWORLD_KEY: 'SECRET',
+    MOLIT_KEY: 'SECRET',
 
     // Endpoints
     ENDPOINTS: {

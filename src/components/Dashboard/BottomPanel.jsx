@@ -66,7 +66,11 @@ const CustomBarLabel = (props) => {
     );
 };
 
-const BottomPanel = ({ selectedAddress, onAnalyzedDataChange }) => {
+import { useDashboard } from '../../context/DashboardContext';
+
+const BottomPanel = () => {
+    const { selectedAddress, setAnalyzedApartments } = useDashboard();
+    const onAnalyzedDataChange = setAnalyzedApartments;
     const [loading, setLoading] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(AREA_CATEGORIES[0]);
     const [selectedApartment, setSelectedApartment] = useState(null);

@@ -1,123 +1,29 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { API_CONFIG } from '../../config/api';
+import { ALL_LAYERS, QUICK_LAYER_IDS, BASIC_LAYERS } from '../../config/layers';
+import { VWorldService } from '../../services/vworldService';
+import MapControls from './MapControls';
+import { useMapMeasurements } from './useMapMeasurements';
+import { useRadiusDrawing } from './useRadiusDrawing';
 
-// Full Layer List extracted from User Reference (Exhaustive)
-const ALL_LAYERS = [
-    { id: 'LP_PA_CBND_BUBUN', label: '지적도', category: '기본' },
+import { useDashboard } from '../../context/DashboardContext';
 
-    { id: 'LT_C_UQ111', label: '도시지역', category: '용도지역' },
-    { id: 'LT_C_UQ112', label: '관리지역', category: '용도지역' },
-    { id: 'LT_C_UQ113', label: '농림지역', category: '용도지역' },
-    { id: 'LT_C_UQ114', label: '자연환경보전지역', category: '용도지역' },
+const MapSection = () => {
+    const {
+        selectedAddress,
+        setSelectedAddress,
+        selectedParcels,
+        setSelectedParcels,
+        analyzedApartments,
+        isAnalysisOpen,
+        setIsAnalysisOpen,
+        isSidebarOpen,
+        setIsSidebarOpen
+    } = useDashboard();
 
-    { id: 'LT_C_UQ129', label: '개발진흥지구', category: '용도지구' },
-    { id: 'LT_C_UQ121', label: '경관지구', category: '용도지구' },
-    { id: 'LT_C_UQ123', label: '고도지구', category: '용도지구' },
-    { id: 'LT_C_UQ122', label: '미관지구', category: '용도지구' },
-    { id: 'LT_C_UQ125', label: '방재지구', category: '용도지구' },
-    { id: 'LT_C_UQ124', label: '방화지구', category: '용도지구' },
-    { id: 'LT_C_UQ126', label: '보존지구', category: '용도지구' },
-    { id: 'LT_C_UQ127', label: '시설보호지구', category: '용도지구' },
-    { id: 'LT_C_UQ128', label: '취락지구', category: '용도지구' },
-    { id: 'LT_C_UQ130', label: '특정용도제한지구', category: '용도지구' },
+    const onAddressSelect = setSelectedAddress;
+    const onParcelsChange = setSelectedParcels;
 
-    { id: 'LT_C_UD801', label: '개발제한구역', category: '용도구역' },
-    { id: 'LT_C_UQ141', label: '국토계획구역', category: '용도구역' },
-    { id: 'LT_C_UQ162', label: '도시자연공원구역', category: '용도구역' },
-    { id: 'LT_C_UM000', label: '가축사육제한구역', category: '용도구역' },
-    { id: 'LT_C_UO601', label: '관광지', category: '용도구역' },
-    { id: 'LT_C_UD610', label: '국민임대주택', category: '용도구역' },
-    { id: 'LT_C_UP401', label: '급경사재해예방지역', category: '용도구역' },
-    { id: 'LT_C_UM301', label: '대기환경규제지역', category: '용도구역' },
-    { id: 'LT_C_UF901', label: '백두대간보호지역', category: '용도구역' },
-    { id: 'LT_C_UH701', label: '벤처기업육성지역', category: '용도구역' },
-    { id: 'LT_C_UD620', label: '보금자리주택', category: '용도구역' },
-    { id: 'LT_C_UF151', label: '산림보호구역', category: '용도구역' },
-    { id: 'LT_C_UM901', label: '습지보호지역', category: '용도구역' },
-    { id: 'LT_C_UB901', label: '시장정비구역', category: '용도구역' },
-    { id: 'LT_C_UM221', label: '야생동식물보호', category: '용도구역' },
-    { id: 'LT_C_UJ401', label: '온천지구', category: '용도구역' },
-    { id: 'LT_C_UH501', label: '유통단지', category: '용도구역' },
-    { id: 'LT_C_UH402', label: '자유무역지역', category: '용도구역' },
-    { id: 'LT_C_UD601', label: '주거환경개선지구도', category: '용도구역' },
-    { id: 'LT_C_UO101', label: '학교환경위생정화구역', category: '용도구역' },
-
-    { id: 'LT_C_LHZONE', label: '사업지구경계도', category: '도시계획' },
-    { id: 'LT_C_LHBLPN', label: '토지이용계획도(LH)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ153', label: '도시계획(공간시설)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ155', label: '도시계획(공공문화)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ152', label: '도시계획(교통시설)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ159', label: '도시계획(기타)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ151', label: '도시계획(도로)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ156', label: '도시계획(방재시설)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ157', label: '도시계획(보건위생)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ154', label: '도시계획(유통공급)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ158', label: '도시계획(환경기초)', category: '도시계획' },
-    { id: 'LT_C_UPISUQ161', label: '지구단위계획', category: '도시계획' },
-    { id: 'LT_C_UPISUQ171', label: '개발행위허가제한', category: '도시계획' },
-    { id: 'LT_C_UPISUQ174', label: '개발행위허가필지', category: '도시계획' },
-    { id: 'LT_C_UPISUQ173', label: '기반시설부담구역', category: '도시계획' },
-    { id: 'LT_C_UPISUQ175', label: '토지거래허가구역', category: '도시계획' },
-
-    { id: 'LT_C_KFDRSSIGUGRADE', label: '산불위험예측지도', category: '환경/산림' },
-    { id: 'LT_C_AGRIXUE101', label: '농업진흥지역도', category: '환경/산림' },
-    { id: 'LT_C_AGRIXUE102', label: '영농여건불리농지', category: '환경/산림' },
-    { id: 'LT_C_FLISFK300', label: '산지(보안림)', category: '환경/산림' },
-    { id: 'LT_C_FLISFK100', label: '산지(자연휴양림)', category: '환경/산림' },
-    { id: 'LT_C_FLISFK200', label: '산지(채종림)', category: '환경/산림' },
-    { id: 'LT_C_UF602', label: '임업및산촌진흥권역', category: '환경/산림' },
-    { id: 'LT_C_FSDIFRSTS', label: '산림입지도', category: '환경/산림' },
-
-    { id: 'LT_C_UP201', label: '재해위험지구', category: '재해/안전' },
-    { id: 'LT_P_EDRSE002', label: '지진대피소', category: '재해/안전' },
-    { id: 'LT_P_ETQSHELTER', label: '지진해일대피소', category: '재해/안전' },
-    { id: 'LT_C_USFSFFB', label: '소방서관할구역', category: '재해/안전' },
-    { id: 'LT_C_CDFRS100FRQ', label: '해안침수(100년)', category: '재해/안전' },
-    { id: 'LT_C_CDFRSMAXFRQ', label: '해안침수(최대범람)', category: '재해/안전' },
-
-    { id: 'LT_C_WGISPLTALK', label: '개발유도연안', category: '수자원/해양' },
-    { id: 'LT_C_WGISPLROW', label: '개발조정연안', category: '수자원/해양' },
-    { id: 'LT_C_WGISPLUSE', label: '이용연안', category: '수자원/해양' },
-    { id: 'LT_C_WGISPLABS', label: '절대보전연안', category: '수자원/해양' },
-    { id: 'LT_C_WGISPLJUN', label: '준보전연안', category: '수자원/해양' },
-    { id: 'LT_C_WKMSBSN', label: '표준권역(수자원)', category: '수자원/해양' },
-    { id: 'LT_C_WKMSTRM', label: '하천망', category: '수자원/해양' },
-    { id: 'LT_C_UM710', label: '상수원보호', category: '수자원/해양' },
-    { id: 'LT_C_WGISARFISHER', label: '수산자원보호구역', category: '수자원/해양' },
-    { id: 'LT_C_WGISARWET', label: '습지보호구역', category: '수자원/해양' },
-    { id: 'LT_L_TOISDEPCNTAH', label: '해안선', category: '수자원/해양' },
-
-    { id: 'LT_C_ADSIDO', label: '광역시도', category: '행정/기타' },
-    { id: 'LT_C_ADSIGG', label: '시군구', category: '행정/기타' },
-    { id: 'LT_C_ADEMD', label: '읍면동', category: '행정/기타' },
-    { id: 'LT_C_RI', label: '리', category: '행정/기타' },
-    { id: 'LT_L_SPRD', label: '도로명주소도로', category: '행정/기타' },
-    { id: 'LT_C_SPBD', label: '도로명주소건물', category: '행정/기타' },
-    { id: 'LT_P_NSNMSSITENM', label: '국가지명', category: '행정/기타' }
-];
-
-const QUICK_LAYER_IDS = [
-    'LP_PA_CBND_BUBUN',
-    'LT_C_UQ111',
-    'LT_C_UQ112',
-    'LT_C_UQ113',
-    'LT_C_UQ114',
-    'LT_C_UD801'
-];
-
-const BASIC_LAYERS = ['LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114'];
-
-const MapSection = ({
-    selectedAddress,
-    onAddressSelect,
-    selectedParcels = [],
-    onParcelsChange,
-    analyzedApartments = [],
-    isAnalysisOpen,
-    setIsAnalysisOpen,
-    isSidebarOpen,
-    setIsSidebarOpen
-}) => {
     const [mapObj, setMapObj] = useState(null);
 
     // Toggles
@@ -136,23 +42,6 @@ const MapSection = ({
     // Stats
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
-
-    // Measurement State
-    const [measureMode, setMeasureMode] = useState(null); // 'distance' | 'area' | null
-    const measureModeRef = useRef(null);
-    useEffect(() => { measureModeRef.current = measureMode; }, [measureMode]);
-
-    // Parcel Select Mode (지번추가)
-    const [parcelPickMode, setParcelPickMode] = useState(false);
-    const parcelPickModeRef = useRef(false);
-    useEffect(() => { parcelPickModeRef.current = parcelPickMode; }, [parcelPickMode]);
-
-    const measureTooltipElement = useRef(null);
-    const measureTooltip = useRef(null);
-    const helpTooltipElement = useRef(null);
-    const helpTooltip = useRef(null);
-    const measureSource = useRef(null);
-    const drawInteraction = useRef(null);
 
     // Cadastral stabilization
     const cadastralLayerRef = useRef(null);
@@ -180,24 +69,8 @@ const MapSection = ({
     };
 
     // ====== Fetcher (Proxy path) ======
-    const fetchParcelByLonLat = useCallback(async (lon, lat, apiKey) => {
-        const base = '/api/vworld';
-        const url =
-            `${base}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun` +
-            `&format=json&geomFilter=POINT(${lon} ${lat})&key=${apiKey}&domain=${window.location.hostname}`;
-
-        const res = await fetch(url);
-        const text = await res.text();
-
-        if (text.trim().startsWith('<')) {
-            console.error('VWorld returned HTML (proxy issue):', text.slice(0, 120));
-            return null;
-        }
-
-        const json = JSON.parse(text);
-        if (json?.response?.status !== 'OK') return null;
-
-        return json.response?.result?.featureCollection?.features?.[0] || null;
+    const fetchParcelByLonLat = useCallback(async (lon, lat) => {
+        return await VWorldService.fetchParcelByLonLat(lon, lat);
     }, []);
 
     // ====== Renderers ======
@@ -345,7 +218,7 @@ const MapSection = ({
                 // Cadastral (WMS)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: 'https://api.vworld.kr/req/wms',
+                        url: `${proxyMapUrl}/req/wms`,
                         params: {
                             service: 'WMS',
                             request: 'GetMap',
@@ -371,7 +244,7 @@ const MapSection = ({
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
                         const source = new OL.source.TileWMS({
-                            url: 'https://api.vworld.kr/req/wms',
+                            url: `${proxyMapUrl}/req/wms`,
                             params: {
                                 LAYERS: layer.id.toLowerCase(),
                                 STYLES: layer.id.toLowerCase(),
@@ -464,20 +337,35 @@ const MapSection = ({
                     }
                 });
 
-                // Measure layer
-                const measureSrc = new OL.source.Vector();
-                measureSource.current = measureSrc;
-                const measureLayer = new OL.layer.Vector({
-                    source: measureSrc,
-                    zIndex: 25,
-                    style: new OL.style.Style({
-                        fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
-                        stroke: new OL.style.Stroke({ color: '#ffcc33', width: 2 }),
-                        image: new OL.style.Circle({
-                            radius: 7,
-                            fill: new OL.style.Fill({ color: '#ffcc33' })
-                        })
-                    })
+                // Radius overlay layer
+                const radiusSrc = new OL.source.Vector();
+                radiusSourceRef.current = radiusSrc;
+                const radiusLayer = new OL.layer.Vector({
+                    source: radiusSrc,
+                    zIndex: 24,
+                    style: (feature) => {
+                        if (feature.get('type') === 'label') {
+                            return new OL.style.Style({
+                                text: new OL.style.Text({
+                                    text: feature.get('text'),
+                                    font: 'bold 12px "Pretendard", sans-serif',
+                                    fill: new OL.style.Fill({ color: '#dc2626' }),
+                                    stroke: new OL.style.Stroke({ color: '#ffffff', width: 3 }),
+                                    offsetY: 0
+                                })
+                            });
+                        }
+                        return new OL.style.Style({
+                            stroke: new OL.style.Stroke({
+                                color: 'rgba(220, 38, 38, 0.8)',
+                                width: 2,
+                                lineDash: [5, 5]
+                            }),
+                            fill: new OL.style.Fill({
+                                color: 'rgba(220, 38, 38, 0.05)'
+                            })
+                        });
+                    }
                 });
 
                 const map = new OL.Map({
@@ -486,7 +374,7 @@ const MapSection = ({
                     layers: [
                         baseLayer, grayLayer, midnightLayer, satelliteLayer,
                         hybridLayer, cadastralLayer, ...wmsLayers,
-                        markerLayer, selectionLayer, aptMarkerLayer, measureLayer
+                        markerLayer, selectionLayer, aptMarkerLayer, radiusLayer, measureLayer
                     ],
                     view: new OL.View({
                         center: [14151740, 4511257],
@@ -624,14 +512,11 @@ const MapSection = ({
         if (!analyzedApartments || analyzedApartments.length === 0) return;
 
         const currentYear = new Date().getFullYear();
-        const apiKey = API_CONFIG.VWORLD_KEY;
-        const proxyBase = '/api/vworld';
 
         analyzedApartments.forEach(async (apt) => {
             if (!apt.jibun || !apt.dongName) return;
 
-            // Format address for Geocoding: Jibun includes Sido/Sigungu typically?
-            // "dongName jibun" works well for VWorld Search API
+            // Format address for Geocoding
             const searchStr = `${apt.dongName} ${apt.jibun}`.trim();
 
             try {
@@ -644,16 +529,10 @@ const MapSection = ({
                     }
                 }
 
-                const url = `${proxyBase}/req/search?service=search&request=search&version=2.0` +
-                    `&crs=EPSG:4326&size=1&page=1&query=${encodeURIComponent(searchStr)}` +
-                    `&type=ADDRESS&category=parcel&format=json&errorformat=json` +
-                    `&key=${apiKey}&domain=${window.location.hostname}`;
+                // Use Centralized Service with Caching
+                const item = await VWorldService.searchAddress(searchStr);
 
-                const res = await fetch(url);
-                const data = await res.json();
-
-                if (data?.response?.status === 'OK' && data.response.result?.items?.length > 0) {
-                    const item = data.response.result.items[0];
+                if (item) {
                     const [lon, lat] = [parseFloat(item.point.x), parseFloat(item.point.y)];
 
                     const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
@@ -826,7 +705,6 @@ const MapSection = ({
         if (!mapObj || !selectedAddress?.x || !selectedAddress?.y) return;
         if (enrichLockRef.current) return;
 
-        const apiKey = API_CONFIG.VWORLD_KEY;
         const lon = parseFloat(selectedAddress.x);
         const lat = parseFloat(selectedAddress.y);
         if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
@@ -844,10 +722,9 @@ const MapSection = ({
 
         const run = async () => {
             try {
-                const fd = await fetchParcelByLonLat(lon, lat, apiKey);
+                const fd = await fetchParcelByLonLat(lon, lat);
                 if (!fd) return;
 
-                // 검색/주소선택은 "단일 포커스"만 표시 (멀티 선택은 그대로 유지)
                 renderSingleFocus(fd);
 
                 if (alreadyEnough) return;
@@ -885,123 +762,6 @@ const MapSection = ({
         run();
     }, [mapObj, selectedAddress, fetchParcelByLonLat, renderSingleFocus, onAddressSelect]);
 
-    // ====== Measurement logic (기존 유지) ======
-    useEffect(() => {
-        if (!mapObj || !measureMode) {
-            if (mapObj && drawInteraction.current) {
-                mapObj.removeInteraction(drawInteraction.current);
-                drawInteraction.current = null;
-            }
-            if (mapObj && helpTooltipElement.current) {
-                mapObj.removeOverlay(helpTooltip.current);
-            }
-            return;
-        }
-
-        const OL = window.ol;
-        const source = measureSource.current;
-
-        const type = measureMode === 'area' ? 'Polygon' : 'LineString';
-        const draw = new OL.interaction.Draw({
-            source,
-            type,
-            style: new OL.style.Style({
-                fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' }),
-                stroke: new OL.style.Stroke({
-                    color: 'rgba(0, 0, 0, 0.5)',
-                    lineDash: [10, 10],
-                    width: 2
-                }),
-                image: new OL.style.Circle({
-                    radius: 5,
-                    stroke: new OL.style.Stroke({ color: 'rgba(0, 0, 0, 0.7)' }),
-                    fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.2)' })
-                })
-            })
-        });
-
-        const createMeasureTooltip = () => {
-            if (measureTooltipElement.current) {
-                measureTooltipElement.current.parentNode.removeChild(measureTooltipElement.current);
-            }
-            measureTooltipElement.current = document.createElement('div');
-            measureTooltipElement.current.className =
-                'ol-tooltip ol-tooltip-measure bg-black/70 text-white px-2 py-1 rounded text-xs';
-            measureTooltip.current = new OL.Overlay({
-                element: measureTooltipElement.current,
-                offset: [0, -15],
-                positioning: 'bottom-center',
-                stopEvent: false,
-                insertFirst: false
-            });
-            mapObj.addOverlay(measureTooltip.current);
-        };
-
-        const createHelpTooltip = () => {
-            if (helpTooltipElement.current) {
-                helpTooltipElement.current.parentNode.removeChild(helpTooltipElement.current);
-            }
-            helpTooltipElement.current = document.createElement('div');
-            helpTooltipElement.current.className = 'ol-tooltip hidden';
-            helpTooltip.current = new OL.Overlay({
-                element: helpTooltipElement.current,
-                offset: [15, 0],
-                positioning: 'center-left'
-            });
-            mapObj.addOverlay(helpTooltip.current);
-        };
-
-        createMeasureTooltip();
-        createHelpTooltip();
-
-        let listener;
-        draw.on('drawstart', (evt) => {
-            let tooltipCoord = evt.coordinate;
-
-            listener = evt.feature.getGeometry().on('change', (e) => {
-                const geom = e.target;
-                let output;
-
-                if (geom instanceof OL.geom.Polygon) {
-                    const area = OL.sphere.getArea(geom);
-                    output = area > 10000
-                        ? (Math.round(area / 1000000 * 100) / 100) + ' km²'
-                        : (Math.round(area * 100) / 100) + ' m²';
-                    tooltipCoord = geom.getInteriorPoint().getCoordinates();
-                } else if (geom instanceof OL.geom.LineString) {
-                    const length = OL.sphere.getLength(geom);
-                    output = length > 1000
-                        ? (Math.round(length / 1000 * 100) / 100) + ' km'
-                        : (Math.round(length * 100) / 100) + ' m';
-                    tooltipCoord = geom.getLastCoordinate();
-                }
-
-                if (measureTooltipElement.current) {
-                    measureTooltipElement.current.innerHTML = output;
-                    measureTooltip.current.setPosition(tooltipCoord);
-                }
-            });
-        });
-
-        draw.on('drawend', () => {
-            if (measureTooltipElement.current) {
-                measureTooltipElement.current.className =
-                    'ol-tooltip ol-tooltip-static bg-black/70 text-white px-2 py-1 rounded text-xs border border-white/20 shadow-sm';
-            }
-            measureTooltip.current.setOffset([0, -7]);
-            measureTooltipElement.current = null;
-            createMeasureTooltip();
-            OL.Observable.unByKey(listener);
-        });
-
-        mapObj.addInteraction(draw);
-        drawInteraction.current = draw;
-
-        return () => {
-            mapObj.removeInteraction(draw);
-        };
-    }, [mapObj, measureMode]);
-
     const handleZoom = useCallback((delta) => {
         if (!mapObj) return;
         const view = mapObj.getView();
@@ -1010,25 +770,26 @@ const MapSection = ({
         if (Number.isFinite(z)) view.animate({ zoom: z + delta, duration: 250 });
     }, [mapObj]);
 
-    const clearAll = () => {
-        measureSource.current?.clear?.();
-        document.querySelectorAll('.ol-tooltip-static')?.forEach((el) => el.remove());
+    const clearAll = useCallback(() => {
+        clearMeasurements();
+        clearRadius();
         setMeasureMode(null);
         renderSingleFocus(null);
+        setRadiusMode(false);
         markerSourceRef.current?.clear?.();
         commitSelectedParcels([]);
         setParcelPickMode(false);
-    };
+    }, [clearMeasurements, clearRadius, commitSelectedParcels, renderSingleFocus]);
 
     // Categories for Filter
-    const categories = [
+    const categories = useMemo(() => [
         '전체',
         ...new Set(
             ALL_LAYERS
                 .filter((l) => !['LP_PA_CBND_BUBUN', ...QUICK_LAYER_IDS].includes(l.id))
                 .map((l) => l.category)
         )
-    ];
+    ], []);
 
     return (
         <div className={`flex-1 relative bg-gray-100 overflow-hidden group h-full w-full ${measureMode ? 'cursor-crosshair' : ''}`}>
@@ -1048,230 +809,30 @@ const MapSection = ({
                 )}
             </div>
 
-            {/* Left Tools Removed - Moved to Right Horizontal Pill */}
-
-            {/* Main Controls (Top Right) */}
-            <div className="absolute top-4 right-4 z-20 pointer-events-auto flex flex-col gap-2 items-end">
-
-                {/* Main Row: Map Utilities (Zoom, Measure, Select, Clear) and Submenu Toggles */}
-                <div className="flex items-center bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-10 w-max relative z-20">
-                    {/* Toolbar Toggle Buttons */}
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isSidebarOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="사이드바 정보창 토글">
-                        {isSidebarOpen ? '정보 숨기기' : '대상지 정보'}
-                    </button>
-                    <button onClick={() => setIsAnalysisOpen(!isAnalysisOpen)} className={`px-3 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${isAnalysisOpen ? 'bg-ink text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="하단 실거래가 분석 패널 토글">
-                        {isAnalysisOpen ? '분석 숨기기' : '실거래가 분석'}
-                    </button>
-
-                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                    <button onClick={() => handleZoom(1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="확대">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    </button>
-                    <button onClick={() => handleZoom(-1)} className="w-8 h-full rounded hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-600" title="축소">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-                    </button>
-
-                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                    <button onClick={() => { setMeasureMode(measureMode === 'distance' ? null : 'distance'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'distance' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="거리 재기">
-                        거리
-                    </button>
-                    <button onClick={() => { setMeasureMode(measureMode === 'area' ? null : 'area'); setParcelPickMode(false); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${measureMode === 'area' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="면적 재기">
-                        면적
-                    </button>
-                    <button onClick={() => { setMeasureMode(null); setParcelPickMode((v) => !v); }} className={`px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap ${parcelPickMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`} title="지번 다중선택">
-                        다중지번
-                    </button>
-
-                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
-
-                    <button onClick={clearAll} className="px-2.5 h-full rounded text-[11px] font-bold transition-colors whitespace-nowrap text-gray-500 hover:bg-red-50 hover:text-red-500" title="모두 지우기">
-                        지우기
-                    </button>
-
-                    <div className="w-px h-5 bg-gray-300 mx-2"></div>
-
-                    {/* UI Map Controls Toggles */}
-                    <div className="flex items-center gap-1 h-full bg-gray-100 rounded p-0.5">
-                        <button
-                            onClick={() => setShowMapTypes(!showMapTypes)}
-                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
-                                ${showMapTypes ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
-                        >
-                            지도종류
-                        </button>
-                        <button
-                            onClick={() => setShowZones(!showZones)}
-                            className={`px-3 h-full text-[11px] font-bold rounded transition-colors whitespace-nowrap shadow-sm border
-                                ${showZones ? 'bg-white text-gray-800 border-gray-300' : 'bg-transparent text-gray-500 border-transparent hover:bg-gray-200'}`}
-                        >
-                            지역지구
-                        </button>
-                    </div>
-                </div>
-
-                {/* Sub Row 1: Base Map Types, Hybrid (명칭), and Cadastral (지적도) */}
-                {showMapTypes && (
-                    <div className="flex items-center w-max gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
-                        <div className="flex items-center">
-                            {[
-                                { id: 'base', label: '일반지도' },
-                                { id: 'gray', label: '백지도' },
-                                { id: 'midnight', label: '야간' }
-                            ].map((type) => (
-                                <button
-                                    key={type.id}
-                                    onClick={() => setMapType(type.id)}
-                                    className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
-                                        ${mapType === type.id
-                                            ? 'bg-gray-800 text-white shadow-sm'
-                                            : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                                >
-                                    {type.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="w-px h-4 bg-gray-300 mx-0.5"></div>
-
-                        <div className="flex bg-gray-100 rounded p-0.5 h-full">
-                            <button
-                                onClick={() => setMapType('satellite')}
-                                className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
-                                    ${mapType === 'satellite'
-                                        ? 'bg-gray-800 text-white shadow-sm'
-                                        : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
-                            >
-                                위성지도
-                            </button>
-                            <button
-                                onClick={() => setShowHybrid(!showHybrid)}
-                                className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
-                                    ${showHybrid ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
-                            >
-                                명칭
-                            </button>
-                        </div>
-
-                        <div className="w-px h-4 bg-gray-300 mx-0.5"></div>
-
-                        <button
-                            onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
-                            className={`px-2.5 h-full text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
-                                ${activeLayers.includes('LP_PA_CBND_BUBUN')
-                                    ? 'bg-indigo-600 text-white border-indigo-600'
-                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                        >
-                            지적도
-                        </button>
-                    </div>
-                )}
-
-                {/* Sub Row 2: All Layers and Basic Area Layers */}
-                {showZones && (
-                    <div className="flex items-center w-max gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
-                        <button
-                            onClick={() => setShowLayerMenu(true)}
-                            className="px-2 h-full text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800 border-gray-800"
-                        >
-                            전체레이어
-                        </button>
-
-                        <div className="w-px h-4 bg-gray-300 mx-1"></div>
-
-                        <div className="flex gap-0.5 h-full">
-                            {BASIC_LAYERS.map((id) => {
-                                const layer = ALL_LAYERS.find((l) => l.id === id);
-                                if (!layer) return null;
-                                const isActive = activeLayers.includes(id);
-                                return (
-                                    <button
-                                        key={id}
-                                        onClick={() => toggleLayer(id)}
-                                        className={`px-1.5 h-full text-[10px] font-bold rounded transition-all whitespace-nowrap overflow-hidden text-ellipsis
-                                            ${isActive
-                                                ? 'bg-teal-600 text-white shadow-sm'
-                                                : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
-                                        title={layer.label}
-                                    >
-                                        {layer.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Full Layer Modal */}
-            {showLayerMenu && (
-                <div
-                    className="absolute inset-0 z-50 bg-black/20 backdrop-blur-[1px] flex justify-end"
-                    onClick={() => setShowLayerMenu(false)}
-                >
-                    <div
-                        className="w-[320px] h-full bg-white shadow-2xl flex flex-col animate-slide-left pointer-events-auto"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-800 text-sm">전체 레이어 목록</h3>
-                            <button onClick={() => setShowLayerMenu(false)} className="p-1 rounded-full hover:bg-gray-200 text-gray-500">
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="p-2 border-b border-gray-100 flex gap-1 overflow-x-auto no-scrollbar">
-                            {categories.map((cat) => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`px-3 py-1 text-[11px] font-bold rounded-full whitespace-nowrap transition-colors
-                    ${selectedCategory === cat ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-3 space-y-6">
-                            {['용도지역', '용도지구', '용도구역', '도시계획', '환경/산림', '재해/안전', '수자원/해양', '행정/기타'].map((category) => {
-                                if (selectedCategory !== '전체' && selectedCategory !== category) return null;
-                                const categoryLayers = ALL_LAYERS.filter(
-                                    (l) => l.category === category && !['LP_PA_CBND_BUBUN', ...BASIC_LAYERS].includes(l.id)
-                                );
-                                if (categoryLayers.length === 0) return null;
-
-                                return (
-                                    <div key={category}>
-                                        <h4 className="text-[11px] font-bold text-gray-400 mb-2 border-b border-gray-100 pb-1 sticky top-0 bg-white/95 backdrop-blur z-10">
-                                            {category}
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {categoryLayers.map((layer) => {
-                                                const isActive = activeLayers.includes(layer.id);
-                                                return (
-                                                    <button
-                                                        key={layer.id}
-                                                        onClick={() => toggleLayer(layer.id)}
-                                                        className={`px-2 py-2 text-[11px] font-medium rounded border transition-all text-left flex items-center justify-between group
-                              ${isActive
-                                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200'
-                                                                : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`}
-                                                    >
-                                                        <span className="truncate">{layer.label}</span>
-                                                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* UI Controls */}
+            <MapControls
+                handleZoom={handleZoom}
+                measureMode={measureMode}
+                setMeasureMode={setMeasureMode}
+                radiusMode={radiusMode}
+                toggleRadiusMode={toggleRadiusMode}
+                clearAll={clearAll}
+                showMapTypes={showMapTypes}
+                setShowMapTypes={setShowMapTypes}
+                showZones={showZones}
+                setShowZones={setShowZones}
+                mapType={mapType}
+                setMapType={setMapType}
+                showHybrid={showHybrid}
+                setShowHybrid={setShowHybrid}
+                toggleLayer={toggleLayer}
+                activeLayers={activeLayers}
+                showLayerMenu={showLayerMenu}
+                setShowLayerMenu={setShowLayerMenu}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+            />
         </div>
     );
 };

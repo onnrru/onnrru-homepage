@@ -21,7 +21,6 @@ const Website = () => {
         <Hero />
         <About />
         <Menu />
-        <Reviews />
         <Locations />
       </main>
       <Footer />

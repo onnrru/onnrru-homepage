@@ -2,27 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
-[[redirects]]
-  from = "/api/vworld/*"
-  to = "https://api.vworld.kr/:splat"
-  status = 200
-  force = true
+# Edge Functions will handle /api/* to inject keys and proxy requests
+# This replaces the need for standard redirects for VWorld, EUM, and MOLIT
 
 [[redirects]]
   from = "/vworld_map/*"
   to = "https://map.vworld.kr/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/eum/*"
-  to = "http://api.eum.go.kr/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/molit/*"
-  to = "http://apis.data.go.kr/:splat"
   status = 200
   force = true
 
