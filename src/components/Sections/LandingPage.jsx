@@ -103,7 +103,7 @@ const LandingPage = () => {
                 }
 
                 if (hasMovement) {
-                    ctx.strokeStyle = `rgba(30, 30, 30, ${0.05 + Math.random() * 0.05})`; // Variable faint ink lines
+                    ctx.strokeStyle = `rgba(0, 0, 0, ${0.1 + Math.random() * 0.15})`; // Darker, more ink-like strokes
                     ctx.stroke();
                 }
             }
@@ -122,8 +122,8 @@ const LandingPage = () => {
         // One central "Ink Drop" every 6 seconds as requested
         const intervalId = setInterval(() => {
             // Target center-ish for the main branding drop
-            dropAt(width / 2 + (Math.random() - 0.5) * 100, height / 2 + (Math.random() - 0.5) * 100, 3, 1024);
-        }, 6000);
+            dropAt(width / 2 + (Math.random() - 0.5) * 100, height / 2 + (Math.random() - 0.5) * 100, 4, 1536);
+        }, 5000); // Shorter interval
 
         const handleMouseMove = (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -154,20 +154,17 @@ const LandingPage = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 3, ease: [0.22, 1, 0.36, 1] }}
                 >
-                    <h1 className="text-gray-900 text-3xl md:text-5xl font-serif font-black tracking-[0.3em] mb-12 opacity-90">
+                    <h1 className="text-gray-900 text-4xl md:text-6xl font-serif font-black tracking-[0.4em] mb-4 opacity-95">
                         ONNRRU
                     </h1>
 
-                    <div className="w-8 h-[1px] bg-gray-900/10 mx-auto mb-12" />
-
-                    <div className="space-y-6">
-                        <p className="text-gray-800 text-lg md:text-xl font-medium tracking-tight leading-relaxed balance">
-                            온류(ONNRRU)는 공간의 가치와 본질을 탐구하며,<br />
-                            더 나은 삶의 방식을 제안하는 기업입니다.
+                    <div className="space-y-8">
+                        <p className="text-gray-600 text-xl md:text-2xl font-serif italic tracking-widest mb-12">
+                            Experience, Insight, Growth.
                         </p>
-                        <p className="text-gray-500 text-sm md:text-base font-light tracking-wide leading-relaxed opacity-80">
-                            우리는 보이지 않는 흐름을 읽고,<br />
-                            당신의 일상에 지속 가능한 변화를 일으키고자 합니다.
+
+                        <p className="text-gray-800 text-lg md:text-2xl font-medium tracking-tight leading-relaxed balance max-w-2xl mx-auto border-t border-gray-100 pt-12">
+                            우리는 현장에서 배우고, 데이터로 분석하며,<br className="hidden md:block" /> 실행으로 증명합니다.
                         </p>
                     </div>
                 </motion.div>
@@ -187,10 +184,7 @@ const LandingPage = () => {
                 </motion.div>
             </div>
 
-            {/* Faint vine-like or ink-wash corner accent (Optional for 수묵화 feel) */}
-            <div className="absolute bottom-0 right-0 w-64 h-64 opacity-[0.03] pointer-events-none rotate-180">
-                <svg viewBox="0 0 100 100" fill="currentColor"><path d="M0 100 Q 20 20 100 0 L 100 100 Z" /></svg>
-            </div>
+            {/* Background Accent Removed */}
         </div>
     );
 };
