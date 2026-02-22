@@ -68,14 +68,13 @@ const LandingPage = () => {
         const draw = () => {
             if (!ctx) return;
 
-            // Background: Paper-like faint texture
             // Background: Faint trail effect for "Ink Bloom" persistence
             ctx.fillStyle = 'rgba(253, 253, 253, 0.04)';
             ctx.fillRect(0, 0, width, height);
 
-            // Subtle paper grain (optional, but good for "premium")
+            // Subtle paper grain
             ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 50; i++) {
                 ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
             }
 
@@ -83,30 +82,37 @@ const LandingPage = () => {
             const cols = Math.ceil(width / res) + 2;
             const rows = Math.ceil(height / res) + 2;
 
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
+            // Efficient rendering using ImageData
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const pixels = imgData.data;
+
+            for (let r = 0; r < rows; r += 2) {
+                for (let c = 0; c < cols; c += 2) {
                     const idx = r * cols + c;
                     const val = rippleData[idx];
 
-                    if (Math.abs(val) > 0.5) {
+                    if (Math.abs(val) > 1) {
                         const x = c * res;
                         const y = r * res;
+                        const opacity = Math.min(100, Math.floor(Math.abs(val) / 10));
 
-                        ctx.beginPath();
-                        const radius = Math.abs(val) * 0.25;
-                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-
-                        // Maximum visibility: much higher base alpha and scaling
-                        const alpha = Math.min(0.5, Math.abs(val) / 2000);
-                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.15 + alpha})`);
-                        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-                        ctx.fillStyle = gradient;
-                        ctx.arc(x, y, radius, 0, Math.PI * 2);
-                        ctx.fill();
+                        for (let dy = 0; dy < 4; dy++) {
+                            for (let dx = 0; dx < 4; dx++) {
+                                const px = x + dx;
+                                const py = y + dy;
+                                if (px < width && py < height) {
+                                    const pIdx = (py * width + px) * 4;
+                                    pixels[pIdx] = 0;     // R
+                                    pixels[pIdx + 1] = 0; // G
+                                    pixels[pIdx + 2] = 0; // B
+                                    pixels[pIdx + 3] = Math.max(pixels[pIdx + 3], opacity); // A
+                                }
+                            }
+                        }
                     }
                 }
             }
+            ctx.putImageData(imgData, 0, 0);
         };
 
         const animate = () => {
