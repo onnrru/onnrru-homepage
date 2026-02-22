@@ -93,11 +93,12 @@ const LandingPage = () => {
                         const y = r * res;
 
                         ctx.beginPath();
-                        const radius = Math.abs(val) * 0.18; // Slightly larger for better impact
+                        const radius = Math.abs(val) * 0.25;
                         const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                        // Significant increase in opacity for better visibility
-                        const alpha = Math.min(0.15, Math.abs(val) / 5000);
-                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.05 + alpha})`);
+
+                        // Maximum visibility: much higher base alpha and scaling
+                        const alpha = Math.min(0.5, Math.abs(val) / 2000);
+                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.15 + alpha})`);
                         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
                         ctx.fillStyle = gradient;
@@ -118,14 +119,28 @@ const LandingPage = () => {
         resize();
         animate();
 
-        // One central "Ink Drop" every 6 seconds as requested
+        // Initial burst: Multiple drops on load to ensure user sees it immediately
+        setTimeout(() => {
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    dropAt(
+                        width / 2 + (Math.random() - 0.5) * 200,
+                        height / 2 + (Math.random() - 0.5) * 200,
+                        4,
+                        2048
+                    );
+                }, i * 500);
+            }
+        }, 1000);
+
+        // One central "Ink Drop" every 4 seconds for frequent visual feedback
         const intervalId = setInterval(() => {
             // Target center-ish for the main branding drop
             // Enhanced natural bloom with random variation
-            const radius = 3 + Math.random() * 2;
-            const strength = 1024 + Math.random() * 1024;
-            dropAt(width / 2 + (Math.random() - 0.5) * 50, height / 2 + (Math.random() - 0.5) * 50, radius, strength);
-        }, 8000); // Slightly more frequent for visual interest
+            const radius = 4 + Math.random() * 2;
+            const strength = 1500 + Math.random() * 1000;
+            dropAt(width / 2 + (Math.random() - 0.5) * 100, height / 2 + (Math.random() - 0.5) * 100, radius, strength);
+        }, 4000);
 
         // Remove mousemove event listener as per request
         // canvas.addEventListener('mousemove', handleMouseMove);
