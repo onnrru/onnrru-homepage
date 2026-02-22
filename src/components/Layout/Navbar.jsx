@@ -21,8 +21,8 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
         {
             name: (
                 <span className="flex flex-col items-center">
-                    <span className="text-[9px] font-bold opacity-60">PapavalleyPizza X</span>
-                    <span className="text-sm font-black tracking-tighter">ONNRRU</span>
+                    <span className="text-[10px] font-bold opacity-60">PapavalleyPizza X</span>
+                    <span className="text-sm font-black tracking-tighter text-ink/40">ONNRRU</span>
                 </span>
             ),
             href: '/pizza',
@@ -64,9 +64,9 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                             onClick={(e) => handleNavigation(e, link.href)}
                             className={`uppercase transition-all relative group cursor-pointer leading-tight
                                 ${link.isBrand
-                                    ? 'text-ink bg-white px-5 py-2.5 rounded-full border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transform hover:-translate-y-0.5'
+                                    ? 'text-ink'
                                     : 'text-xs text-ink/70 font-bold tracking-wider hover:text-ink'}
-                                ${location.pathname === link.href ? (link.isBrand ? 'border-ink' : 'text-ink') : ''}
+                                ${location.pathname === link.href ? (link.isBrand ? 'text-ink' : 'text-ink') : ''}
                             `}
                         >
                             <span className="whitespace-pre-line text-center block">

@@ -103,7 +103,7 @@ const LandingPage = () => {
                 }
 
                 if (hasMovement) {
-                    ctx.strokeStyle = `rgba(0, 0, 0, ${0.1 + Math.random() * 0.15})`; // Darker, more ink-like strokes
+                    ctx.strokeStyle = `rgba(0, 0, 0, ${0.01 + Math.random() * 0.02})`; // Extremely faint strokes
                     ctx.stroke();
                 }
             }
@@ -123,7 +123,7 @@ const LandingPage = () => {
         const intervalId = setInterval(() => {
             // Target center-ish for the main branding drop
             dropAt(width / 2 + (Math.random() - 0.5) * 100, height / 2 + (Math.random() - 0.5) * 100, 4, 1536);
-        }, 5000); // Shorter interval
+        }, 12000); // Much longer interval to reduce visual clutter
 
         const handleMouseMove = (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -145,7 +145,7 @@ const LandingPage = () => {
         <div className="relative w-full h-screen overflow-hidden bg-white flex items-center justify-center font-sans" ref={containerRef}>
             <canvas
                 ref={canvasRef}
-                className="absolute inset-0 w-full h-full cursor-none"
+                className="absolute inset-0 w-full h-full"
             />
 
             <div className="z-10 text-center px-6 max-w-4xl pointer-events-none select-none">

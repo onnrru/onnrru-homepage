@@ -7,7 +7,16 @@ const TopBar = () => {
 
     const navLinks = [
         { name: 'ABOUT', href: '/about' },
-        { name: 'PapavalleyPizza\nX OnnRRu', href: '/', isBrand: true },
+        {
+            name: (
+                <span className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold opacity-60">PapavalleyPizza X</span>
+                    <span className="text-sm font-black tracking-tighter text-ink/40">ONNRRU</span>
+                </span>
+            ),
+            href: '/',
+            isBrand: true
+        },
         { name: 'Consulting', href: '/consulting' },
         { name: 'Test', href: '/test' },
     ];
@@ -38,16 +47,14 @@ const TopBar = () => {
                             href={link.href}
                             onClick={(e) => handleNavigation(e, link.href)}
                             className={`uppercase tracking-wider hover:text-ink transition-colors relative group cursor-pointer leading-tight
-                                ${link.isBrand ? 'text-[10px] font-black text-ink bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm' : 'text-[11px] text-ink/70 font-bold'}
+                                ${link.isBrand ? 'text-ink' : 'text-[11px] text-ink/70 font-bold'}
                                 ${location.pathname === link.href ? 'text-ink' : ''}
                             `}
                         >
                             <span className="whitespace-pre-line text-center block">
                                 {link.name}
                             </span>
-                            {!link.isBrand && (
-                                <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
-                            )}
+                            <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
                         </a>
                     ))}
                 </div>

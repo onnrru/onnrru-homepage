@@ -156,7 +156,7 @@ const AddressSearch = ({ onSelect }) => {
 
             const s = document.createElement('script');
             s.id = cbName;
-            s.src = `https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&size=10&page=1&query=${encodeURIComponent(searchTerm)}&type=ADDRESS&category=${category}&format=json&errorformat=json&key=${API_CONFIG.VWORLD_KEY}&domain=${encodeURIComponent(window.location.origin)}&callback=${cbName}`;
+            s.src = `/api/vworld/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&size=10&page=1&query=${encodeURIComponent(searchTerm)}&type=ADDRESS&category=${category}&format=json&errorformat=json&key=SECRET&callback=${cbName}`;
             document.body.appendChild(s);
         }
 
