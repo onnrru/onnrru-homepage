@@ -69,7 +69,8 @@ const LandingPage = () => {
             if (!ctx) return;
 
             // Background: Paper-like faint texture
-            ctx.fillStyle = '#fdfdfd';
+            // Background: Faint trail effect for "Ink Bloom" persistence
+            ctx.fillStyle = 'rgba(253, 253, 253, 0.04)';
             ctx.fillRect(0, 0, width, height);
 
             // Subtle paper grain (optional, but good for "premium")

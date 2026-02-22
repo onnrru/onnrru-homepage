@@ -42,9 +42,17 @@ const Locations = () => {
                         {/* Info Area */}
                         <div className="p-8 flex-grow flex flex-col justify-between">
                             <div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <h4 className="text-2xl font-bold text-ink">파파밸리피자 파크하비오점</h4>
-                                    <span className="px-3 py-1 bg-ink text-white text-xs font-bold rounded-full">1F</span>
+                                <div className="flex flex-col mb-4">
+                                    <div className="flex items-center space-x-1.5 mb-2">
+                                        <div className="w-5 h-5 bg-[#03C75A] rounded-sm flex items-center justify-center">
+                                            <span className="text-[11px] font-black text-white leading-none">N</span>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-ink/40 tracking-wider">네이버 플레이스</span>
+                                    </div>
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="text-2xl font-bold text-ink">파파밸리피자 파크하비오점</h4>
+                                        <span className="px-3 py-1 bg-ink text-white text-xs font-bold rounded-full">1F</span>
+                                    </div>
                                 </div>
                                 <p className="text-ink/70 mb-2 leading-relaxed">
                                     서울 송파구 송파대로 111, 파크하비오 110-112호<br />
@@ -53,13 +61,11 @@ const Locations = () => {
                                 <p className="text-ink/50 text-sm mb-6">+82 02-2043-0700</p>
                             </div>
                             <div className="mt-6">
-                                <div className="flex items-center space-x-2 mb-2 text-ink/40">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                    <span className="text-[10px] font-bold tracking-widest uppercase">네이버 플레이스</span>
-                                </div>
                                 <a href="https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%ED%8C%8C%ED%81%AC%ED%95%98%EB%B9%84%EC%98%A4%EC%A0%90" target="_blank" rel="noreferrer" className="inline-flex items-center px-6 py-4 bg-[#03C75A] text-white rounded-xl font-bold hover:bg-[#02b351] transition-colors shadow-sm hover:shadow-md text-lg">
-                                    <svg className="w-6 h-6 mr-3 fill-current" viewBox="0 0 24 24"><path d="M16.273 17.5v-11h-4.25v6.927L7.75 6.5H3.5v11h4.25V10.5l4.273 7z" /></svg>
-                                    파크하비오점
+                                    <div className="w-6 h-6 mr-3 bg-white rounded-sm flex items-center justify-center">
+                                        <span className="text-[14px] font-black text-[#03C75A] leading-none">N</span>
+                                    </div>
+                                    네이버 지도 및 스마트주문
                                 </a>
                             </div>
                         </div>
@@ -90,9 +96,17 @@ const Locations = () => {
                         {/* Info Area */}
                         <div className="p-8 flex-grow flex flex-col justify-between">
                             <div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <h4 className="text-2xl font-bold text-ink">파파밸리피자 잠실롯데마트점</h4>
-                                    <span className="px-3 py-1 bg-ink text-white text-xs font-bold rounded-full">6F</span>
+                                <div className="flex flex-col mb-4">
+                                    <div className="flex items-center space-x-1.5 mb-2">
+                                        <div className="w-5 h-5 bg-[#03C75A] rounded-sm flex items-center justify-center">
+                                            <span className="text-[11px] font-black text-white leading-none">N</span>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-ink/40 tracking-wider">네이버 플레이스</span>
+                                    </div>
+                                    <div className="flex justify-between items-start">
+                                        <h4 className="text-2xl font-bold text-ink">파파밸리피자 잠실롯데마트점</h4>
+                                        <span className="px-3 py-1 bg-ink text-white text-xs font-bold rounded-full">6F</span>
+                                    </div>
                                 </div>
                                 <p className="text-ink/70 mb-2 leading-relaxed">
                                     서울 송파구 올림픽로 240, 롯데마트 제타플렉스 6층<br />
@@ -101,13 +115,11 @@ const Locations = () => {
                                 <p className="text-ink/50 text-sm mb-6">+82 02-2143-1662</p>
                             </div>
                             <div className="mt-6">
-                                <div className="flex items-center space-x-2 mb-2 text-ink/40">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                    <span className="text-[10px] font-bold tracking-widest uppercase">네이버 플레이스</span>
-                                </div>
                                 <a href="https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%EC%9E%A0%EC%8B%A4%EB%A1%AF%EB%8D%B0%EB%A7%88%ED%8A%B8%EC%A0%90" target="_blank" rel="noreferrer" className="inline-flex items-center px-6 py-4 bg-[#03C75A] text-white rounded-xl font-bold hover:bg-[#02b351] transition-colors shadow-sm hover:shadow-md text-lg">
-                                    <svg className="w-6 h-6 mr-3 fill-current" viewBox="0 0 24 24"><path d="M16.273 17.5v-11h-4.25v6.927L7.75 6.5H3.5v11h4.25V10.5l4.273 7z" /></svg>
-                                    잠실롯데마트점
+                                    <div className="w-6 h-6 mr-3 bg-white rounded-sm flex items-center justify-center">
+                                        <span className="text-[14px] font-black text-[#03C75A] leading-none">N</span>
+                                    </div>
+                                    네이버 지도 및 스마트주문
                                 </a>
                             </div>
                         </div>
