@@ -90,7 +90,7 @@ function AppContent() {
   const isLanding = location.pathname === '/';
 
   return (
-    <div className={`font-sans text-ink bg-paper min-h-screen overflow-x-hidden ${isLanding ? 'bg-black' : ''}`}>
+    <div className={`font-sans text-ink bg-paper min-h-screen overflow-x-hidden`}>
       {!isLanding && <Navbar />}
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
