@@ -123,17 +123,18 @@ const MapControls = ({
 
             {/* Sub Row 1: Base Map Types, Hybrid, and Cadastral */}
             {showMapTypes && (
-                <div className="flex items-center justify-between w-[300px] md:w-[400px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
-                    <div className="flex items-center space-x-1">
+                <div className="flex items-center justify-between w-[280px] md:w-[360px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
+                    <div className="flex items-center space-x-0.5 h-full">
                         {[
                             { id: 'base', label: '일반' },
+                            { id: 'satellite', label: '위성' },
                             { id: 'gray', label: '백지도' },
                             { id: 'midnight', label: '야간' }
                         ].map((type) => (
                             <button
                                 key={type.id}
                                 onClick={() => setMapType(type.id)}
-                                className={`px-2 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
+                                className={`px-1.5 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
                                     ${mapType === type.id
                                         ? 'bg-gray-800 text-white shadow-sm'
                                         : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
@@ -143,25 +144,25 @@ const MapControls = ({
                         ))}
                     </div>
 
-                    <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
+                    <div className="w-px h-4 bg-gray-200"></div>
 
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-0.5 h-full">
                         <button
                             onClick={() => setShowHybrid(!showHybrid)}
-                            className={`px-2 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
+                            className={`px-1.5 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
                                 ${showHybrid ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
                         >
-                            명칭표시
+                            명칭
                         </button>
 
                         <button
                             onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
-                            className={`px-2 h-6 text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
+                            className={`px-1.5 h-6 text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
                                 ${activeLayers.includes('LP_PA_CBND_BUBUN')
                                     ? 'bg-indigo-600 text-white border-indigo-600'
                                     : 'bg-white text-gray-700 border-gray-100 hover:bg-gray-50'}`}
                         >
-                            지적도
+                            지적
                         </button>
                     </div>
                 </div>
@@ -169,7 +170,7 @@ const MapControls = ({
 
             {/* Sub Row 2: Basic Area Layers */}
             {showZones && (
-                <div className="flex items-center w-[300px] md:w-[400px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
+                <div className="flex items-center w-[280px] md:w-[360px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
                     <button
                         onClick={() => setShowLayerMenu(true)}
                         className="px-2 h-full text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800 border-gray-800"

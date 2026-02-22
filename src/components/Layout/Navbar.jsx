@@ -62,9 +62,11 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                             key={typeof link.name === 'string' ? link.name : 'brand'}
                             href={link.href}
                             onClick={(e) => handleNavigation(e, link.href)}
-                            className={`uppercase tracking-wider hover:text-ink transition-colors relative group cursor-pointer leading-tight
-                                ${link.isBrand ? 'text-ink bg-gray-50/50 px-4 py-2 rounded-2xl border border-gray-100/50 hover:bg-white hover:shadow-sm' : 'text-xs text-ink/70 font-bold'}
-                                ${location.pathname === link.href ? 'text-ink' : ''}
+                            className={`uppercase transition-all relative group cursor-pointer leading-tight
+                                ${link.isBrand
+                                    ? 'text-ink bg-white px-5 py-2.5 rounded-full border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transform hover:-translate-y-0.5'
+                                    : 'text-xs text-ink/70 font-bold tracking-wider hover:text-ink'}
+                                ${location.pathname === link.href ? (link.isBrand ? 'border-ink' : 'text-ink') : ''}
                             `}
                         >
                             <span className="whitespace-pre-line text-center block">
