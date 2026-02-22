@@ -66,6 +66,8 @@ const LandingPage = () => {
         };
 
         const draw = () => {
+            if (!ctx) return;
+
             // Background: Paper-like faint texture
             ctx.fillStyle = '#fdfdfd';
             ctx.fillRect(0, 0, width, height);
@@ -80,36 +82,27 @@ const LandingPage = () => {
             const cols = Math.ceil(width / res) + 2;
             const rows = Math.ceil(height / res) + 2;
 
-            // Draw ink-like ripples: Darker strokes with variable opacity
-            const draw = () => {
-                if (!ctx) return;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const idx = r * cols + c;
+                    const val = rippleData[idx];
 
-                // Subtle fade of the entire canvas to make old drops disappear slowly
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
-                ctx.fillRect(0, 0, width, height);
+                    if (Math.abs(val) > 0.5) {
+                        const x = c * res;
+                        const y = r * res;
 
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        const idx = r * cols + c;
-                        const val = rippleData[idx];
+                        ctx.beginPath();
+                        const radius = Math.abs(val) * 0.15;
+                        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.01 + Math.random() * 0.01})`);
+                        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-                        if (Math.abs(val) > 0.5) {
-                            const x = c * res;
-                            const y = r * res;
-
-                            ctx.beginPath();
-                            const radius = Math.abs(val) * 0.15;
-                            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                            gradient.addColorStop(0, `rgba(0, 0, 0, ${0.01 + Math.random() * 0.01})`);
-                            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-                            ctx.fillStyle = gradient;
-                            ctx.arc(x, y, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
+                        ctx.fillStyle = gradient;
+                        ctx.arc(x, y, radius, 0, Math.PI * 2);
+                        ctx.fill();
                     }
                 }
-            };
+            }
         };
 
         const animate = () => {
