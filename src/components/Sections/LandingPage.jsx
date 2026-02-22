@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const TypingText = ({ text, delay = 0, speed = 40 }) => {
     const [displayedText, setDisplayedText] = useState('');
-    const [isComplete, setIsComplete] = useState(false);
 
     useEffect(() => {
         let timeout;
@@ -20,7 +19,6 @@ const TypingText = ({ text, delay = 0, speed = 40 }) => {
                 i++;
                 if (i >= text.length) {
                     clearInterval(timer);
-                    setIsComplete(true);
                 }
             }, speed);
             return () => clearInterval(timer);
@@ -32,13 +30,6 @@ const TypingText = ({ text, delay = 0, speed = 40 }) => {
     return (
         <span className="inline-block min-h-[1.5em]">
             {displayedText}
-            {!isComplete && (
-                <motion.span
-                    animate={{ opacity: [1, 0] }}
-                    transition={{ duration: 0.8, repeat: Infinity }}
-                    className="inline-block w-[2px] h-[1em] bg-gray-400 ml-1 align-middle"
-                />
-            )}
         </span>
     );
 };
@@ -70,12 +61,11 @@ const LandingPage = () => {
             reset() {
                 this.x = Math.random() * width;
                 this.y = Math.random() * height;
-                this.baseSize = Math.random() * 2 + 1.2; // Increased minimum size
+                this.baseSize = Math.random() * 2 + 1.2;
                 this.size = this.baseSize;
                 this.vx = (Math.random() - 0.5) * 0.12;
                 this.vy = (Math.random() - 0.5) * 0.12;
 
-                // Significantly darker and higher opacity
                 this.baseOpacity = Math.random() * 0.4 + 0.2;
                 this.opacity = 0;
                 this.targetOpacity = this.baseOpacity;
@@ -109,7 +99,6 @@ const LandingPage = () => {
             }
 
             draw() {
-                // Using a slightly more artistic "ink-like" softening
                 ctx.shadowBlur = 1;
                 ctx.shadowColor = `rgba(0, 0, 0, ${this.opacity * 0.5})`;
                 ctx.fillStyle = `rgba(0, 0, 0, ${this.opacity})`;
@@ -122,7 +111,7 @@ const LandingPage = () => {
 
         const initParticles = () => {
             particles = [];
-            const count = Math.min(60, (width * height) / 25000); // Fewer but bigger/darker
+            const count = Math.min(60, (width * height) / 25000);
             for (let i = 0; i < count; i++) {
                 particles.push(new Particle());
             }
@@ -131,7 +120,6 @@ const LandingPage = () => {
         const animate = () => {
             ctx.clearRect(0, 0, width, height);
 
-            // Subtle grain
             ctx.fillStyle = 'rgba(0, 0, 0, 0.015)';
             for (let i = 0; i < 15; i++) {
                 ctx.fillRect(Math.random() * width, Math.random() * height, 1, 1);
@@ -168,15 +156,12 @@ const LandingPage = () => {
                     transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
                     className="flex flex-col items-center"
                 >
-                    {/* Brand Name */}
                     <span className="text-xs font-bold text-gray-400 tracking-[0.5em] uppercase mb-4">ONNRRU</span>
 
-                    {/* English Vision */}
                     <h1 className="text-4xl md:text-5xl font-extralight text-black mb-10 leading-tight">
                         A New Perspective on <span className="font-normal">What Matters</span>
                     </h1>
 
-                    {/* Korean Description with Typing Effect */}
                     <div className="text-sm md:text-base text-gray-500 font-light mb-16 leading-loose break-keep flex flex-col items-center space-y-1">
                         <TypingText text="본질 위에 새로운 시선을 더합니다." delay={1000} speed={50} />
                         <TypingText text="삶의 가치와 공간을 가다듬어" delay={3000} speed={50} />
@@ -190,22 +175,15 @@ const LandingPage = () => {
                     >
                         <a
                             href="/pizza"
-                            className="group relative px-12 py-5 overflow-hidden rounded-full border border-black/10 hover:border-black transition-colors duration-700"
+                            className="group relative inline-block px-12 py-5 overflow-hidden rounded-full border border-black/10 hover:border-black transition-colors duration-700"
                         >
                             <span className="relative z-10 text-[10px] font-bold text-black tracking-[0.4em] group-hover:text-white transition-colors duration-500">
                                 ENTER PROJECT
                             </span>
-                            <motion.div
-                                className="absolute inset-0 bg-black translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"
-                            />
+                            <div className="absolute inset-0 bg-black pointer-events-none translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out" />
                         </a>
                     </motion.div>
                 </motion.div>
-            </div>
-
-            {/* Minimal Corner Label */}
-            <div className="absolute top-10 left-10 hidden md:block">
-                <span className="text-[10px] text-gray-300 font-light tracking-[0.4em] uppercase">VISION 2026</span>
             </div>
         </div>
     );
