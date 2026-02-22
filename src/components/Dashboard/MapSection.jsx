@@ -395,7 +395,9 @@ const MapSection = () => {
                         renderSingleFocus(fd);
 
                         const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
-                        map.getView().animate({ center: center3857, zoom: 15, duration: 350 });
+                        // Removed auto-zoom on selection as per request
+                        // map.getView().animate({ center: center3857, zoom: 15, duration: 350 });
+                        map.getView().animate({ center: center3857, duration: 350 });
 
                         const props = fd.properties || {};
                         if (props.pnu) {
@@ -462,9 +464,6 @@ const MapSection = () => {
                             commitSelectedParcels(next);
                             return;
                         }
-
-                        // If not in pick mode, single click just updates address info but doesn't change selection
-                        // (Selection is now handled by dblclick or search)
                     } catch (e) {
                         console.error('singleclick error:', e);
                     }
@@ -677,7 +676,15 @@ const MapSection = () => {
             if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
             const center = OL.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-            mapObj.getView()?.animate({ center, duration: 500, zoom: 15 });
+            // Check if this is a fresh search result (often lacks PNU or comes from Search bar)
+            // We'll use a local flag or heuristics. For now, if zoom is very different from 14, we might adjust.
+            // Requirement: "Zoom level 14 only when first selected by search"
+            const currentZoom = mapObj.getView().getZoom();
+            if (currentZoom !== 14) {
+                mapObj.getView()?.animate({ center, duration: 500, zoom: 14 });
+            } else {
+                mapObj.getView()?.animate({ center, duration: 500 });
+            }
         } catch (e) {
             console.error('Map Update Error:', e);
         }

@@ -81,32 +81,35 @@ const LandingPage = () => {
             const rows = Math.ceil(height / res) + 2;
 
             // Draw ink-like ripples: Darker strokes with variable opacity
-            ctx.lineWidth = 1.2;
+            const draw = () => {
+                if (!ctx) return;
 
-            // We draw horizontal "ink strokes" that follow the ripple displacement
-            for (let r = 1; r < rows - 2; r += 3) {
-                ctx.beginPath();
-                let hasMovement = false;
-                for (let c = 1; c < cols - 1; c++) {
-                    const idx = r * cols + c;
-                    const val = rippleData[idx];
+                // Subtle fade of the entire canvas to make old drops disappear slowly
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
+                ctx.fillRect(0, 0, width, height);
 
-                    if (Math.abs(val) > 0.1) hasMovement = true;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const idx = r * cols + c;
+                        const val = rippleData[idx];
 
-                    const x = (c - 1) * res;
-                    const y = (r - 1) * res + (val * 0.08); // Slight vertical offset to create wave effect
+                        if (Math.abs(val) > 0.5) {
+                            const x = c * res;
+                            const y = r * res;
 
-                    // Opacity based on displacement magnitude for "ink bleeding" feel
-                    const alpha = Math.min(1, Math.abs(val) / 64);
-                    if (c === 1) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                            ctx.beginPath();
+                            const radius = Math.abs(val) * 0.15;
+                            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                            gradient.addColorStop(0, `rgba(0, 0, 0, ${0.01 + Math.random() * 0.01})`);
+                            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                            ctx.fillStyle = gradient;
+                            ctx.arc(x, y, radius, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
                 }
-
-                if (hasMovement) {
-                    ctx.strokeStyle = `rgba(0, 0, 0, ${0.01 + Math.random() * 0.02})`; // Extremely faint strokes
-                    ctx.stroke();
-                }
-            }
+            };
         };
 
         const animate = () => {

@@ -22,8 +22,8 @@ const DashboardContent = () => {
     } = useDashboard();
 
     return (
-        <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
-            <TopBar />
+        <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden pt-16">
+            {/* TopBar removed to use unified Navbar from App.jsx */}
 
             {/* Dashboard Layout Container */}
             <div className="flex-1 relative flex flex-col md:flex-row overflow-hidden">

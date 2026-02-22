@@ -21,8 +21,8 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
         {
             name: (
                 <span className="flex flex-col items-center">
-                    <span className="text-[10px] font-bold opacity-60">PapavalleyPizza X</span>
-                    <span className="text-sm font-black tracking-tighter text-ink/40">ONNRRU</span>
+                    <span className="text-[10px] font-bold text-ink/40">Papavalley Pizza  X</span>
+                    <span className="text-sm font-black tracking-tighter text-ink">  ONNRRU</span>
                 </span>
             ),
             href: '/pizza',
@@ -72,7 +72,7 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                             <span className="whitespace-pre-line text-center block">
                                 {link.name}
                             </span>
-                            <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
+                            <span className="absolute left-0 bottom-[-4px] w-0 h-[2px] bg-ink transition-all group-hover:w-full"></span>
                         </a>
                     ))}
 
