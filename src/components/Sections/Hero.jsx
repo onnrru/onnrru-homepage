@@ -138,7 +138,7 @@ const Hero = () => {
                                 blog: "45",
                                 tag: "맛있어요",
                                 percent: "95%",
-                                url: "https://m.place.naver.com/restaurant/1649363852/review/visitor"
+                                url: "https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%ED%8C%8C%ED%81%AC%ED%95%98%EB%B9%84%EC%98%A4%EC%A0%90"
                             },
                             {
                                 name: "파파밸리피자 잠실롯데마트점",
@@ -148,7 +148,7 @@ const Hero = () => {
                                 blog: "312",
                                 tag: "가성비 좋아요",
                                 percent: "98%",
-                                url: "https://m.place.naver.com/restaurant/1050556556/review/visitor"
+                                url: "https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%EC%9E%A0%EC%8B%A4%EB%A1%AF%EB%8D%B0%EB%A7%88%ED%8A%B8%EC%A0%90"
                             }
                         ].map((store, idx) => (
                             <a
@@ -162,9 +162,15 @@ const Hero = () => {
                                     <div className="w-10 h-10 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center p-2 text-ink">
                                         <svg fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
                                     </div>
-                                    <div>
-                                        <h4 className="text-sm font-bold text-ink group-hover/store:text-ink-light transition-colors">{store.name}</h4>
-                                        <p className="text-[10px] text-gray-400 font-light">{store.addr}</p>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-1 mb-1">
+                                            <div className="w-3.5 h-3.5 bg-[#03C75A] rounded-[2px] flex items-center justify-center">
+                                                <span className="text-[8px] font-black text-white leading-none">N</span>
+                                            </div>
+                                            <span className="text-[9px] font-bold text-[#03C75A]">네이버 플레이스</span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-ink group-hover/store:text-ink-light transition-colors truncate">{store.name}</h4>
+                                        <p className="text-[10px] text-gray-400 font-light truncate">{store.addr}</p>
                                     </div>
                                 </div>
 

@@ -93,9 +93,11 @@ const LandingPage = () => {
                         const y = r * res;
 
                         ctx.beginPath();
-                        const radius = Math.abs(val) * 0.15;
+                        const radius = Math.abs(val) * 0.18; // Slightly larger for better impact
                         const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.01 + Math.random() * 0.01})`);
+                        // Significant increase in opacity for better visibility
+                        const alpha = Math.min(0.15, Math.abs(val) / 5000);
+                        gradient.addColorStop(0, `rgba(0, 0, 0, ${0.05 + alpha})`);
                         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
                         ctx.fillStyle = gradient;
@@ -154,11 +156,13 @@ const LandingPage = () => {
 
                     <div className="space-y-8">
                         <p className="text-gray-600 text-xl md:text-2xl font-serif italic tracking-widest mb-12">
-                            Experience, Insight, Growth.
+                            A New Perspective on What Matters
                         </p>
 
                         <p className="text-gray-800 text-lg md:text-2xl font-medium tracking-tight leading-relaxed balance max-w-2xl mx-auto border-t border-gray-100 pt-12">
-                            우리는 현장에서 배우고, 데이터로 분석하며,<br className="hidden md:block" /> 실행으로 증명합니다.
+                            본질 위에 새로운 시선을 더합니다.<br />
+                            삶의 가치와 공간을 가다듬어<br />
+                            그 여유와 비전을 함께 나눕니다.
                         </p>
                     </div>
                 </motion.div>
