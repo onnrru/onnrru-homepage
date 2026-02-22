@@ -118,21 +118,18 @@ const LandingPage = () => {
         // One central "Ink Drop" every 6 seconds as requested
         const intervalId = setInterval(() => {
             // Target center-ish for the main branding drop
-            dropAt(width / 2 + (Math.random() - 0.5) * 100, height / 2 + (Math.random() - 0.5) * 100, 4, 1536);
-        }, 12000); // Much longer interval to reduce visual clutter
+            // Enhanced natural bloom with random variation
+            const radius = 3 + Math.random() * 2;
+            const strength = 1024 + Math.random() * 1024;
+            dropAt(width / 2 + (Math.random() - 0.5) * 50, height / 2 + (Math.random() - 0.5) * 50, radius, strength);
+        }, 8000); // Slightly more frequent for visual interest
 
-        const handleMouseMove = (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            dropAt(x, y, 1, 48);
-        };
-
-        canvas.addEventListener('mousemove', handleMouseMove);
+        // Remove mousemove event listener as per request
+        // canvas.addEventListener('mousemove', handleMouseMove);
 
         return () => {
             window.removeEventListener('resize', resize);
-            canvas.removeEventListener('mousemove', handleMouseMove);
+            // canvas.removeEventListener('mousemove', handleMouseMove);
             clearInterval(intervalId);
         };
     }, []);

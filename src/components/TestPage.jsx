@@ -1,11 +1,9 @@
 import React from 'react';
-import Navbar from './Layout/Navbar';
-import Footer from './Layout/Footer';
+// Navbar and Footer removed to use global ones from App.jsx
 
 const TestPage = () => {
     return (
-        <div className="font-sans text-ink bg-paper min-h-screen flex flex-col">
-            <Navbar />
+        <div className="font-sans text-ink bg-paper min-h-screen flex flex-col pt-16">
             <main className="flex-1 container mx-auto px-6 py-24">
                 <h1 className="text-4xl font-bold mb-8">Test Page</h1>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -18,7 +16,6 @@ const TestPage = () => {
                     </div>
                 </div>
             </main>
-            <Footer />
         </div>
     );
 };

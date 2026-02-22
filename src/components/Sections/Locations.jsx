@@ -53,9 +53,13 @@ const Locations = () => {
                                 <p className="text-ink/50 text-sm mb-6">+82 02-2043-0700</p>
                             </div>
                             <div className="mt-6">
+                                <div className="flex items-center space-x-2 mb-2 text-ink/40">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span className="text-[10px] font-bold tracking-widest uppercase">네이버 플레이스</span>
+                                </div>
                                 <a href="https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%ED%8C%8C%ED%81%AC%ED%95%98%EB%B9%84%EC%98%A4%EC%A0%90" target="_blank" rel="noreferrer" className="inline-flex items-center px-6 py-4 bg-[#03C75A] text-white rounded-xl font-bold hover:bg-[#02b351] transition-colors shadow-sm hover:shadow-md text-lg">
                                     <svg className="w-6 h-6 mr-3 fill-current" viewBox="0 0 24 24"><path d="M16.273 17.5v-11h-4.25v6.927L7.75 6.5H3.5v11h4.25V10.5l4.273 7z" /></svg>
-                                    네이버 지도 및 네이버 주문
+                                    파크하비오점
                                 </a>
                             </div>
                         </div>
@@ -97,9 +101,13 @@ const Locations = () => {
                                 <p className="text-ink/50 text-sm mb-6">+82 02-2143-1662</p>
                             </div>
                             <div className="mt-6">
+                                <div className="flex items-center space-x-2 mb-2 text-ink/40">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <span className="text-[10px] font-bold tracking-widest uppercase">네이버 플레이스</span>
+                                </div>
                                 <a href="https://search.naver.com/search.naver?sm=tab_hty.top&where=nexearch&query=%ED%8C%8C%ED%8C%8C%EB%B0%B8%EB%A6%AC%ED%94%BC%EC%9E%90+%EC%9E%A0%EC%8B%A4%EB%A1%AF%EB%8D%B0%EB%A7%88%ED%8A%B8%EC%A0%90" target="_blank" rel="noreferrer" className="inline-flex items-center px-6 py-4 bg-[#03C75A] text-white rounded-xl font-bold hover:bg-[#02b351] transition-colors shadow-sm hover:shadow-md text-lg">
                                     <svg className="w-6 h-6 mr-3 fill-current" viewBox="0 0 24 24"><path d="M16.273 17.5v-11h-4.25v6.927L7.75 6.5H3.5v11h4.25V10.5l4.273 7z" /></svg>
-                                    네이버 지도 및 네이버 주문
+                                    잠실롯데마트점
                                 </a>
                             </div>
                         </div>
