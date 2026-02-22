@@ -13,11 +13,11 @@ const Hero = () => {
 
     const [activeIndex, setActiveIndex] = useState(0);
 
-    // Auto rotate every 3 seconds
+    // Auto rotate every 6 seconds
     useEffect(() => {
         const interval = setInterval(() => {
             setActiveIndex((prev) => (prev + 1) % pizzaImages.length);
-        }, 3000);
+        }, 6000);
         return () => clearInterval(interval);
     }, [pizzaImages.length]);
 
@@ -48,15 +48,15 @@ const Hero = () => {
                         transition={{ duration: 1, ease: "easeOut" }}
                         className="max-w-3xl"
                     >
-                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-serif text-ink mb-6 leading-tight">
+                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-serif text-ink mb-6 leading-[1.1] tracking-tight">
                             Why flavor seekers<br />
-                            choose <span className="text-ink-light">OnnRRu</span>
+                            choose <span className="text-ink-light underline decoration-ink-light/20 underline-offset-8">OnnRRu</span>
                         </h1>
 
-                        <p className="text-lg text-ink/70 font-light max-w-xl leading-relaxed">
+                        <p className="text-lg md:text-xl text-ink/70 font-light max-w-xl leading-relaxed">
                             OnnRRu takes pizza crafting to the next level,
-                            helping you taste beautiful, premium, and
-                            authentic flavors like never before.
+                            helping you taste <span className="text-ink font-medium">beautiful, premium, and
+                                authentic flavors</span> like never before.
                         </p>
                     </motion.div>
 
@@ -69,7 +69,7 @@ const Hero = () => {
                     >
                         <a
                             href="#menu"
-                            className="group inline-flex items-center px-8 py-4 bg-transparent border border-gray-300 rounded-full text-ink font-medium transition-all hover:bg-ink hover:text-white hover:border-ink"
+                            className="group inline-flex items-center px-8 py-4 bg-transparent border border-gray-300 rounded-full text-ink font-medium transition-all hover:bg-ink hover:text-white hover:border-ink shadow-sm"
                         >
                             Explore Menu
                             <svg className="w-4 h-4 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
@@ -94,13 +94,14 @@ const Hero = () => {
                                 key={pizzaImages[activeIndex].img}
                                 src={pizzaImages[activeIndex].img}
                                 alt={pizzaImages[activeIndex].title}
-                                initial={{ opacity: 0, scale: 1.1 }}
+                                initial={{ opacity: 0, scale: 1.05 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.6 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 1.2, ease: "easeInOut" }}
                                 className="absolute inset-0 w-full h-full object-cover"
                             />
                         </AnimatePresence>
+
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-8">
                             <motion.h3
                                 key={pizzaImages[activeIndex].title}

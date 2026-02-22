@@ -25,21 +25,21 @@ const DashboardContent = () => {
         <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
             <TopBar />
 
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left Panel */}
+            {/* Dashboard Layout Container */}
+            <div className="flex-1 relative flex flex-col md:flex-row overflow-hidden">
+                {/* Sidebar - Property Info (Conditional Visibility) */}
                 {isSidebarOpen && (
-                    <div className="absolute inset-y-0 left-0 z-40 w-full md:w-[350px] md:relative">
-                        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+                    <div className="w-full md:w-[400px] h-[50vh] md:h-full order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white z-20 shadow-xl md:shadow-none overflow-y-auto">
+                        <Sidebar
+                            isOpen={isSidebarOpen}
+                            onClose={() => setIsSidebarOpen(false)}
+                        />
                     </div>
                 )}
 
-                {/* Main Content Area */}
-                <div className="flex-1 relative flex flex-col min-w-0 overflow-hidden bg-gray-100">
-                    {/* Map Area */}
-                    <div className="absolute inset-0 z-0">
-                        <MapSection />
-                    </div>
-
+                {/* Main Content (Map) */}
+                <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-full">
+                    <MapSection />
                     {/* Bottom Analysis Panel Overlay */}
                     <motion.div
                         initial={false}

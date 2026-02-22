@@ -332,7 +332,7 @@ const MapSection = () => {
                         const radius = isHovered ? 32 : 25;
                         const zIndex = isHovered ? 1000 : 30;
                         const strokeWidth = isHovered ? 3 : 2;
-                        const bgColor = isHovered ? 'rgba(255, 69, 58, 0.8)' : 'rgba(255, 69, 58, 0.4)';
+                        const bgColor = isHovered ? 'rgba(255, 215, 0, 0.8)' : 'rgba(255, 215, 0, 0.4)';
 
                         return new OL.style.Style({
                             zIndex: zIndex,
@@ -342,50 +342,19 @@ const MapSection = () => {
                                     color: bgColor
                                 }),
                                 stroke: new OL.style.Stroke({
-                                    color: 'rgba(255, 69, 58, 0.9)',
+                                    color: 'rgba(255, 255, 255, 0.9)',
                                     width: strokeWidth
                                 })
                             }),
                             text: new OL.style.Text({
                                 text: labelText,
                                 font: 'bold 12px "Pretendard", "Apple SD Gothic Neo", sans-serif',
-                                fill: new OL.style.Fill({ color: '#ffffff' }),
-                                stroke: new OL.style.Stroke({ color: '#000000', width: 3 }),
+                                fill: new OL.style.Fill({ color: '#222222' }),
+                                stroke: new OL.style.Stroke({ color: '#ffffff', width: 3 }),
                                 offsetY: 0,
                                 textAlign: 'center',
                                 textBaseline: 'middle',
                                 padding: [5, 5, 5, 5]
-                            })
-                        });
-                    }
-                });
-
-                // Radius overlay layer
-                const radiusSrc = new OL.source.Vector();
-                radiusSourceRef.current = radiusSrc;
-                const radiusLayer = new OL.layer.Vector({
-                    source: radiusSrc,
-                    zIndex: 24,
-                    style: (feature) => {
-                        if (feature.get('type') === 'label') {
-                            return new OL.style.Style({
-                                text: new OL.style.Text({
-                                    text: feature.get('text'),
-                                    font: 'bold 12px "Pretendard", sans-serif',
-                                    fill: new OL.style.Fill({ color: '#dc2626' }),
-                                    stroke: new OL.style.Stroke({ color: '#ffffff', width: 3 }),
-                                    offsetY: 0
-                                })
-                            });
-                        }
-                        return new OL.style.Style({
-                            stroke: new OL.style.Stroke({
-                                color: 'rgba(220, 38, 38, 0.8)',
-                                width: 2,
-                                lineDash: [5, 5]
-                            }),
-                            fill: new OL.style.Fill({
-                                color: 'rgba(220, 38, 38, 0.05)'
                             })
                         });
                     }
@@ -397,7 +366,7 @@ const MapSection = () => {
                     layers: [
                         baseLayer, grayLayer, midnightLayer, satelliteLayer,
                         hybridLayer, cadastralLayer, ...wmsLayers,
-                        markerLayer, selectionLayer, aptMarkerLayer, radiusLayer
+                        markerLayer, selectionLayer, aptMarkerLayer
                     ],
                     view: new OL.View({
                         center: [14151740, 4511257],
@@ -415,7 +384,6 @@ const MapSection = () => {
                 // dblclick: 단일 선택 + 줌 + 포커스 (지번추가 모드일 땐 무시)
                 map.on('dblclick', async (evt) => {
                     if (measureModeRef.current) return;
-                    if (parcelPickModeRef.current) return; // ✅ 지번추가 모드일 땐 더블클릭 무시
                     evt.preventDefault?.();
 
                     const [lon, lat] = OL.proj.transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
@@ -445,7 +413,7 @@ const MapSection = () => {
                             });
                         }
 
-                        // dblclick는 "선택 초기화(단일)"로
+                        // dblclick handles "single selection/reset"
                         selectedParcelsRef.current = [fd];
                         commitSelectedParcels([fd]);
                     } catch (e) {
@@ -468,7 +436,7 @@ const MapSection = () => {
 
                         const props = fd.properties || {};
 
-                        // ✅ 좌측 주소/기본정보 갱신은 "항상" 수행 (요구 유지)
+                        // Update left address info ALWAYS
                         onAddressSelect?.({
                             address: props.addr || '',
                             roadAddr: props.road || props.addr || '',
@@ -482,29 +450,21 @@ const MapSection = () => {
                             zone: props.unm
                         });
 
-                        // ✅ 여기! props selectedParcels 대신 ref 사용
-                        const current = selectedParcelsRef.current || [];
-
-                        // ✅ 지번추가 모드일 때: 토글(추가/해제)
+                        // ONLY toggle parcel if parcelPickMode is ON
                         if (parcelPickModeRef.current) {
+                            const current = selectedParcelsRef.current || [];
                             const exists = current.some((x) => getPnu(x) === pnu);
                             const next = exists
                                 ? current.filter((x) => getPnu(x) !== pnu)
                                 : [...current, fd];
 
-                            // ✅ 즉시 ref 갱신(렌더 타이밍 이슈 방지)
                             selectedParcelsRef.current = next;
-
                             commitSelectedParcels(next);
-                            // (선택) 멀티 선택 중에는 단일 포커스 마커는 굳이 안 바꿔도 됨
-                            // renderSingleFocus(fd); 
                             return;
                         }
 
-                        // ✅ 지번추가 모드 OFF일 때: 단일 선택
-                        selectedParcelsRef.current = [fd];
-                        commitSelectedParcels([fd]);
-                        renderSingleFocus(fd);
+                        // If not in pick mode, single click just updates address info but doesn't change selection
+                        // (Selection is now handled by dblclick or search)
                     } catch (e) {
                         console.error('singleclick error:', e);
                     }

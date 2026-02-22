@@ -123,17 +123,17 @@ const MapControls = ({
 
             {/* Sub Row 1: Base Map Types, Hybrid, and Cadastral */}
             {showMapTypes && (
-                <div className="flex items-center w-max gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
-                    <div className="flex items-center">
+                <div className="flex items-center justify-between w-[300px] md:w-[400px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
+                    <div className="flex items-center space-x-1">
                         {[
-                            { id: 'base', label: '일반지도' },
+                            { id: 'base', label: '일반' },
                             { id: 'gray', label: '백지도' },
                             { id: 'midnight', label: '야간' }
                         ].map((type) => (
                             <button
                                 key={type.id}
                                 onClick={() => setMapType(type.id)}
-                                className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
+                                className={`px-2 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
                                     ${mapType === type.id
                                         ? 'bg-gray-800 text-white shadow-sm'
                                         : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
@@ -143,44 +143,33 @@ const MapControls = ({
                         ))}
                     </div>
 
-                    <div className="w-px h-4 bg-gray-300 mx-0.5"></div>
+                    <div className="w-px h-4 bg-gray-200 mx-0.5"></div>
 
-                    <div className="flex bg-gray-100 rounded p-0.5 h-full">
-                        <button
-                            onClick={() => setMapType('satellite')}
-                            className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
-                                ${mapType === 'satellite'
-                                    ? 'bg-gray-800 text-white shadow-sm'
-                                    : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
-                        >
-                            위성지도
-                        </button>
+                    <div className="flex items-center space-x-1">
                         <button
                             onClick={() => setShowHybrid(!showHybrid)}
-                            className={`px-2 h-full text-[10px] font-bold rounded transition-colors whitespace-nowrap
-                                ${showHybrid ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-200'}`}
+                            className={`px-2 h-6 text-[10px] font-bold rounded transition-all whitespace-nowrap
+                                ${showHybrid ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-600 hover:bg-gray-100'}`}
                         >
-                            명칭
+                            명칭표시
+                        </button>
+
+                        <button
+                            onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
+                            className={`px-2 h-6 text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
+                                ${activeLayers.includes('LP_PA_CBND_BUBUN')
+                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                    : 'bg-white text-gray-700 border-gray-100 hover:bg-gray-50'}`}
+                        >
+                            지적도
                         </button>
                     </div>
-
-                    <div className="w-px h-4 bg-gray-300 mx-0.5"></div>
-
-                    <button
-                        onClick={() => toggleLayer('LP_PA_CBND_BUBUN')}
-                        className={`px-2.5 h-full text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap
-                            ${activeLayers.includes('LP_PA_CBND_BUBUN')
-                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                    >
-                        지적도
-                    </button>
                 </div>
             )}
 
             {/* Sub Row 2: Basic Area Layers */}
             {showZones && (
-                <div className="flex items-center w-max gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
+                <div className="flex items-center w-[300px] md:w-[400px] gap-0.5 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-gray-100 p-1 h-8 animate-fade-in-down relative z-10 transition-all origin-top-right transform">
                     <button
                         onClick={() => setShowLayerMenu(true)}
                         className="px-2 h-full text-[10px] font-bold rounded shadow-sm border transition-all whitespace-nowrap bg-gray-900 text-white hover:bg-gray-800 border-gray-800"

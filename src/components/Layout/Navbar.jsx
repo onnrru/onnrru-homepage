@@ -18,7 +18,16 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
 
     const navLinks = [
         { name: 'ABOUT', href: '/about' },
-        { name: 'PapavalleyPizza\nX OnnRRu', href: '/', isBrand: true },
+        {
+            name: (
+                <span className="flex flex-col items-center">
+                    <span className="text-[9px] font-bold opacity-60">PapavalleyPizza X</span>
+                    <span className="text-sm font-black tracking-tighter">ONNRRU</span>
+                </span>
+            ),
+            href: '/pizza',
+            isBrand: true
+        },
         { name: 'Consulting', href: '/consulting' },
         { name: 'Test', href: '/test' },
     ];
@@ -39,8 +48,8 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
             <div className="container mx-auto px-6 flex justify-between items-center">
                 {/* Logo */}
                 <a
-                    href="#home"
-                    onClick={(e) => handleNavigation(e, '#home')}
+                    href="/"
+                    onClick={(e) => handleNavigation(e, '/')}
                     className="text-2xl font-serif font-bold tracking-widest text-ink hover:text-ink-light transition-colors"
                 >
                     온 류
@@ -50,22 +59,21 @@ const Navbar = ({ activeGroup, setActiveGroup }) => {
                 <div className="hidden md:flex space-x-10 items-center">
                     {navLinks.map((link) => (
                         <a
-                            key={link.name}
+                            key={typeof link.name === 'string' ? link.name : 'brand'}
                             href={link.href}
                             onClick={(e) => handleNavigation(e, link.href)}
                             className={`uppercase tracking-wider hover:text-ink transition-colors relative group cursor-pointer leading-tight
-                                ${link.isBrand ? 'text-[11px] font-black text-ink bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 hover:bg-white hover:shadow-sm' : 'text-xs text-ink/70 font-bold'}
+                                ${link.isBrand ? 'text-ink bg-gray-50/50 px-4 py-2 rounded-2xl border border-gray-100/50 hover:bg-white hover:shadow-sm' : 'text-xs text-ink/70 font-bold'}
                                 ${location.pathname === link.href ? 'text-ink' : ''}
                             `}
                         >
                             <span className="whitespace-pre-line text-center block">
                                 {link.name}
                             </span>
-                            {!link.isBrand && (
-                                <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
-                            )}
+                            <span className={`absolute left-0 bottom-[-4px] h-[2px] bg-ink transition-all group-hover:w-full ${location.pathname === link.href ? 'w-full' : 'w-0'}`}></span>
                         </a>
                     ))}
+
 
                     {/* Social Icons */}
                     <div className="flex items-center space-x-3 border-l border-ink/10 pl-6 ml-2">

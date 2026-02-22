@@ -17,11 +17,11 @@ export const useRadiusDrawing = (mapObj, radiusMode, selectedAddress, selectedPa
                     if (type === 'circle') {
                         return new OL.style.Style({
                             stroke: new OL.style.Stroke({
-                                color: 'rgba(239, 68, 68, 0.6)',
+                                color: 'rgba(255, 255, 255, 0.8)',
                                 width: 2,
                                 lineDash: [5, 5]
                             }),
-                            fill: new OL.style.Fill({ color: 'rgba(239, 68, 68, 0.05)' })
+                            fill: new OL.style.Fill({ color: 'rgba(255, 255, 255, 0.05)' })
                         });
                     }
                     if (type === 'label') {
@@ -29,8 +29,8 @@ export const useRadiusDrawing = (mapObj, radiusMode, selectedAddress, selectedPa
                             text: new OL.style.Text({
                                 text: feature.get('text'),
                                 font: 'bold 10px Inter, sans-serif',
-                                fill: new OL.style.Fill({ color: '#ef4444' }),
-                                stroke: new OL.style.Stroke({ color: '#fff', width: 2 }),
+                                fill: new OL.style.Fill({ color: '#ffffff' }),
+                                stroke: new OL.style.Stroke({ color: '#444', width: 2 }),
                                 offsetY: -10
                             })
                         });
@@ -73,8 +73,8 @@ export const useRadiusDrawing = (mapObj, radiusMode, selectedAddress, selectedPa
         if (!centerLng || !centerLat) return;
 
         const center3857 = OL.proj.transform([Number(centerLng), Number(centerLat)], 'EPSG:4326', 'EPSG:3857');
-        const distances = [500, 1000, 1500, 3000, 5000, 10000];
-        const labels = ['500m', '1km', '1.5km', '3km', '5km', '10km'];
+        const distances = [1000, 1500, 3000, 5000];
+        const labels = ['1km', '1.5km', '3km', '5km'];
 
         distances.forEach((dist, idx) => {
             const radius3857 = dist / Math.cos(Number(centerLat) * Math.PI / 180);
