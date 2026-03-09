@@ -6,8 +6,8 @@ export const API_CONFIG = {
     MOLIT_BASE_URL: '/api/molit',
 
     // Keys
-    VWORLD_KEY: 'SECRET',
-    MOLIT_KEY: 'SECRET',
+    VWORLD_KEY: 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
+    MOLIT_KEY: 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04',
 
     // Endpoints
     ENDPOINTS: {
