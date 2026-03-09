@@ -8,7 +8,11 @@ const vworldCache = {
 };
 
 function normalizeQuery(query) {
-    return String(query || '').trim().replace(/\s+/g, ' ');
+    return String(query || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/번지/g, '')
+        .trim();
 }
 
 function coordKey(lon, lat) {
@@ -17,34 +21,58 @@ function coordKey(lon, lat) {
     return `${x},${y}`;
 }
 
-async function safeFetchJson(url, label = 'request') {
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function safeFetchJson(url, label = 'request', retry = 1) {
     try {
         const res = await fetch(url, { method: 'GET' });
         const text = await res.text();
 
         if (!res.ok) {
-            console.error(`${label} HTTP error:`, res.status, text.slice(0, 300));
+            if (retry > 0) {
+                await sleep(300);
+                return safeFetchJson(url, label, retry - 1);
+            }
+            console.warn(`${label} HTTP error:`, res.status, text.slice(0, 300));
             return null;
         }
 
         if (!text || !text.trim()) {
-            console.error(`${label} empty response`);
+            if (retry > 0) {
+                await sleep(300);
+                return safeFetchJson(url, label, retry - 1);
+            }
+            console.warn(`${label} empty response`);
             return null;
         }
 
         if (text.trim().startsWith('<')) {
-            console.error(`${label} returned HTML:`, text.slice(0, 300));
+            if (retry > 0) {
+                await sleep(300);
+                return safeFetchJson(url, label, retry - 1);
+            }
+            console.warn(`${label} returned HTML:`, text.slice(0, 300));
             return null;
         }
 
         try {
             return JSON.parse(text);
         } catch (parseError) {
-            console.error(`${label} JSON parse error:`, parseError, text.slice(0, 300));
+            if (retry > 0) {
+                await sleep(300);
+                return safeFetchJson(url, label, retry - 1);
+            }
+            console.warn(`${label} JSON parse error:`, parseError, text.slice(0, 300));
             return null;
         }
     } catch (error) {
-        console.error(`${label} failed:`, error);
+        if (retry > 0) {
+            await sleep(300);
+            return safeFetchJson(url, label, retry - 1);
+        }
+        console.warn(`${label} failed:`, error);
         return null;
     }
 }
@@ -110,7 +138,7 @@ export const VWorldService = {
             `&format=json` +
             `&errorformat=json`;
 
-        const data = await safeFetchJson(url, 'searchAddress');
+        const data = await safeFetchJson(url, 'searchAddress', 1);
 
         if (data?.response?.status === 'OK' && data?.response?.result?.items?.length > 0) {
             const result = data.response.result.items[0];
@@ -138,7 +166,7 @@ export const VWorldService = {
             `&numOfRows=1` +
             `&pageNo=1`;
 
-        const data = await safeFetchJson(url, 'fetchLandCharacteristics');
+        const data = await safeFetchJson(url, 'fetchLandCharacteristics', 1);
 
         if (data) {
             vworldCache.landCharacteristics.set(pnu, data);
@@ -164,7 +192,7 @@ export const VWorldService = {
             `&numOfRows=1` +
             `&pageNo=1`;
 
-        const data = await safeFetchJson(url, 'fetchLadfrl');
+        const data = await safeFetchJson(url, 'fetchLadfrl', 1);
 
         if (data) {
             vworldCache.ladfrl.set(pnu, data);

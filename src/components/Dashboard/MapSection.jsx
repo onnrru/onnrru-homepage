@@ -480,63 +480,78 @@ const MapSection = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ====== Apartment Analytical Markers Rendering ======
     useEffect(() => {
         if (!mapObj || !aptMarkerSourceRef.current) return;
+
         const src = aptMarkerSourceRef.current;
         const OL = window.ol;
 
-        src.clear(); // remove previous analytics markers
+        src.clear();
 
         if (!analyzedApartments || analyzedApartments.length === 0) return;
 
+        let isCancelled = false;
         const currentYear = new Date().getFullYear();
 
-        analyzedApartments.forEach(async (apt) => {
-            if (!apt.jibun || !apt.dongName) return;
+        const runSequentialGeocoding = async () => {
+            for (const apt of analyzedApartments) {
+                if (isCancelled) break;
+                if (!apt?.jibun || !apt?.dongName) continue;
 
-            // Format address for Geocoding
-            const searchStr = `${apt.dongName} ${apt.jibun}`.trim();
+                const searchStr = `${apt.dongName} ${apt.jibun}`.trim();
 
-            try {
-                // Determine building age
-                let ageStr = '- 년차';
-                if (apt.buildYear && apt.buildYear.length === 4) {
-                    const bYear = parseInt(apt.buildYear, 10);
-                    if (!isNaN(bYear)) {
-                        ageStr = `${currentYear - bYear + 1}년차`;
+                try {
+                    let ageStr = '-년차';
+                    if (apt.buildYear && String(apt.buildYear).length === 4) {
+                        const bYear = parseInt(apt.buildYear, 10);
+                        if (!isNaN(bYear)) {
+                            ageStr = `${currentYear - bYear + 1}년차`;
+                        }
                     }
-                }
 
-                // Use Centralized Service with Caching
-                const item = await VWorldService.searchAddress(searchStr);
+                    const item = await VWorldService.searchAddress(searchStr);
 
-                if (item) {
-                    const [lon, lat] = [parseFloat(item.point.x), parseFloat(item.point.y)];
+                    if (isCancelled) break;
+                    if (!item?.point?.x || !item?.point?.y) continue;
+
+                    const lon = parseFloat(item.point.x);
+                    const lat = parseFloat(item.point.y);
+
+                    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
 
                     const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
+
                     const feature = new OL.Feature({
                         geometry: new OL.geom.Point(center3857)
                     });
 
-                    const priceInEok = (apt.avg / 10000).toFixed(2);
-                    const areaDisp = apt.avgArea.toFixed(1);
+                    const priceInEok = Number.isFinite(apt.avg) ? (apt.avg / 10000).toFixed(2) : '-';
+                    const areaDisp = Number.isFinite(apt.avgArea) ? apt.avgArea.toFixed(1) : '-';
 
                     feature.setProperties({
-                        aptName: apt.name,
-                        ageStr: ageStr,
-                        areaDisp: areaDisp,
-                        priceInEok: priceInEok,
-                        count: apt.count,
+                        aptName: apt.name || '-',
+                        ageStr,
+                        areaDisp,
+                        priceInEok,
+                        count: apt.count || 0,
                         layerType: 'aptMarker'
                     });
 
                     src.addFeature(feature);
+
+                    // 요청 폭주 방지용 작은 간격
+                    await new Promise((resolve) => setTimeout(resolve, 120));
+                } catch (e) {
+                    console.warn('Map marker geocoding skipped for:', searchStr, e);
                 }
-            } catch (e) {
-                console.error('Map marker geocoding failed for:', searchStr, e);
             }
-        });
+        };
+
+        runSequentialGeocoding();
+
+        return () => {
+            isCancelled = true;
+        };
     }, [analyzedApartments, mapObj]);
 
     // ====== Cadastral stabilization ======

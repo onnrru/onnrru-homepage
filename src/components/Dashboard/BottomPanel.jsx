@@ -384,7 +384,7 @@ const BottomPanel = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full relative">
+                    <div className="flex-1 w-full relative h-[260px] min-h-[260px]">
                         {barChartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={barChartData} margin={{ top: 10, right: 10, left: 0, bottom: 25 }}>
@@ -453,7 +453,7 @@ const BottomPanel = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full">
+                    <div className="flex-1 w-full h-[260px] min-h-[260px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={lineChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -463,54 +463,54 @@ const BottomPanel = () => {
                                     axisLine={false}
                                     tickLine={false}
                                     interval={2} // Show fewer labels to avoid crowding
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 10, fill: '#6b7280' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tickFormatter={(value) => trendDataType === 'avg'
-                                        ? `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`
-                                        : `${value}건`}
-                                    width={45}
-                                />
-                                <Tooltip content={<TrendTooltip trendDataType={trendDataType} />} />
-                                <Legend wrapperStyle={{ fontSize: '11px', bottom: 0 }} />
+                                </XAxis>
+                            <YAxis
+                                tick={{ fontSize: 10, fill: '#6b7280' }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(value) => trendDataType === 'avg'
+                                    ? `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`
+                                    : `${value}건`}
+                                width={45}
+                            />
+                            <Tooltip content={<TrendTooltip trendDataType={trendDataType} />} />
+                            <Legend wrapperStyle={{ fontSize: '11px', bottom: 0 }} />
 
+                            <Line
+                                type="monotone"
+                                dataKey="guAvg"
+                                name={`${regionLabels.gu} 평균`}
+                                stroke="#9ca3af"
+                                strokeWidth={2}
+                                dot={{ r: 2, fill: '#9ca3af' }}
+                                connectNulls
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="dongAvg"
+                                name={`${regionLabels.dong} 평균`}
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                dot={{ r: 3, fill: '#10b981' }}
+                                connectNulls
+                            />
+                            {selectedApartment && (
                                 <Line
                                     type="monotone"
-                                    dataKey="guAvg"
-                                    name={`${regionLabels.gu} 평균`}
-                                    stroke="#9ca3af"
-                                    strokeWidth={2}
-                                    dot={{ r: 2, fill: '#9ca3af' }}
+                                    dataKey="aptAvg"
+                                    name={`선택: ${selectedApartment}`}
+                                    stroke="#2563eb"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: '#2563eb' }}
                                     connectNulls
                                 />
-                                <Line
-                                    type="monotone"
-                                    dataKey="dongAvg"
-                                    name={`${regionLabels.dong} 평균`}
-                                    stroke="#10b981"
-                                    strokeWidth={2}
-                                    dot={{ r: 3, fill: '#10b981' }}
-                                    connectNulls
-                                />
-                                {selectedApartment && (
-                                    <Line
-                                        type="monotone"
-                                        dataKey="aptAvg"
-                                        name={`선택: ${selectedApartment}`}
-                                        stroke="#2563eb"
-                                        strokeWidth={3}
-                                        dot={{ r: 4, fill: '#2563eb' }}
-                                        connectNulls
-                                    />
-                                )}
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                            )}
+                        </LineChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
         </div>
+        </div >
     );
 };
 
