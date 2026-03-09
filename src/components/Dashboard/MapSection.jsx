@@ -184,7 +184,7 @@ const MapSection = () => {
                 const container = document.getElementById('vworld_map_target');
                 if (container) container.innerHTML = '';
 
-                const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL || '/.netlify/functions/vworld';
+                const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL;
 
                 // Base layers
                 const baseLayer = new OL.layer.Tile({

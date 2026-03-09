@@ -114,14 +114,15 @@ export const VWorldService = {
     },
 
     /**
-     * Search address or geocode a string to coordinates
+     * Search addresses or geocode a string to coordinates (multi-result)
      */
-    async searchAddress(query) {
+    async searchAddress(query, size = 10) {
         const normalized = normalizeQuery(query);
-        if (!normalized) return null;
+        if (!normalized) return [];
 
-        if (vworldCache.geocoding.has(normalized)) {
-            return vworldCache.geocoding.get(normalized);
+        const cacheKey = `${normalized}_${size}`;
+        if (vworldCache.geocoding.has(cacheKey)) {
+            return vworldCache.geocoding.get(cacheKey);
         }
 
         const url =
@@ -130,7 +131,7 @@ export const VWorldService = {
             `&request=search` +
             `&version=2.0` +
             `&crs=EPSG:4326` +
-            `&size=1` +
+            `&size=${size}` +
             `&page=1` +
             `&query=${encodeURIComponent(normalized)}` +
             `&type=ADDRESS` +
@@ -141,12 +142,12 @@ export const VWorldService = {
         const data = await safeFetchJson(url, 'searchAddress', 1);
 
         if (data?.response?.status === 'OK' && data?.response?.result?.items?.length > 0) {
-            const result = data.response.result.items[0];
-            vworldCache.geocoding.set(normalized, result);
-            return result;
+            const items = data.response.result.items;
+            vworldCache.geocoding.set(cacheKey, items);
+            return items;
         }
 
-        return null;
+        return [];
     },
 
     /**
