@@ -92,14 +92,10 @@ const parseXmlToJSON = (xmlText) => {
 export const fetchApartmentTransactions = async (lawdCd, monthsCount = 36) => {
     try {
         const months = getPastMonths(monthsCount);
-        const { MOLIT_BASE_URL, MOLIT_KEY, ENDPOINTS } = API_CONFIG;
-
-        // Prepare URL base
-        // The key provided by the user is already URL-encoded.
-        const encodedKey = MOLIT_KEY;
+        const { MOLIT_BASE_URL, ENDPOINTS } = API_CONFIG;
 
         const fetchMonthData = async (dealYmd) => {
-            const url = `${MOLIT_BASE_URL}${ENDPOINTS.APT_TRADE}?serviceKey=${encodedKey}&LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
+            const url = `${MOLIT_BASE_URL}${ENDPOINTS.APT_TRADE}?LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
 
             const response = await fetch(url);
             if (!response.ok) {
