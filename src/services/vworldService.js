@@ -1,126 +1,151 @@
-import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 
 const vworldCache = {
     geocoding: new Map(),
     parcelData: new Map(),
+    landCharacteristics: new Map(),
+    ladfrl: new Map()
 };
 
-/**
- * VWorld API Centralized Service
- */
+function normalizeQuery(query) {
+    return String(query || '').trim().replace(/\s+/g, ' ');
+}
+
+function coordKey(lon, lat) {
+    const x = Number(lon).toFixed(6);
+    const y = Number(lat).toFixed(6);
+    return `${x},${y}`;
+}
+
+async function safeFetchJson(url, label = 'request') {
+    try {
+        const res = await fetch(url, { method: 'GET' });
+        const text = await res.text();
+
+        if (!res.ok) {
+            console.error(`${label} HTTP error:`, res.status, text.slice(0, 300));
+            return null;
+        }
+
+        if (!text || !text.trim()) {
+            console.error(`${label} empty response`);
+            return null;
+        }
+
+        if (text.trim().startsWith('<')) {
+            console.error(`${label} returned HTML:`, text.slice(0, 300));
+            return null;
+        }
+
+        return JSON.parse(text);
+    } catch (error) {
+        console.error(`${label} failed:`, error);
+        return null;
+    }
+}
+
 export const VWorldService = {
-    /**
-     * Get parcel information by longitude and latitude (Reverse Geocoding / Data API)
-     */
     async fetchParcelByLonLat(lon, lat) {
-        const cacheKey = `${lon},${lat}`;
+        const cacheKey = coordKey(lon, lat);
+
         if (vworldCache.parcelData.has(cacheKey)) {
             return vworldCache.parcelData.get(cacheKey);
         }
 
-        const url = `${API_CONFIG.VWORLD_BASE_URL}/req/data?service=data&request=GetFeature&data=lp_pa_cbnd_bubun` +
-            `&format=json&geomFilter=POINT(${lon} ${lat})&key=${API_CONFIG.VWORLD_KEY}&domain=${window.location.hostname}`;
+        const url =
+            `${API_CONFIG.VWORLD_BASE_URL}/req/data` +
+            `?service=data` +
+            `&request=GetFeature` +
+            `&data=lp_pa_cbnd_bubun` +
+            `&format=json` +
+            `&geomFilter=POINT(${lon} ${lat})`;
 
-        try {
-            const res = await fetch(url);
-            const text = await res.text();
+        const json = await safeFetchJson(url, 'fetchParcelByLonLat');
+        if (json?.response?.status !== 'OK') return null;
 
-            if (text.trim().startsWith('<')) {
-                console.error('VWorld returned HTML:', text.slice(0, 120));
-                return null;
-            }
+        const feature = json?.response?.result?.featureCollection?.features?.[0] || null;
 
-            const json = JSON.parse(text);
-            if (json?.response?.status !== 'OK') return null;
-
-            const feature = json.response?.result?.featureCollection?.features?.[0] || null;
-            if (feature) {
-                vworldCache.parcelData.set(cacheKey, feature);
-            }
-            return feature;
-        } catch (error) {
-            console.error('fetchParcelByLonLat failed:', error);
-            return null;
+        if (feature) {
+            vworldCache.parcelData.set(cacheKey, feature);
         }
+
+        return feature;
     },
 
-    /**
-     * Search address or geocode a string to coordinates
-     */
     async searchAddress(query) {
-        if (vworldCache.geocoding.has(query)) {
-            return vworldCache.geocoding.get(query);
+        const normalized = normalizeQuery(query);
+        if (!normalized) return null;
+
+        if (vworldCache.geocoding.has(normalized)) {
+            return vworldCache.geocoding.get(normalized);
         }
 
-        const url = `${API_CONFIG.VWORLD_BASE_URL}/req/search?service=search&request=search&version=2.0` +
-            `&crs=EPSG:4326&size=1&page=1&query=${encodeURIComponent(query)}` +
-            `&type=ADDRESS&category=parcel&format=json&errorformat=json` +
-            `&key=${API_CONFIG.VWORLD_KEY}&domain=${window.location.hostname}`;
+        const url =
+            `${API_CONFIG.VWORLD_BASE_URL}/req/search` +
+            `?service=search` +
+            `&request=search` +
+            `&version=2.0` +
+            `&crs=EPSG:4326` +
+            `&size=1` +
+            `&page=1` +
+            `&query=${encodeURIComponent(normalized)}` +
+            `&type=ADDRESS` +
+            `&category=parcel` +
+            `&format=json` +
+            `&errorformat=json`;
 
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
+        const data = await safeFetchJson(url, 'searchAddress');
 
-            if (data?.response?.status === 'OK' && data.response.result?.items?.length > 0) {
-                const result = data.response.result.items[0];
-                vworldCache.geocoding.set(query, result);
-                return result;
-            }
-            return null;
-        } catch (error) {
-            console.error('searchAddress failed for:', query, error);
-            return null;
+        if (data?.response?.status === 'OK' && data?.response?.result?.items?.length > 0) {
+            const result = data.response.result.items[0];
+            vworldCache.geocoding.set(normalized, result);
+            return result;
         }
+
+        return null;
     },
 
-    /**
-     * Fetch Land Characteristics (NED Data API)
-     */
     async fetchLandCharacteristics(pnu) {
-        const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/data/getLandCharacteristics`;
-        try {
-            const res = await axios.get(url, {
-                params: {
-                    key: API_CONFIG.VWORLD_KEY,
-                    domain: window.location.hostname,
-                    pnu,
-                    format: 'json',
-                    numOfRows: 1,
-                    pageNo: 1
-                },
-                timeout: 3000
-            });
-            // Handle some inconsistency in axios response vs fetch
-            const d = (typeof res.data === 'string') ? JSON.parse(res.data) : res.data;
-            return d;
-        } catch (error) {
-            console.warn('fetchLandCharacteristics failed:', error);
-            return null;
+        if (!pnu) return null;
+        if (vworldCache.landCharacteristics.has(pnu)) {
+            return vworldCache.landCharacteristics.get(pnu);
         }
+
+        const url =
+            `${API_CONFIG.VWORLD_BASE_URL}/ned/data/getLandCharacteristics` +
+            `?pnu=${encodeURIComponent(pnu)}` +
+            `&format=json` +
+            `&numOfRows=1` +
+            `&pageNo=1`;
+
+        const data = await safeFetchJson(url, 'fetchLandCharacteristics');
+
+        if (data) {
+            vworldCache.landCharacteristics.set(pnu, data);
+        }
+
+        return data;
     },
 
-    /**
-     * Fetch Land Parcel List (NED Data API) - Backup for Area/Jimok
-     */
     async fetchLadfrl(pnu) {
-        const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/data/ladfrlList`;
-        try {
-            const res = await axios.get(url, {
-                params: {
-                    key: API_CONFIG.VWORLD_KEY,
-                    domain: window.location.hostname,
-                    pnu,
-                    format: 'json',
-                    numOfRows: 1,
-                    pageNo: 1
-                },
-                timeout: 2000
-            });
-            return (typeof res.data === 'string') ? JSON.parse(res.data) : res.data;
-        } catch (error) {
-            console.warn('fetchLadfrl failed:', error);
-            return null;
+        if (!pnu) return null;
+        if (vworldCache.ladfrl.has(pnu)) {
+            return vworldCache.ladfrl.get(pnu);
         }
+
+        const url =
+            `${API_CONFIG.VWORLD_BASE_URL}/ned/data/ladfrlList` +
+            `?pnu=${encodeURIComponent(pnu)}` +
+            `&format=json` +
+            `&numOfRows=1` +
+            `&pageNo=1`;
+
+        const data = await safeFetchJson(url, 'fetchLadfrl');
+
+        if (data) {
+            vworldCache.ladfrl.set(pnu, data);
+        }
+
+        return data;
     }
 };

@@ -184,13 +184,12 @@ const MapSection = () => {
                 const container = document.getElementById('vworld_map_target');
                 if (container) container.innerHTML = '';
 
-                const apiKey = API_CONFIG.VWORLD_KEY;
-                const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL || '/vworld_map';
+                const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL || '/.netlify/functions/vworld';
 
                 // Base layers
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Base/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/wmts/Base/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -200,7 +199,7 @@ const MapSection = () => {
 
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/white/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/wmts/white/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -210,7 +209,7 @@ const MapSection = () => {
 
                 const midnightLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/midnight/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/wmts/midnight/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -220,7 +219,7 @@ const MapSection = () => {
 
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Satellite/{z}/{y}/{x}.jpeg`,
+                        url: `${proxyMapUrl}/wmts/Satellite/{z}/{y}/{x}.jpeg`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -230,7 +229,7 @@ const MapSection = () => {
 
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/req/wmts/1.0.0/${apiKey}/Hybrid/{z}/{y}/{x}.png`,
+                        url: `${proxyMapUrl}/wmts/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 10,
@@ -241,18 +240,16 @@ const MapSection = () => {
                 // Cadastral (WMS)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: `${proxyMapUrl}/req/wms`,
+                        url: `${proxyMapUrl}/wms`,
                         params: {
-                            service: 'WMS',
-                            request: 'GetMap',
-                            version: '1.3.0',
-                            layers: 'lp_pa_cbnd_bubun',
-                            styles: '',
-                            crs: 'EPSG:3857',
-                            format: 'image/png',
-                            transparent: true,
-                            key: apiKey,
-                            domain: window.location.hostname
+                            SERVICE: 'WMS',
+                            REQUEST: 'GetMap',
+                            VERSION: '1.3.0',
+                            LAYERS: 'LP_PA_CBND_BUBUN',
+                            STYLES: '',
+                            CRS: 'EPSG:3857',
+                            FORMAT: 'image/png',
+                            TRANSPARENT: true
                         }
                     }),
                     zIndex: 15,
@@ -267,16 +264,16 @@ const MapSection = () => {
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
                         const source = new OL.source.TileWMS({
-                            url: `${proxyMapUrl}/req/wms`,
+                            url: `${proxyMapUrl}/wms`,
                             params: {
-                                LAYERS: layer.id.toLowerCase(),
-                                STYLES: layer.id.toLowerCase(),
+                                SERVICE: 'WMS',
+                                REQUEST: 'GetMap',
+                                VERSION: '1.3.0',
+                                LAYERS: layer.id,
+                                STYLES: '',
                                 CRS: 'EPSG:3857',
                                 FORMAT: 'image/png',
-                                TRANSPARENT: 'TRUE',
-                                VERSION: '1.3.0',
-                                key: apiKey,
-                                DOMAIN: window.location.hostname
+                                TRANSPARENT: 'TRUE'
                             }
                         });
 
