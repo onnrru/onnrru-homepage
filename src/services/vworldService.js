@@ -77,15 +77,7 @@ async function safeFetchJson(url, label = 'request', retry = 1) {
     }
 }
 
-/**
- * VWorld API Centralized Service
- * - key/domain 은 Netlify function 에서만 주입
- * - 프런트에서는 절대 key/domain 을 붙이지 않음
- */
 export const VWorldService = {
-    /**
-     * Get parcel information by longitude and latitude
-     */
     async fetchParcelByLonLat(lon, lat) {
         const cacheKey = coordKey(lon, lat);
 
@@ -101,7 +93,7 @@ export const VWorldService = {
             `&format=json` +
             `&geomFilter=POINT(${lon} ${lat})`;
 
-        const json = await safeFetchJson(url, 'fetchParcelByLonLat');
+        const json = await safeFetchJson(url, 'fetchParcelByLonLat', 1);
         if (json?.response?.status !== 'OK') return null;
 
         const feature = json?.response?.result?.featureCollection?.features?.[0] || null;
@@ -113,16 +105,12 @@ export const VWorldService = {
         return feature;
     },
 
-    /**
-     * Search addresses or geocode a string to coordinates (multi-result)
-     */
-    async searchAddress(query, size = 10) {
+    async searchAddress(query) {
         const normalized = normalizeQuery(query);
-        if (!normalized) return [];
+        if (!normalized) return null;
 
-        const cacheKey = `${normalized}_${size}`;
-        if (vworldCache.geocoding.has(cacheKey)) {
-            return vworldCache.geocoding.get(cacheKey);
+        if (vworldCache.geocoding.has(normalized)) {
+            return vworldCache.geocoding.get(normalized);
         }
 
         const url =
@@ -131,7 +119,7 @@ export const VWorldService = {
             `&request=search` +
             `&version=2.0` +
             `&crs=EPSG:4326` +
-            `&size=${size}` +
+            `&size=1` +
             `&page=1` +
             `&query=${encodeURIComponent(normalized)}` +
             `&type=ADDRESS` +
@@ -142,17 +130,14 @@ export const VWorldService = {
         const data = await safeFetchJson(url, 'searchAddress', 1);
 
         if (data?.response?.status === 'OK' && data?.response?.result?.items?.length > 0) {
-            const items = data.response.result.items;
-            vworldCache.geocoding.set(cacheKey, items);
-            return items;
+            const result = data.response.result.items[0];
+            vworldCache.geocoding.set(normalized, result);
+            return result;
         }
 
-        return [];
+        return null;
     },
 
-    /**
-     * Fetch Land Characteristics (NED Data API)
-     */
     async fetchLandCharacteristics(pnu) {
         if (!pnu) return null;
 
@@ -176,9 +161,6 @@ export const VWorldService = {
         return data;
     },
 
-    /**
-     * Fetch Land Parcel List (NED Data API)
-     */
     async fetchLadfrl(pnu) {
         if (!pnu) return null;
 

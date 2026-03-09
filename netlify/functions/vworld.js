@@ -38,9 +38,7 @@ export async function handler(event) {
             return {
                 statusCode: 500,
                 headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({
-                    error: 'VWORLD_API_KEY is missing'
-                })
+                body: JSON.stringify({ error: 'VWORLD_API_KEY is missing' })
             };
         }
 
@@ -49,13 +47,13 @@ export async function handler(event) {
 
         let upstreamUrl = '';
 
-        // 1) WMTS
+        // /wmts/Base/...
+        // /req/wmts/1.0.0/SECRET/Base/... 형태도 보정
         if (rawPath.startsWith('/wmts/') || rawPath.startsWith('/req/wmts/')) {
             let wmtsPath = rawPath;
 
             if (wmtsPath.startsWith('/req/wmts/1.0.0/')) {
                 wmtsPath = wmtsPath.replace('/req/wmts/1.0.0/', '');
-
                 const firstSlash = wmtsPath.indexOf('/');
                 if (firstSlash > -1) {
                     wmtsPath = wmtsPath.slice(firstSlash + 1);
@@ -67,7 +65,6 @@ export async function handler(event) {
             upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
         }
 
-        // 2) WMS
         else if (rawPath === '/wms' || rawPath === '/req/wms') {
             const query = buildQuery({
                 ...q,
@@ -78,7 +75,6 @@ export async function handler(event) {
             upstreamUrl = `${VWORLD_API_BASE}/req/wms?${query.toString()}`;
         }
 
-        // 3) req/*
         else if (rawPath.startsWith('/req/')) {
             const query = buildQuery({
                 ...q,
@@ -89,7 +85,6 @@ export async function handler(event) {
             upstreamUrl = `${VWORLD_API_BASE}${rawPath}?${query.toString()}`;
         }
 
-        // 4) ned/*
         else if (rawPath.startsWith('/ned/')) {
             const query = buildQuery({
                 ...q,

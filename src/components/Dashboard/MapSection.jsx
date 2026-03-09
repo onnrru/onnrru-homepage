@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { API_CONFIG } from '../../config/api';
-import { ALL_LAYERS, QUICK_LAYER_IDS, BASIC_LAYERS } from '../../config/layers';
+import { ALL_LAYERS, QUICK_LAYER_IDS } from '../../config/layers';
 import { VWorldService } from '../../services/vworldService';
 import MapControls from './MapControls';
 import { useMapMeasurements } from './useMapMeasurements';
 import { useRadiusDrawing } from './useRadiusDrawing';
-
 import { useDashboard } from '../../context/DashboardContext';
 
 const MapSection = () => {
@@ -15,10 +14,6 @@ const MapSection = () => {
         selectedParcels,
         setSelectedParcels,
         analyzedApartments,
-        isAnalysisOpen,
-        setIsAnalysisOpen,
-        isSidebarOpen,
-        setIsSidebarOpen,
         parcelPickMode,
         setParcelPickMode
     } = useDashboard();
@@ -28,38 +23,25 @@ const MapSection = () => {
 
     const [mapObj, setMapObj] = useState(null);
 
-    // Toggles
     const [showHybrid, setShowHybrid] = useState(false);
     const [mapType, setMapType] = useState('satellite');
     const [activeLayers, setActiveLayers] = useState([]);
     const [showLayerMenu, setShowLayerMenu] = useState(false);
-
-    // Sub-menu Toggles for Map Types and Zones
     const [showMapTypes, setShowMapTypes] = useState(false);
     const [showZones, setShowZones] = useState(false);
-
-    // Filter
     const [selectedCategory, setSelectedCategory] = useState('전체');
-
-    // Stats
     const [isMapLoading, setIsMapLoading] = useState(true);
     const [mapError, setMapError] = useState(null);
-
-    // Measurement & Radius States
-    const [measureMode, setMeasureMode] = useState(null); // null, 'length', 'area'
+    const [measureMode, setMeasureMode] = useState(null);
     const [radiusMode, setRadiusMode] = useState(false);
 
-    const toggleRadiusMode = () => setRadiusMode(!radiusMode);
+    const toggleRadiusMode = () => setRadiusMode((prev) => !prev);
 
-    // Cadastral stabilization
     const cadastralLayerRef = useRef(null);
     const cadastralPendingRef = useRef(false);
-
-    // Data enrichment lock
     const enrichLockRef = useRef(false);
     const lastEnrichKeyRef = useRef(null);
 
-    // Refs
     const activeLayersRef = useRef([]);
     useEffect(() => { activeLayersRef.current = activeLayers; }, [activeLayers]);
 
@@ -69,12 +51,10 @@ const MapSection = () => {
     const parcelPickModeRef = useRef(parcelPickMode);
     useEffect(() => { parcelPickModeRef.current = parcelPickMode; }, [parcelPickMode]);
 
-    const markerSourceRef = useRef(null);     // 단일 포커스(검색/더블클릭 등)
-    const selectionSourceRef = useRef(null);  // 멀티 선택(Shift 누적)
-    const aptMarkerSourceRef = useRef(null);  // 아파트 분석 마커
-    const radiusSourceRef = useRef(null);     // 방경 레이어 소스
+    const markerSourceRef = useRef(null);
+    const selectionSourceRef = useRef(null);
+    const aptMarkerSourceRef = useRef(null);
 
-    // ====== Hooks ======
     const { clearMeasurements } = useMapMeasurements(mapObj, measureMode);
     const { toggleRadius, clearRadius } = useRadiusDrawing(mapObj, radiusMode, selectedAddress, selectedParcels);
 
@@ -91,18 +71,18 @@ const MapSection = () => {
         });
     };
 
-    // ====== Fetcher (Proxy path) ======
     const fetchParcelByLonLat = useCallback(async (lon, lat) => {
         return await VWorldService.fetchParcelByLonLat(lon, lat);
     }, []);
 
-    // ====== Renderers ======
     const renderSingleFocus = useCallback((featureData) => {
         const OL = window.ol;
         const src = markerSourceRef.current;
-        if (!OL || !src || !featureData) return;
+        if (!OL || !src) return;
 
         src.clear();
+        if (!featureData) return;
+
         const format = new OL.format.GeoJSON();
         const f = format.readFeature(featureData, {
             featureProjection: 'EPSG:3857',
@@ -129,6 +109,7 @@ const MapSection = () => {
         const format = new OL.format.GeoJSON();
         (featuresDataList || []).forEach((fd) => {
             if (!fd) return;
+
             const f = format.readFeature(fd, {
                 featureProjection: 'EPSG:3857',
                 dataProjection: 'EPSG:4326'
@@ -145,14 +126,12 @@ const MapSection = () => {
         });
     }, []);
 
-    // 부모 상태 업데이트(중요: prev=> 형태 금지)
     const commitSelectedParcels = useCallback((nextList) => {
         const safe = Array.isArray(nextList) ? nextList : [];
         onParcelsChange?.(safe);
         renderSelectedParcels(safe);
     }, [onParcelsChange, renderSelectedParcels]);
 
-    // props selectedParcels 변경 시 지도에도 반영
     const selectedParcelsRef = useRef(selectedParcels);
     useEffect(() => {
         selectedParcelsRef.current = selectedParcels;
@@ -160,7 +139,6 @@ const MapSection = () => {
         renderSelectedParcels(selectedParcels);
     }, [mapObj, selectedParcels, renderSelectedParcels]);
 
-    // ====== Init Map ======
     useEffect(() => {
         let retryCount = 0;
         const maxRetries = 20;
@@ -169,7 +147,7 @@ const MapSection = () => {
             if (mapObj) return;
 
             if (!window.ol) {
-                retryCount++;
+                retryCount += 1;
                 if (retryCount > maxRetries) {
                     setMapError('OpenLayers 로드 실패');
                     setIsMapLoading(false);
@@ -186,7 +164,6 @@ const MapSection = () => {
 
                 const proxyMapUrl = API_CONFIG.VWORLD_MAP_URL;
 
-                // Base layers
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
                         url: `${proxyMapUrl}/wmts/Base/{z}/{y}/{x}.png`,
@@ -237,7 +214,6 @@ const MapSection = () => {
                 });
                 hybridLayer.set('name', 'hybrid');
 
-                // Cadastral (WMS)
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
                         url: `${proxyMapUrl}/wms`,
@@ -259,7 +235,6 @@ const MapSection = () => {
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
                 cadastralLayerRef.current = cadastralLayer;
 
-                // Other WMS layers
                 const wmsLayers = ALL_LAYERS
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
@@ -287,17 +262,14 @@ const MapSection = () => {
                         return olLayer;
                     });
 
-                // Marker layer (single focus)
                 const markerSrc = new OL.source.Vector();
                 markerSourceRef.current = markerSrc;
                 const markerLayer = new OL.layer.Vector({ source: markerSrc, zIndex: 20 });
 
-                // Selection layer (multi)
                 const selectionSrc = new OL.source.Vector();
                 selectionSourceRef.current = selectionSrc;
                 const selectionLayer = new OL.layer.Vector({ source: selectionSrc, zIndex: 21 });
 
-                // Apartment markers (analytics)
                 const aptMarkerSrc = new OL.source.Vector();
                 aptMarkerSourceRef.current = aptMarkerSrc;
                 const aptMarkerLayer = new OL.layer.Vector({
@@ -305,7 +277,7 @@ const MapSection = () => {
                     zIndex: 30,
                     declutter: false,
                     style: (feature) => {
-                        const map = window.map; // stored globally in init
+                        const map = window.map;
                         const zoom = map ? map.getView().getZoom() : 16;
                         const isHovered = feature.get('hovered') === true;
 
@@ -315,16 +287,12 @@ const MapSection = () => {
                         const priceInEok = feature.get('priceInEok');
                         const count = feature.get('count');
 
-                        // Zoom cutoff threshold
                         const isZoomedOut = zoom < 15.5;
                         const showFull = !isZoomedOut || isHovered;
 
-                        let labelText;
-                        if (showFull) {
-                            labelText = `[ ${aptName} ]\n${ageStr}\n평균 ${areaDisp}㎡\n${priceInEok}억원 / ${count}건`;
-                        } else {
-                            labelText = `[ ${aptName} ]\n${priceInEok}억원`;
-                        }
+                        const labelText = showFull
+                            ? `[ ${aptName} ]\n${ageStr}\n평균 ${areaDisp}㎡\n${priceInEok}억원 / ${count}건`
+                            : `[ ${aptName} ]\n${priceInEok}억원`;
 
                         const radius = isHovered ? 32 : 25;
                         const zIndex = isHovered ? 1000 : 30;
@@ -332,12 +300,10 @@ const MapSection = () => {
                         const bgColor = isHovered ? 'rgba(255, 215, 0, 0.8)' : 'rgba(255, 215, 0, 0.4)';
 
                         return new OL.style.Style({
-                            zIndex: zIndex,
+                            zIndex,
                             image: new OL.style.Circle({
-                                radius: radius,
-                                fill: new OL.style.Fill({
-                                    color: bgColor
-                                }),
+                                radius,
+                                fill: new OL.style.Fill({ color: bgColor }),
                                 stroke: new OL.style.Stroke({
                                     color: 'rgba(255, 255, 255, 0.9)',
                                     width: strokeWidth
@@ -361,9 +327,16 @@ const MapSection = () => {
                     target: 'vworld_map_target',
                     controls: OL.control.defaults.defaults({ zoom: false, attribution: false }),
                     layers: [
-                        baseLayer, grayLayer, midnightLayer, satelliteLayer,
-                        hybridLayer, cadastralLayer, ...wmsLayers,
-                        markerLayer, selectionLayer, aptMarkerLayer
+                        baseLayer,
+                        grayLayer,
+                        midnightLayer,
+                        satelliteLayer,
+                        hybridLayer,
+                        cadastralLayer,
+                        ...wmsLayers,
+                        markerLayer,
+                        selectionLayer,
+                        aptMarkerLayer
                     ],
                     view: new OL.View({
                         center: [14151740, 4511257],
@@ -373,12 +346,12 @@ const MapSection = () => {
                     })
                 });
 
-                // disable dblclick zoom
                 map.getInteractions().forEach((i) => {
-                    if (i instanceof OL.interaction.DoubleClickZoom) map.removeInteraction(i);
+                    if (i instanceof OL.interaction.DoubleClickZoom) {
+                        map.removeInteraction(i);
+                    }
                 });
 
-                // dblclick: 단일 선택 + 줌 + 포커스 (지번추가 모드일 땐 무시)
                 map.on('dblclick', async (evt) => {
                     if (measureModeRef.current) return;
                     evt.preventDefault?.();
@@ -392,8 +365,6 @@ const MapSection = () => {
                         renderSingleFocus(fd);
 
                         const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
-                        // Removed auto-zoom on selection as per request
-                        // map.getView().animate({ center: center3857, zoom: 15, duration: 350 });
                         map.getView().animate({ center: center3857, duration: 350 });
 
                         const props = fd.properties || {};
@@ -412,7 +383,6 @@ const MapSection = () => {
                             });
                         }
 
-                        // dblclick handles "single selection/reset"
                         selectedParcelsRef.current = [fd];
                         commitSelectedParcels([fd]);
                     } catch (e) {
@@ -420,7 +390,6 @@ const MapSection = () => {
                     }
                 });
 
-                // singleclick: 지번추가 모드일 때만 누적/토글, 아니면 단일
                 map.on('singleclick', async (evt) => {
                     if (measureModeRef.current) return;
 
@@ -435,7 +404,6 @@ const MapSection = () => {
 
                         const props = fd.properties || {};
 
-                        // Update left address info ALWAYS
                         onAddressSelect?.({
                             address: props.addr || '',
                             roadAddr: props.road || props.addr || '',
@@ -449,7 +417,6 @@ const MapSection = () => {
                             zone: props.unm
                         });
 
-                        // ONLY toggle parcel if parcelPickMode is ON
                         if (parcelPickModeRef.current) {
                             const current = selectedParcelsRef.current || [];
                             const exists = current.some((x) => getPnu(x) === pnu);
@@ -459,7 +426,6 @@ const MapSection = () => {
 
                             selectedParcelsRef.current = next;
                             commitSelectedParcels(next);
-                            return;
                         }
                     } catch (e) {
                         console.error('singleclick error:', e);
@@ -477,8 +443,7 @@ const MapSection = () => {
         };
 
         initMap();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [mapObj, fetchParcelByLonLat, commitSelectedParcels, onAddressSelect, renderSingleFocus]);
 
     useEffect(() => {
         if (!mapObj || !aptMarkerSourceRef.current) return;
@@ -504,7 +469,7 @@ const MapSection = () => {
                     let ageStr = '-년차';
                     if (apt.buildYear && String(apt.buildYear).length === 4) {
                         const bYear = parseInt(apt.buildYear, 10);
-                        if (!isNaN(bYear)) {
+                        if (!Number.isNaN(bYear)) {
                             ageStr = `${currentYear - bYear + 1}년차`;
                         }
                     }
@@ -516,11 +481,9 @@ const MapSection = () => {
 
                     const lon = parseFloat(item.point.x);
                     const lat = parseFloat(item.point.y);
-
                     if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
 
                     const center3857 = OL.proj.transform([lon, lat], 'EPSG:4326', 'EPSG:3857');
-
                     const feature = new OL.Feature({
                         geometry: new OL.geom.Point(center3857)
                     });
@@ -539,7 +502,6 @@ const MapSection = () => {
 
                     src.addFeature(feature);
 
-                    // 요청 폭주 방지용 작은 간격
                     await new Promise((resolve) => setTimeout(resolve, 120));
                 } catch (e) {
                     console.warn('Map marker geocoding skipped for:', searchStr, e);
@@ -554,7 +516,6 @@ const MapSection = () => {
         };
     }, [analyzedApartments, mapObj]);
 
-    // ====== Cadastral stabilization ======
     useEffect(() => {
         if (!mapObj) return;
 
@@ -617,7 +578,6 @@ const MapSection = () => {
         view.animate({ zoom: targetZoom, duration: 350 });
     }, [mapObj, activeLayers]);
 
-    // ====== Layer visibility ======
     useEffect(() => {
         if (!mapObj) return;
 
@@ -636,7 +596,6 @@ const MapSection = () => {
         });
     }, [mapObj, mapType, showHybrid, activeLayers]);
 
-    // ====== Layout Hover Interaction ======
     useEffect(() => {
         if (!mapObj) return;
 
@@ -646,7 +605,7 @@ const MapSection = () => {
             const pixel = mapObj.getEventPixel(e.originalEvent);
             const hitFeatures = [];
 
-            mapObj.forEachFeatureAtPixel(pixel, (feature, layer) => {
+            mapObj.forEachFeatureAtPixel(pixel, (feature) => {
                 if (feature.get('layerType') === 'aptMarker') {
                     hitFeatures.push(feature);
                 }
@@ -654,20 +613,16 @@ const MapSection = () => {
 
             const targetFeature = hitFeatures.length > 0 ? hitFeatures[0] : null;
 
-            // Set hovered state
-            let changed = false;
             const src = aptMarkerSourceRef.current;
             if (src) {
-                src.getFeatures().forEach(f => {
-                    const isHovered = (f === targetFeature);
+                src.getFeatures().forEach((f) => {
+                    const isHovered = f === targetFeature;
                     if (f.get('hovered') !== isHovered) {
                         f.set('hovered', isHovered);
-                        changed = true;
                     }
                 });
             }
 
-            // Change pointer styling
             mapObj.getTargetElement().style.cursor = targetFeature ? 'pointer' : '';
         };
 
@@ -678,9 +633,9 @@ const MapSection = () => {
         };
     }, [mapObj]);
 
-    // ====== Update map center on selectedAddress ======
     useEffect(() => {
         if (!mapObj || !selectedAddress?.x || !selectedAddress?.y) return;
+
         try {
             const OL = window.ol;
             const x = parseFloat(selectedAddress.x);
@@ -688,10 +643,8 @@ const MapSection = () => {
             if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
             const center = OL.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
-            // Check if this is a fresh search result (often lacks PNU or comes from Search bar)
-            // We'll use a local flag or heuristics. For now, if zoom is very different from 14, we might adjust.
-            // Requirement: "Zoom level 14 only when first selected by search"
             const currentZoom = mapObj.getView().getZoom();
+
             if (currentZoom !== 14) {
                 mapObj.getView()?.animate({ center, duration: 500, zoom: 14 });
             } else {
@@ -702,7 +655,6 @@ const MapSection = () => {
         }
     }, [mapObj, selectedAddress]);
 
-    // ====== Enrichment (search selection) ======
     useEffect(() => {
         if (!mapObj || !selectedAddress?.x || !selectedAddress?.y) return;
         if (enrichLockRef.current) return;
@@ -781,9 +733,8 @@ const MapSection = () => {
         markerSourceRef.current?.clear?.();
         commitSelectedParcels([]);
         setParcelPickMode(false);
-    }, [clearMeasurements, clearRadius, commitSelectedParcels, renderSingleFocus]);
+    }, [clearMeasurements, clearRadius, commitSelectedParcels, renderSingleFocus, setParcelPickMode]);
 
-    // Categories for Filter
     const categories = useMemo(() => [
         '전체',
         ...new Set(
@@ -795,9 +746,12 @@ const MapSection = () => {
 
     return (
         <div className={`flex-1 relative bg-gray-100 overflow-hidden group h-full w-full ${measureMode ? 'cursor-crosshair' : ''}`}>
-            <div id="vworld_map_target" className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none" tabIndex="0"></div>
+            <div
+                id="vworld_map_target"
+                className="w-full h-full absolute inset-0 z-0 bg-gray-200 outline-none"
+                tabIndex="0"
+            />
 
-            {/* Error/Loading */}
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                 {isMapLoading && (
                     <div className="bg-white/90 px-4 py-2 rounded shadow text-gray-800 font-medium">
@@ -811,7 +765,6 @@ const MapSection = () => {
                 )}
             </div>
 
-            {/* UI Controls */}
             <MapControls
                 handleZoom={handleZoom}
                 measureMode={measureMode}
