@@ -386,7 +386,7 @@ const MapSection = () => {
                     const [lon, lat] = OL.proj.transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
-                        const fd = await fetchParcelByLonLat(lon, lat, apiKey);
+                        const fd = await fetchParcelByLonLat(lon, lat);
                         if (!fd) return;
 
                         renderSingleFocus(fd);
