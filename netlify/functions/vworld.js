@@ -47,8 +47,10 @@ export async function handler(event) {
         let upstreamUrl = '';
 
         // 1) WMTS tile proxy
-        if (rawPath.startsWith('/wmts/')) {
-            const wmtsPath = rawPath.replace('/wmts/', '');
+        if (rawPath.startsWith('/wmts/') || rawPath.startsWith('/req/wmts/')) {
+            const wmtsPath = rawPath
+                .replace('/req/wmts/', '')
+                .replace('/wmts/', '');
             upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
         }
 
