@@ -19,7 +19,7 @@ const MiniMap = ({ x, y, features }) => {
         // 1. Base Layer: White Map (Background)
         const baseLayer = new OL.layer.Tile({
             source: new OL.source.XYZ({
-                url: `${proxyUrl}/req/wmts/1.0.0/${API_CONFIG.VWORLD_KEY}/white/{z}/{y}/{x}.png`,
+                url: `${proxyUrl}/wmts/white/{z}/{y}/{x}.png`,
                 attributions: 'VWorld',
                 crossOrigin: 'anonymous'
             }),
@@ -37,7 +37,7 @@ const MiniMap = ({ x, y, features }) => {
 
         const zoningWmsLayer = new OL.layer.Tile({
             source: new OL.source.TileWMS({
-                url: `${proxyUrl}/req/wms`,
+                url: `${proxyUrl}/wms`,
                 params: {
                     SERVICE: 'WMS',
                     REQUEST: 'GetMap',
@@ -46,9 +46,7 @@ const MiniMap = ({ x, y, features }) => {
                     STYLES: zoningLayers,
                     CRS: 'EPSG:3857',
                     FORMAT: 'image/png',
-                    TRANSPARENT: 'TRUE',
-                    KEY: API_CONFIG.VWORLD_KEY,
-                    DOMAIN: window.location.hostname
+                    TRANSPARENT: 'TRUE'
                 }
             }),
             zIndex: 10,

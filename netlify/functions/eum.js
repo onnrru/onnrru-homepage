@@ -38,7 +38,9 @@ export async function handler(event) {
             return {
                 statusCode: 500,
                 headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({ error: 'EUM_API_ID or EUM_API_KEY is missing' })
+                body: JSON.stringify({
+                    error: 'EUM_API_ID or EUM_API_KEY is missing'
+                })
             };
         }
 
@@ -63,7 +65,6 @@ export async function handler(event) {
         });
 
         const upstreamUrl = `${EUM_API_BASE}${rawPath}?${query.toString()}`;
-
         const res = await fetch(upstreamUrl);
         const text = await res.text();
         const contentType = res.headers.get('content-type') || 'application/json; charset=utf-8';

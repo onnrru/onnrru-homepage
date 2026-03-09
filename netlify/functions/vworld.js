@@ -1,5 +1,4 @@
 const VWORLD_API_BASE = 'https://api.vworld.kr';
-const VWORLD_DOMAIN = process.env.VWORLD_DOMAIN || 'onnrru.com';
 
 function buildQuery(params = {}) {
     const qs = new URLSearchParams();
@@ -33,11 +32,15 @@ export async function handler(event) {
 
     try {
         const apiKey = process.env.VWORLD_API_KEY;
+        const vworldDomain = process.env.VWORLD_DOMAIN || 'onnrru.com';
+
         if (!apiKey) {
             return {
                 statusCode: 500,
                 headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({ error: 'VWORLD_API_KEY is missing' })
+                body: JSON.stringify({
+                    error: 'VWORLD_API_KEY is missing'
+                })
             };
         }
 
@@ -46,35 +49,58 @@ export async function handler(event) {
 
         let upstreamUrl = '';
 
-        // 1) WMTS tile proxy
+        // 1) WMTS
         if (rawPath.startsWith('/wmts/') || rawPath.startsWith('/req/wmts/')) {
-            const wmtsPath = rawPath
-                .replace('/req/wmts/', '')
-                .replace('/wmts/', '');
+            let wmtsPath = rawPath;
+
+            if (wmtsPath.startsWith('/req/wmts/1.0.0/')) {
+                wmtsPath = wmtsPath.replace('/req/wmts/1.0.0/', '');
+
+                const firstSlash = wmtsPath.indexOf('/');
+                if (firstSlash > -1) {
+                    wmtsPath = wmtsPath.slice(firstSlash + 1);
+                }
+            } else {
+                wmtsPath = wmtsPath.replace('/wmts/', '');
+            }
+
             upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
         }
 
-        // 2) WMS proxy
-        else if (rawPath === '/wms') {
+        // 2) WMS
+        else if (rawPath === '/wms' || rawPath === '/req/wms') {
             const query = buildQuery({
                 ...q,
                 key: apiKey,
-                domain: VWORLD_DOMAIN
+                domain: vworldDomain
             });
 
             upstreamUrl = `${VWORLD_API_BASE}/req/wms?${query.toString()}`;
         }
 
-        // 3) Search/Data/NED direct proxy
-        else if (rawPath.startsWith('/req/') || rawPath.startsWith('/ned/')) {
+        // 3) req/*
+        else if (rawPath.startsWith('/req/')) {
             const query = buildQuery({
                 ...q,
                 key: apiKey,
-                domain: VWORLD_DOMAIN
+                domain: vworldDomain
             });
 
             upstreamUrl = `${VWORLD_API_BASE}${rawPath}?${query.toString()}`;
-        } else {
+        }
+
+        // 4) ned/*
+        else if (rawPath.startsWith('/ned/')) {
+            const query = buildQuery({
+                ...q,
+                key: apiKey,
+                domain: vworldDomain
+            });
+
+            upstreamUrl = `${VWORLD_API_BASE}${rawPath}?${query.toString()}`;
+        }
+
+        else {
             return {
                 statusCode: 404,
                 headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
@@ -88,13 +114,12 @@ export async function handler(event) {
         const res = await fetch(upstreamUrl, {
             method: 'GET',
             headers: {
-                'User-Agent': 'onnrru-netlify-proxy'
+                'User-Agent': 'onnrru-netlify-vworld-proxy'
             }
         });
 
         const arrayBuffer = await res.arrayBuffer();
         const bodyBuffer = Buffer.from(arrayBuffer);
-
         const contentType = res.headers.get('content-type') || 'application/octet-stream';
 
         if (

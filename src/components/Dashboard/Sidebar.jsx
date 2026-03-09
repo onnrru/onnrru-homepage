@@ -25,7 +25,6 @@ const Sidebar = ({ onClose }) => {
         setCharOpen(!next);
     };
 
-    const getVworldDomain = () => window.location.hostname;
 
     // Helper to find first non-empty value
     const first = (...vals) => {
@@ -102,12 +101,11 @@ const Sidebar = ({ onClose }) => {
 
     // API 3: WFS (XML Fallback)
     const fetchLandCharacteristicsWFS = async (pnu) => {
-        const key = API_CONFIG.VWORLD_KEY;
-        const url = `/api/vworld/ned/wfs/getLandCharacteristicsWFS`;
+        const url = `${API_CONFIG.VWORLD_BASE_URL}/ned/wfs/getLandCharacteristicsWFS`;
         try {
             const res = await axios.get(url, {
                 params: {
-                    key, domain: getVworldDomain(), typename: 'dt_d194', pnu,
+                    typename: 'dt_d194', pnu,
                     maxFeatures: 1, resultType: 'results', srsName: 'EPSG:4326'
                 },
                 responseType: 'text',
@@ -224,7 +222,7 @@ const Sidebar = ({ onClose }) => {
             });
 
             // WMS is always same
-            const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?key=${encodeURIComponent(API_CONFIG.VWORLD_KEY)}&domain=${encodeURIComponent(getVworldDomain())}&pnu=${encodeURIComponent(repPnu)}`;
+            const wmsUrl = `${API_CONFIG.VWORLD_BASE_URL}/ned/wms/getLandUseWMS?pnu=${encodeURIComponent(repPnu)}`;
             setLandUseWmsUrl(wmsUrl);
             setShowLandUseWms(true);
 

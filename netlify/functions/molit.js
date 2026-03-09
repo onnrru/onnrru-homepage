@@ -32,11 +32,14 @@ export async function handler(event) {
 
     try {
         const apiKey = process.env.MOLIT_API_KEY;
+
         if (!apiKey) {
             return {
                 statusCode: 500,
                 headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({ error: 'MOLIT_API_KEY is missing' })
+                body: JSON.stringify({
+                    error: 'MOLIT_API_KEY is missing'
+                })
             };
         }
 
@@ -49,7 +52,6 @@ export async function handler(event) {
         });
 
         const upstreamUrl = `${MOLIT_API_BASE}${rawPath}?${query.toString()}`;
-
         const res = await fetch(upstreamUrl);
         const text = await res.text();
         const contentType = res.headers.get('content-type') || 'application/xml; charset=utf-8';

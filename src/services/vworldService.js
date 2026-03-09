@@ -4,7 +4,7 @@ const vworldCache = {
     geocoding: new Map(),
     parcelData: new Map(),
     landCharacteristics: new Map(),
-    ladfrl: new Map()
+    ladfrl: new Map(),
 };
 
 function normalizeQuery(query) {
@@ -37,14 +37,27 @@ async function safeFetchJson(url, label = 'request') {
             return null;
         }
 
-        return JSON.parse(text);
+        try {
+            return JSON.parse(text);
+        } catch (parseError) {
+            console.error(`${label} JSON parse error:`, parseError, text.slice(0, 300));
+            return null;
+        }
     } catch (error) {
         console.error(`${label} failed:`, error);
         return null;
     }
 }
 
+/**
+ * VWorld API Centralized Service
+ * - key/domain 은 Netlify function 에서만 주입
+ * - 프런트에서는 절대 key/domain 을 붙이지 않음
+ */
 export const VWorldService = {
+    /**
+     * Get parcel information by longitude and latitude
+     */
     async fetchParcelByLonLat(lon, lat) {
         const cacheKey = coordKey(lon, lat);
 
@@ -72,6 +85,9 @@ export const VWorldService = {
         return feature;
     },
 
+    /**
+     * Search address or geocode a string to coordinates
+     */
     async searchAddress(query) {
         const normalized = normalizeQuery(query);
         if (!normalized) return null;
@@ -105,8 +121,12 @@ export const VWorldService = {
         return null;
     },
 
+    /**
+     * Fetch Land Characteristics (NED Data API)
+     */
     async fetchLandCharacteristics(pnu) {
         if (!pnu) return null;
+
         if (vworldCache.landCharacteristics.has(pnu)) {
             return vworldCache.landCharacteristics.get(pnu);
         }
@@ -127,8 +147,12 @@ export const VWorldService = {
         return data;
     },
 
+    /**
+     * Fetch Land Parcel List (NED Data API)
+     */
     async fetchLadfrl(pnu) {
         if (!pnu) return null;
+
         if (vworldCache.ladfrl.has(pnu)) {
             return vworldCache.ladfrl.get(pnu);
         }
