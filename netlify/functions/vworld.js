@@ -43,17 +43,21 @@ export async function handler(event) {
 
         // /wmts/Base/...
         // /req/wmts/1.0.0/SECRET/Base/... 형태도 보정
-        if (rawPath.startsWith('/wmts/') || rawPath.startsWith('/req/wmts/')) {
+        if (rawPath.includes('wmts')) {
             let wmtsPath = rawPath;
 
-            if (wmtsPath.startsWith('/req/wmts/1.0.0/')) {
-                wmtsPath = wmtsPath.replace('/req/wmts/1.0.0/', '');
-                const firstSlash = wmtsPath.indexOf('/');
-                if (firstSlash > -1) {
-                    wmtsPath = wmtsPath.slice(firstSlash + 1);
-                }
-            } else {
-                wmtsPath = wmtsPath.replace('/wmts/', '');
+            // Handle cases like /req/wmts/1.0.0/SECRET/Base/17/...
+            // or /wmts/Base/17/...
+            if (wmtsPath.includes('/wmts/')) {
+                const parts = wmtsPath.split('/wmts/');
+                wmtsPath = parts[parts.length - 1]; // Take everything after the last /wmts/
+            }
+
+            // If it still has a key-like segment at the start (e.g. 1.0.0/SECRET/Base/...)
+            if (wmtsPath.startsWith('1.0.0/')) {
+                const segments = wmtsPath.split('/');
+                // segments[0] = '1.0.0', segments[1] = '{key}', segments[2] = '{Layer}'
+                wmtsPath = segments.slice(2).join('/');
             }
 
             upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;

@@ -7,6 +7,11 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/api/vworld/req/wmts/1.0.0/SECRET/*"
+  to = "/.netlify/functions/vworld/:splat"
+  status = 200
+
+[[redirects]]
   from = "/api/vworld/*"
   to = "/.netlify/functions/vworld"
   status = 200
