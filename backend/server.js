@@ -134,6 +134,91 @@ app.get('/api/eum/devlist', async (req, res) => {
     }
 });
 
+// --- VWorld API Handle ---
+const VWORLD_API_BASE = 'https://api.vworld.kr';
+const VWORLD_FALLBACK_KEY = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
+
+app.get('/api/vworld/*', async (req, res) => {
+    try {
+        const apiKey = process.env.VWORLD_API_KEY || VWORLD_FALLBACK_KEY;
+        const vworldDomain = process.env.VWORLD_DOMAIN || 'onnrru.com';
+
+        // Clean path
+        let relPath = req.path
+            .replace('/api/vworld', '')
+            .replace('/req/wmts/1.0.0/SECRET', '')
+            .replace('/req/wmts/1.0.0/' + apiKey, '');
+        
+        if (relPath.startsWith('/')) relPath = relPath.slice(1);
+
+        let upstreamUrl = '';
+        const q = req.query || {};
+
+        // JS logic to determine upstream URL (similar to Netlify function)
+        if (relPath.toLowerCase().includes('wmts') || 
+            (relPath.split('/').length >= 3 && /\d+\/\d+\/\d+/.test(relPath))) {
+            
+            let wmtsPath = relPath;
+            if (wmtsPath.includes('wmts/')) {
+                wmtsPath = wmtsPath.split('wmts/').pop();
+            }
+            if (wmtsPath.startsWith('1.0.0/')) {
+                wmtsPath = wmtsPath.split('/').slice(2).join('/');
+            }
+            upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
+        } else if (relPath.toLowerCase().includes('wms')) {
+            const params = new URLSearchParams({ ...q, key: apiKey, domain: vworldDomain });
+            upstreamUrl = `${VWORLD_API_BASE}/req/wms?${params.toString()}`;
+        } else {
+            const params = new URLSearchParams({ ...q, key: apiKey, domain: vworldDomain });
+            const finalPath = relPath.startsWith('req/') ? relPath : `req/${relPath}`;
+            upstreamUrl = `${VWORLD_API_BASE}/${finalPath}?${params.toString()}`;
+        }
+
+        const response = await axios.get(upstreamUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Referer': `https://${vworldDomain}/`
+            },
+            responseType: 'arraybuffer'
+        });
+
+        const contentType = response.headers['content-type'];
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.send(response.data);
+    } catch (error) {
+        console.error('VWorld Proxy Error:', error.message);
+        res.status(500).json({ error: 'VWorld proxy failed', message: error.message });
+    }
+});
+
+// --- MOLIT API Handle ---
+const MOLIT_API_BASE = 'https://apis.data.go.kr';
+app.get('/api/molit/*', async (req, res) => {
+    try {
+        const apiKey = process.env.MOLIT_API_KEY;
+        if (!apiKey) throw new Error('MOLIT_API_KEY missing');
+
+        const relPath = req.path.replace('/api/molit', '') || '';
+        const upstreamUrl = `${MOLIT_API_BASE}${relPath}`;
+
+        const response = await axios.get(upstreamUrl, {
+            params: {
+                ...req.query,
+                serviceKey: apiKey
+            },
+            responseType: 'text'
+        });
+
+        res.set('Content-Type', response.headers['content-type'] || 'application/xml');
+        res.send(response.data);
+    } catch (error) {
+        console.error('MOLIT Proxy Error:', error.message);
+        res.status(500).json({ error: 'MOLIT proxy failed', message: error.message });
+    }
+});
+
 app.get('/', (req, res) => {
     res.send('Onnrru Backend Proxy is Running');
 });
