@@ -80,12 +80,18 @@ export async function handler(event) {
             body: text
         };
     } catch (error) {
+        console.error('EUM Proxy Error:', error);
         return {
             statusCode: 500,
             headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
             body: JSON.stringify({
                 error: 'EUM proxy failed',
-                message: error.message
+                message: error.message,
+                stack: error.stack,
+                env_check: {
+                    has_key: !!process.env.EUM_API_ID,
+                    node_version: process.version
+                }
             })
         };
     }

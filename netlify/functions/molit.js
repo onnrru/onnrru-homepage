@@ -67,12 +67,18 @@ export async function handler(event) {
             body: text
         };
     } catch (error) {
+        console.error('MOLIT Proxy Error:', error);
         return {
             statusCode: 500,
             headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
             body: JSON.stringify({
                 error: 'MOLIT proxy failed',
-                message: error.message
+                message: error.message,
+                stack: error.stack,
+                env_check: {
+                    has_key: !!process.env.MOLIT_API_KEY,
+                    node_version: process.version
+                }
             })
         };
     }

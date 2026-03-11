@@ -84,10 +84,19 @@ export async function handler(event) {
             body: bodyBuffer.toString('utf-8')
         };
     } catch (error) {
+        console.error('VWorld Proxy Error:', error);
         return {
             statusCode: 500,
             headers: withCors({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ error: 'VWorld proxy failed', message: error.message })
+            body: JSON.stringify({ 
+                error: 'VWorld proxy failed', 
+                message: error.message,
+                stack: error.stack,
+                env_check: {
+                    has_key: !!process.env.VWORLD_API_KEY,
+                    node_version: process.version
+                }
+            })
         };
     }
 }
