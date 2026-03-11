@@ -1,8 +1,8 @@
 export const API_CONFIG = {
-    EUM_BASE_URL: '/.netlify/functions/eum',
-    VWORLD_BASE_URL: '/.netlify/functions/vworld',
-    VWORLD_MAP_URL: '/.netlify/functions/vworld',
-    MOLIT_BASE_URL: '/.netlify/functions/molit',
+    EUM_BASE_URL: '/api/eum',
+    VWORLD_BASE_URL: '/api/vworld',
+    VWORLD_MAP_URL: '/api/vworld',
+    MOLIT_BASE_URL: '/api/molit',
 
     ENDPOINTS: {
         SEARCHZONE: '/Web/Rest/OP/searchZone',

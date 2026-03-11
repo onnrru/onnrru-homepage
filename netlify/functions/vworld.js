@@ -42,7 +42,9 @@ export async function handler(event) {
             };
         }
 
-        const rawPath = event.path.replace('/.netlify/functions/vworld', '') || '';
+        const rawPath = event.path
+            .replace('/.netlify/functions/vworld', '')
+            .replace('/api/vworld', '') || '';
         const q = event.queryStringParameters || {};
 
         let upstreamUrl = '';

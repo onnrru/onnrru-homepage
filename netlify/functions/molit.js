@@ -43,7 +43,9 @@ export async function handler(event) {
             };
         }
 
-        const rawPath = event.path.replace('/.netlify/functions/molit', '') || '';
+        const rawPath = event.path
+            .replace('/.netlify/functions/molit', '')
+            .replace('/api/molit', '') || '';
         const q = event.queryStringParameters || {};
 
         const query = buildQuery({

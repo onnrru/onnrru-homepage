@@ -7,6 +7,21 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/api/vworld/*"
+  to = "/.netlify/functions/vworld"
+  status = 200
+
+[[redirects]]
+  from = "/api/eum/*"
+  to = "/.netlify/functions/eum"
+  status = 200
+
+[[redirects]]
+  from = "/api/molit/*"
+  to = "/.netlify/functions/molit"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "http://34.50.25.171:8080/api/:splat"
   status = 200

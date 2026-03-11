@@ -44,7 +44,9 @@ export async function handler(event) {
             };
         }
 
-        const rawPath = event.path.replace('/.netlify/functions/eum', '') || '';
+        const rawPath = event.path
+            .replace('/.netlify/functions/eum', '')
+            .replace('/api/eum', '') || '';
         const q = event.queryStringParameters || {};
 
         if (!rawPath.startsWith('/Web/Rest/OP/')) {
