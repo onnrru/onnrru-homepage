@@ -23,6 +23,12 @@ app.use(cors({
 
 app.use(express.json());
 
+// Logger middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // ------------------------------
 // EUM Proxy (Catch-all)
 // ------------------------------
@@ -34,13 +40,12 @@ app.all('/api/eum/*', async (req, res) => {
     const apiId = (process.env.EUM_API_ID || '').trim();
     
     if (!apiKey || !apiId) {
+      console.error('[EUM Proxy] Configuration missing');
       return res.status(500).json({ error: 'EUM_API configuration missing' });
     }
 
     const relPath = req.path.replace('/api/eum', '') || '';
     const upstreamUrl = `${EUM_API_BASE}${relPath}`;
-
-    console.log(`[EUM Proxy] ${req.method} ${upstreamUrl}`);
 
     const response = await axios({
       method: req.method,
@@ -75,30 +80,26 @@ app.all('/api/vworld/*', async (req, res) => {
     const domain = (process.env.VWORLD_DOMAIN || 'onnrru.com').trim();
 
     if (!apiKey) {
+      console.error('[VWorld Proxy] API Key missing');
       return res.status(500).json({ error: 'VWORLD_API_KEY missing' });
     }
 
     let relPath = req.path.replace('/api/vworld', '') || '';
     let upstreamUrl = '';
 
-    // Specialized Logic for WMTS (handling /map/wmts, /wmts, etc.)
-    if (relPath.includes('wmts') || /\d+\/\d+\/\d+/.test(relPath)) {
-      const segments = relPath.split('/');
-      // Extract tile coords: layer/z/x/y (last 4 segments)
-      const wmtsSegments = segments.filter(s => s && s !== 'SECRET' && s !== apiKey);
-      const wmtsPath = wmtsSegments.slice(-4).join('/');
-      
+    // Specialized Logic for WMTS
+    if (relPath.includes('wmts') || /\d+\/\d+\/\d+/.test(req.path)) {
+      const segments = relPath.split('/').filter(s => s && s !== 'SECRET' && s !== apiKey);
+      const wmtsPath = segments.slice(-4).join('/');
       upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
     } else {
-      // Standard WMS or Data requests
       const params = new URLSearchParams(req.query);
       if (!params.has('key')) params.set('key', apiKey);
       if (!params.has('domain')) params.set('domain', domain);
-      
       upstreamUrl = `${VWORLD_API_BASE}${relPath}?${params.toString()}`;
     }
 
-    console.log(`[VWorld Proxy] ${req.method} ${upstreamUrl}`);
+    console.log(`[VWorld Proxy] Outgoing to: ${upstreamUrl}`);
 
     const isBinary = relPath.includes('wmts') || relPath.includes('wms') || /\.(png|jpe?g|gif)$/i.test(relPath);
 
@@ -114,6 +115,10 @@ app.all('/api/vworld/*', async (req, res) => {
       },
       validateStatus: () => true
     });
+
+    if (response.status >= 400) {
+      console.warn(`[VWorld Proxy] Upstream returned ${response.status} for ${upstreamUrl}`);
+    }
 
     res.status(response.status);
     res.set('Content-Type', response.headers['content-type'] || (isBinary ? 'image/png' : 'application/json; charset=utf-8'));
@@ -134,13 +139,14 @@ app.all('/api/molit/*', async (req, res) => {
   try {
     const apiKey = (process.env.MOLIT_API_KEY || '').trim();
     if (!apiKey) {
+      console.error('[MOLIT Proxy] API Key missing');
       return res.status(500).json({ error: 'MOLIT_API_KEY missing' });
     }
 
     const relPath = req.path.replace('/api/molit', '') || '';
     const upstreamUrl = `${MOLIT_API_BASE}${relPath}`;
 
-    console.log(`[MOLIT Proxy] ${req.method} ${upstreamUrl}`);
+    console.log(`[MOLIT Proxy] Outgoing to: ${upstreamUrl}`);
 
     const response = await axios({
       method: req.method,
