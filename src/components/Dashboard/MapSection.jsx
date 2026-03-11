@@ -16,9 +16,11 @@ const MapSection = () => {
         analyzedApartments,
         parcelPickMode,
         setParcelPickMode
-    } = useDashboard();
+  } = useDashboard();
 
-    const onAddressSelect = setSelectedAddress;
+  console.log('[MapSection] v1.0.5 - Unified API Version');
+
+  const onAddressSelect = setSelectedAddress;
     const onParcelsChange = setSelectedParcels;
 
     const [mapObj, setMapObj] = useState(null);
