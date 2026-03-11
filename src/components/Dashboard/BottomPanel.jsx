@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { fetchApartmentTransactions } from '../../services/realEstateApi';
 import { processTransactionData, AREA_CATEGORIES } from '../../utils/apartmentAnalysis';
+import { useDashboard } from '../../context/DashboardContext';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -66,7 +67,6 @@ const CustomBarLabel = (props) => {
     );
 };
 
-import { useDashboard } from '../../context/DashboardContext';
 
 const BottomPanel = () => {
     const { selectedAddress, setAnalyzedApartments } = useDashboard();
@@ -462,55 +462,54 @@ const BottomPanel = () => {
                                     tick={{ fontSize: 9, fill: '#6b7280' }}
                                     axisLine={false}
                                     tickLine={false}
-                                    interval={2} // Show fewer labels to avoid crowding
-                                </XAxis>
-                            <YAxis
-                                tick={{ fontSize: 10, fill: '#6b7280' }}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(value) => trendDataType === 'avg'
-                                    ? `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`
-                                    : `${value}건`}
-                                width={45}
-                            />
-                            <Tooltip content={<TrendTooltip trendDataType={trendDataType} />} />
-                            <Legend wrapperStyle={{ fontSize: '11px', bottom: 0 }} />
-
-                            <Line
-                                type="monotone"
-                                dataKey="guAvg"
-                                name={`${regionLabels.gu} 평균`}
-                                stroke="#9ca3af"
-                                strokeWidth={2}
-                                dot={{ r: 2, fill: '#9ca3af' }}
-                                connectNulls
-                            />
-                            <Line
-                                type="monotone"
-                                dataKey="dongAvg"
-                                name={`${regionLabels.dong} 평균`}
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                dot={{ r: 3, fill: '#10b981' }}
-                                connectNulls
-                            />
-                            {selectedApartment && (
+                                    interval={2}
+                                />
+                                <YAxis
+                                    tick={{ fontSize: 10, fill: '#6b7280' }}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tickFormatter={(value) => trendDataType === 'avg'
+                                        ? `${value > 0 ? (value / 10000).toFixed(2) + '억' : '0'}`
+                                        : `${value}건`}
+                                    width={45}
+                                />
+                                <Tooltip content={<TrendTooltip trendDataType={trendDataType} />} />
+                                <Legend wrapperStyle={{ fontSize: '11px', bottom: 0 }} />
                                 <Line
                                     type="monotone"
-                                    dataKey="aptAvg"
-                                    name={`선택: ${selectedApartment}`}
-                                    stroke="#2563eb"
-                                    strokeWidth={3}
-                                    dot={{ r: 4, fill: '#2563eb' }}
+                                    dataKey="guAvg"
+                                    name={`${regionLabels.gu} 평균`}
+                                    stroke="#9ca3af"
+                                    strokeWidth={2}
+                                    dot={{ r: 2, fill: '#9ca3af' }}
                                     connectNulls
                                 />
-                            )}
-                        </LineChart>
-                    </ResponsiveContainer>
+                                <Line
+                                    type="monotone"
+                                    dataKey="dongAvg"
+                                    name={`${regionLabels.dong} 평균`}
+                                    stroke="#10b981"
+                                    strokeWidth={2}
+                                    dot={{ r: 3, fill: '#10b981' }}
+                                    connectNulls
+                                />
+                                {selectedApartment && (
+                                    <Line
+                                        type="monotone"
+                                        dataKey="aptAvg"
+                                        name={`선택: ${selectedApartment}`}
+                                        stroke="#2563eb"
+                                        strokeWidth={3}
+                                        dot={{ r: 4, fill: '#2563eb' }}
+                                        connectNulls
+                                    />
+                                )}
+                            </LineChart>
+                        </ResponsiveContainer>
                 </div>
             </div>
         </div>
-        </div >
+    </div>
     );
 };
 
