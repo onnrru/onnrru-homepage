@@ -42,20 +42,26 @@ async function safeFetchJson(url, label = 'request', retry = 1) {
         await sleep(250);
         return safeFetchJson(url, label, retry - 1);
       }
-      console.warn(`${label} empty response`);
       return null;
     }
 
-    if (text.trim().startsWith('<')) {
+    // if text doesn't look like JSON (doesn't start with { or [)
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
       if (retry > 0) {
         await sleep(250);
         return safeFetchJson(url, label, retry - 1);
       }
-      console.warn(`${label} returned HTML:`, text.slice(0, 300));
+      console.warn(`${label} returned non-JSON:`, trimmed.slice(0, 300));
       return null;
     }
 
-    return JSON.parse(text);
+    try {
+      return JSON.parse(trimmed);
+    } catch (e) {
+      console.error(`${label} JSON parse error:`, e.message, trimmed.slice(0, 300));
+      return null;
+    }
   } catch (error) {
     if (retry > 0) {
       await sleep(250);
