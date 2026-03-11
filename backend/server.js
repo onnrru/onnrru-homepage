@@ -164,11 +164,9 @@ app.get('/api/vworld/*', async (req, res) => {
 
     // 2) WMS
     if (subPath === '/wms' || subPath === '/req/wms') {
-      const params = new URLSearchParams({
-        ...q,
-        key: apiKey,
-        domain: vworldDomain
-      });
+      const params = new URLSearchParams(q);
+      if (!params.has('key')) params.set('key', apiKey);
+      if (!params.has('domain')) params.set('domain', vworldDomain);
 
       upstreamUrl = `${VWORLD_API_BASE}/req/wms?${params.toString()}`;
 
@@ -176,7 +174,7 @@ app.get('/api/vworld/*', async (req, res) => {
         responseType: 'arraybuffer',
         timeout: 15000,
         headers: {
-          'User-Agent': 'onnrru-server',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           'Referer': `https://${vworldDomain}/`,
           'Origin': `https://${vworldDomain}`
         },
@@ -191,11 +189,9 @@ app.get('/api/vworld/*', async (req, res) => {
 
     // 3) req/* or ned/*
     if (subPath.startsWith('/req/') || subPath.startsWith('/ned/')) {
-      const params = new URLSearchParams({
-        ...q,
-        key: apiKey,
-        domain: vworldDomain
-      });
+      const params = new URLSearchParams(q);
+      if (!params.has('key')) params.set('key', apiKey);
+      if (!params.has('domain')) params.set('domain', vworldDomain);
 
       upstreamUrl = `${VWORLD_API_BASE}${subPath}?${params.toString()}`;
 
@@ -203,7 +199,7 @@ app.get('/api/vworld/*', async (req, res) => {
         responseType: 'text',
         timeout: 15000,
         headers: {
-          'User-Agent': 'onnrru-server',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           'Referer': `https://${vworldDomain}/`,
           'Origin': `https://${vworldDomain}`
         },
