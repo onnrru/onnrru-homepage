@@ -144,6 +144,7 @@ app.get('/api/vworld/*', async (req, res) => {
       }
 
       upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
+      console.log(`[VWorld WMTS] Proxying to: ${upstreamUrl}`);
 
       const response = await axios.get(upstreamUrl, {
         responseType: 'arraybuffer',
@@ -169,6 +170,7 @@ app.get('/api/vworld/*', async (req, res) => {
       if (!params.has('domain')) params.set('domain', vworldDomain);
 
       upstreamUrl = `${VWORLD_API_BASE}/req/wms?${params.toString()}`;
+      console.log(`[VWorld WMS] Proxying to: ${upstreamUrl}`);
 
       const response = await axios.get(upstreamUrl, {
         responseType: 'arraybuffer',
@@ -194,6 +196,7 @@ app.get('/api/vworld/*', async (req, res) => {
       if (!params.has('domain')) params.set('domain', vworldDomain);
 
       upstreamUrl = `${VWORLD_API_BASE}${subPath}?${params.toString()}`;
+      console.log(`[VWorld REQ/NED] Proxying to: ${upstreamUrl}`);
 
       const response = await axios.get(upstreamUrl, {
         responseType: 'text',
