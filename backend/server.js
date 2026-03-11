@@ -136,60 +136,150 @@ app.get('/api/eum/devlist', async (req, res) => {
 
 // --- VWorld API Handle ---
 const VWORLD_API_BASE = 'https://api.vworld.kr';
-const VWORLD_FALLBACK_KEY = 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
 
 app.get('/api/vworld/*', async (req, res) => {
     try {
-        const apiKey = process.env.VWORLD_API_KEY || VWORLD_FALLBACK_KEY;
+        const apiKey = process.env.VWORLD_API_KEY;
         const vworldDomain = process.env.VWORLD_DOMAIN || 'onnrru.com';
 
-        // Clean path
-        let relPath = req.path
-            .replace('/api/vworld', '')
-            .replace('/req/wmts/1.0.0/SECRET', '')
-            .replace('/req/wmts/1.0.0/' + apiKey, '');
-        
-        if (relPath.startsWith('/')) relPath = relPath.slice(1);
-
-        let upstreamUrl = '';
-        const q = req.query || {};
-
-        // JS logic to determine upstream URL (similar to Netlify function)
-        if (relPath.toLowerCase().includes('wmts') || 
-            (relPath.split('/').length >= 3 && /\d+\/\d+\/\d+/.test(relPath))) {
-            
-            let wmtsPath = relPath;
-            if (wmtsPath.includes('wmts/')) {
-                wmtsPath = wmtsPath.split('wmts/').pop();
-            }
-            if (wmtsPath.startsWith('1.0.0/')) {
-                wmtsPath = wmtsPath.split('/').slice(2).join('/');
-            }
-            upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
-        } else if (relPath.toLowerCase().includes('wms')) {
-            const params = new URLSearchParams({ ...q, key: apiKey, domain: vworldDomain });
-            upstreamUrl = `${VWORLD_API_BASE}/req/wms?${params.toString()}`;
-        } else {
-            const params = new URLSearchParams({ ...q, key: apiKey, domain: vworldDomain });
-            const finalPath = relPath.startsWith('req/') ? relPath : `req/${relPath}`;
-            upstreamUrl = `${VWORLD_API_BASE}/${finalPath}?${params.toString()}`;
+        if (!apiKey) {
+            return res.status(500).json({
+                error: 'VWORLD_API_KEY missing'
+            });
         }
 
-        const response = await axios.get(upstreamUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Referer': `https://${vworldDomain}/`
-            },
-            responseType: 'arraybuffer'
-        });
+        // /api/vworld 제거 후 실제 하위 경로 추출
+        const subPath = req.path.replace('/api/vworld', '') || '';
+        const q = req.query || {};
 
-        const contentType = response.headers['content-type'];
-        res.set('Content-Type', contentType);
-        res.set('Cache-Control', 'public, max-age=86400');
-        res.send(response.data);
+        let upstreamUrl = '';
+
+        // 1) WMTS 처리
+        // 지원해야 하는 호출 예:
+        // /api/vworld/wmts/Satellite/17/...
+        // /api/vworld/req/wmts/1.0.0/SECRET/Satellite/17/...
+        // /api/vworld/req/wmts/1.0.0/{REALKEY}/Satellite/17/...
+        if (subPath.startsWith('/wmts/') || subPath.startsWith('/req/wmts/1.0.0/')) {
+            let wmtsPath = subPath;
+
+            if (wmtsPath.startsWith('/req/wmts/1.0.0/')) {
+                wmtsPath = wmtsPath.replace('/req/wmts/1.0.0/', '');
+
+                // 첫 segment(기존 SECRET 또는 하드코딩된 키)를 제거
+                const firstSlash = wmtsPath.indexOf('/');
+                if (firstSlash === -1) {
+                    return res.status(400).send('Invalid WMTS path');
+                }
+                wmtsPath = wmtsPath.slice(firstSlash + 1);
+            } else {
+                wmtsPath = wmtsPath.replace('/wmts/', '');
+            }
+
+            upstreamUrl = `${VWORLD_API_BASE}/req/wmts/1.0.0/${apiKey}/${wmtsPath}`;
+
+            const response = await axios.get(upstreamUrl, {
+                responseType: 'arraybuffer',
+                timeout: 15000,
+                headers: {
+                    'User-Agent': 'onnrru-server',
+                    'Referer': `https://${vworldDomain}/`,
+                    'Origin': `https://${vworldDomain}`
+                },
+                validateStatus: () => true
+            });
+
+            if (response.status >= 400) {
+                res.status(response.status);
+                res.set('Content-Type', response.headers['content-type'] || 'text/plain; charset=utf-8');
+                return res.send(response.data);
+            }
+
+            res.set('Content-Type', response.headers['content-type'] || 'image/png');
+            res.set('Cache-Control', 'public, max-age=86400');
+            return res.send(response.data);
+        }
+
+        // 2) WMS 처리
+        if (subPath === '/wms' || subPath === '/req/wms') {
+            const params = new URLSearchParams({
+                ...q,
+                key: apiKey,
+                domain: vworldDomain
+            });
+
+            upstreamUrl = `${VWORLD_API_BASE}/req/wms?${params.toString()}`;
+
+            const response = await axios.get(upstreamUrl, {
+                responseType: 'arraybuffer',
+                timeout: 15000,
+                headers: {
+                    'User-Agent': 'onnrru-server',
+                    'Referer': `https://${vworldDomain}/`,
+                    'Origin': `https://${vworldDomain}`
+                },
+                validateStatus: () => true
+            });
+
+            if (response.status >= 400) {
+                res.status(response.status);
+                res.set('Content-Type', response.headers['content-type'] || 'text/plain; charset=utf-8');
+                return res.send(response.data);
+            }
+
+            res.set('Content-Type', response.headers['content-type'] || 'image/png');
+            res.set('Cache-Control', 'public, max-age=300');
+            return res.send(response.data);
+        }
+
+        // 3) 일반 req/* 및 ned/* 처리
+        if (subPath.startsWith('/req/') || subPath.startsWith('/ned/')) {
+            const params = new URLSearchParams({
+                ...q,
+                key: apiKey,
+                domain: vworldDomain
+            });
+
+            upstreamUrl = `${VWORLD_API_BASE}${subPath}?${params.toString()}`;
+
+            const response = await axios.get(upstreamUrl, {
+                responseType: 'text',
+                timeout: 15000,
+                headers: {
+                    'User-Agent': 'onnrru-server',
+                    'Referer': `https://${vworldDomain}/`,
+                    'Origin': `https://${vworldDomain}`
+                },
+                validateStatus: () => true
+            });
+
+            res.status(response.status);
+            res.set(
+                'Content-Type',
+                response.headers['content-type'] || 'application/json; charset=utf-8'
+            );
+            return res.send(response.data);
+        }
+
+        return res.status(404).json({
+            error: 'Unsupported VWorld path',
+            path: subPath
+        });
     } catch (error) {
-        console.error('VWorld Proxy Error:', error.message);
-        res.status(500).json({ error: 'VWorld proxy failed', message: error.message });
+        console.error('VWorld Proxy Error:', error.response?.status, error.message);
+
+        if (error.response) {
+            res.status(error.response.status);
+            res.set(
+                'Content-Type',
+                error.response.headers?.['content-type'] || 'text/plain; charset=utf-8'
+            );
+            return res.send(error.response.data);
+        }
+
+        return res.status(500).json({
+            error: 'VWorld proxy failed',
+            message: error.message
+        });
     }
 });
 
