@@ -31,16 +31,8 @@ export async function handler(event) {
     }
 
     try {
-        const apiKey = process.env.VWORLD_API_KEY;
+        const apiKey = process.env.VWORLD_API_KEY || 'F359ED4A-0FCB-3F3D-AB0B-0F58879EEA04';
         const vworldDomain = process.env.VWORLD_DOMAIN || 'onnrru.com';
-
-        if (!apiKey) {
-            return {
-                statusCode: 500,
-                headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({ error: 'VWORLD_API_KEY is missing' })
-            };
-        }
 
         const rawPath = event.path
             .replace('/.netlify/functions/vworld', '')
@@ -111,7 +103,8 @@ export async function handler(event) {
         const res = await fetch(upstreamUrl, {
             method: 'GET',
             headers: {
-                'User-Agent': 'onnrru-netlify-vworld-proxy'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Referer': `https://${vworldDomain}/`
             }
         });
 
