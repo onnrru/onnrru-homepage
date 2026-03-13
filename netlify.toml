@@ -6,25 +6,14 @@
 [functions]
   node_bundler = "esbuild"
 
-
 [[redirects]]
-  # v1.0.7 - Hybrid Proxy (Netlify for VWorld, GCP VM for Molit/EUM)
-  from = "/api/vworld/*"
-  to = "/.netlify/functions/vworld/:splat"
-  status = 200
-
-[[redirects]]
-  # Use GCP VM for APIs requiring Fixed IP
-  from = "/api/molit/*"
-  to = "http://34.50.25.171:8080/api/molit/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/api/eum/*"
-  to = "http://34.50.25.171:8080/api/eum/:splat"
+  # Redirect all API requests to the GCP VM
+  from = "/api/*"
+  to = "http://34.50.25.171:8080/api/:splat"
   status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
