@@ -19,16 +19,52 @@ export const getPastMonths = (numMonths) => {
     return months;
 };
 
-// Parse XML response from MOLIT API
-const parseXmlToJSON = (xmlText) => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+// Parse response from MOLIT API (handles both JSON and XML)
+const parseMolitResponse = (text) => {
+    if (!text) return [];
 
-    // Check for errors (MOLIT often uses '000' or '00' for success)
+    // 1. Try parsing as JSON first (Modern format)
+    try {
+        const jsonData = JSON.parse(text);
+        if (jsonData.response) {
+            const header = jsonData.response.header || {};
+            const body = jsonData.response.body || {};
+            const resultCode = header.resultCode;
+
+            if (resultCode !== '00' && resultCode !== '000') {
+                console.error('[MOLIT API Error]', header.resultMsg || 'Unknown Error Response');
+                return [];
+            }
+
+            const items = body.items?.item || [];
+            const itemList = Array.isArray(items) ? items : [items];
+            
+            return itemList.filter(Boolean).map(item => ({
+                apartmentName: item.aptNm,
+                dongName: item.umdNm || item.umdnm,
+                jibun: item.jibun,
+                dealYear: String(item.dealYear),
+                dealMonth: String(item.dealMonth),
+                dealDay: String(item.dealDay),
+                dealDate: `${item.dealYear}-${String(item.dealMonth).padStart(2, '0')}-${String(item.dealDay).padStart(2, '0')}`,
+                price: Number(String(item.dealAmount || 0).replace(/,/g, '')),
+                area: Number(item.excluUseAr),
+                floor: Number(item.floor),
+                buildYear: String(item.buildYear)
+            }));
+        }
+    } catch (e) {
+        // Not a valid JSON, fallback to XML
+    }
+
+    // 2. XML Parsing (Legacy fallback)
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(text, "text/xml");
+
     const resultCode = xmlDoc.getElementsByTagName('resultCode')[0]?.textContent;
     if (resultCode !== '00' && resultCode !== '000') {
         const resultMsg = xmlDoc.getElementsByTagName('resultMsg')[0]?.textContent;
-        console.error('API Error:', resultMsg);
+        console.error('[MOLIT API Error]', resultMsg || 'Unknown XML Error');
         return [];
     }
 
@@ -37,50 +73,38 @@ const parseXmlToJSON = (xmlText) => {
 
     for (let i = 0; i < items.length; i++) {
         const item = items[i];
-
-        // Helper to get text content safely
         const getText = (tag) => {
             const el = item.getElementsByTagName(tag)[0];
             return el ? el.textContent.trim() : '';
         };
 
         try {
-            // The price comes with commas, remove them and convert to Number
             const priceStr = getText('dealAmount').replace(/,/g, '');
             const price = Number(priceStr);
-
             const aptNm = getText('aptNm');
             const dongNm = getText('umdNm');
 
-            if (!aptNm || !dongNm) {
-                console.warn(`Missing aptNm or umdNm in item ${i}`);
-                continue;
-            }
+            if (!aptNm || !dongNm) continue;
 
             result.push({
-                // Core identifiers
                 apartmentName: aptNm,
-                dongName: dongNm, // e.g. "잠실동"
+                dongName: dongNm,
                 jibun: getText('jibun'),
-
-                // Transaction Details
                 dealYear: getText('dealYear'),
                 dealMonth: getText('dealMonth'),
                 dealDay: getText('dealDay'),
                 dealDate: `${getText('dealYear')}-${getText('dealMonth').padStart(2, '0')}-${getText('dealDay').padStart(2, '0')}`,
-                price: price, // in 10,000 KRW
-
-                // Property details
+                price: price,
                 area: Number(getText('excluUseAr')),
                 floor: Number(getText('floor')),
                 buildYear: getText('buildYear')
             });
         } catch (e) {
-            console.error("Error parsing item", i, e);
+            console.error("Error parsing XML item", i, e);
         }
     }
 
-    console.log(`Parsed ${result.length} valid transactions out of ${items.length} items.`);
+    console.log(`Parsed ${result.length} valid transactions from XML.`);
     return result;
 };
 
@@ -95,7 +119,7 @@ export const fetchApartmentTransactions = async (lawdCd, monthsCount = 36) => {
         const { MOLIT_BASE_URL, ENDPOINTS } = API_CONFIG;
 
         const fetchMonthData = async (dealYmd) => {
-            const url = `${MOLIT_BASE_URL}${ENDPOINTS.APT_TRADE}?LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1`;
+            const url = `${MOLIT_BASE_URL}${ENDPOINTS.APT_TRADE}?LAWD_CD=${lawdCd}&DEAL_YMD=${dealYmd}&numOfRows=1000&pageNo=1&_type=json`;
 
             const response = await fetch(url);
             if (!response.ok) {
@@ -103,8 +127,8 @@ export const fetchApartmentTransactions = async (lawdCd, monthsCount = 36) => {
                 return [];
             }
 
-            const xmlText = await response.text();
-            return parseXmlToJSON(xmlText);
+            const text = await response.text();
+            return parseMolitResponse(text);
         };
 
         // Batch requests in groups of 6 to avoid overwhelming the browser/API
