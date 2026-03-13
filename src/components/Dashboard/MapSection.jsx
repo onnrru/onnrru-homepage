@@ -232,7 +232,7 @@ const MapSection = () => {
                     }),
                     zIndex: 15,
                     visible: false,
-                    minZoom: 14
+                    minZoom: 14 // Start showing from zoom 14
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
                 cadastralLayerRef.current = cadastralLayer;
@@ -514,7 +514,7 @@ const MapSection = () => {
         if (!view) return;
 
         const cadastralOn = activeLayers.includes('LP_PA_CBND_BUBUN');
-        const MIN_Z = 17;
+        const MIN_Z = 14;
         const MAX_Z = 19;
 
         const refresh = () => {
