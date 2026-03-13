@@ -41,6 +41,7 @@ const MapSection = () => {
 
     const cadastralLayerRef = useRef(null);
     const cadastralPendingRef = useRef(false);
+    const wmsLayerMapRef = useRef(new Map());
     const enrichLockRef = useRef(false);
     const lastEnrichKeyRef = useRef(null);
 
@@ -66,10 +67,37 @@ const MapSection = () => {
 
     const getPnu = (fd) => fd?.properties?.pnu;
 
+    const refreshWmsLayerByName = useCallback((layerName) => {
+        if (layerName === 'LP_PA_CBND_BUBUN') {
+            const src = cadastralLayerRef.current?.getSource?.();
+            if (src?.updateParams) {
+                src.updateParams({ _t: Date.now() });
+            } else if (src?.refresh) {
+                src.refresh();
+            }
+            return;
+        }
+
+        const layer = wmsLayerMapRef.current.get(layerName);
+        const src = layer?.getSource?.();
+        if (src?.updateParams) {
+            src.updateParams({ _t: Date.now() });
+        } else if (src?.refresh) {
+            src.refresh();
+        }
+    }, []);
+
     const toggleLayer = (layerId) => {
         setActiveLayers((prev) => {
             const isActive = prev.includes(layerId);
-            return isActive ? prev.filter((id) => id !== layerId) : [...prev, layerId];
+            const next = isActive ? prev.filter((id) => id !== layerId) : [...prev, layerId];
+            
+            // Force WMS refresh on next tick to ensure tile update
+            setTimeout(() => {
+                refreshWmsLayerByName(layerId);
+            }, 0);
+            
+            return next;
         });
     };
 
@@ -211,57 +239,71 @@ const MapSection = () => {
                         url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
-                    zIndex: 20, // Labels above zones
+                    zIndex: 8, // Behind WMS/Zones but above base
                     visible: true
                 });
                 hybridLayer.set('name', 'hybrid');
 
+                const cadastralSource = new OL.source.TileWMS({
+                    url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                    params: {
+                        SERVICE: 'WMS',
+                        REQUEST: 'GetMap',
+                        VERSION: '1.3.0',
+                        LAYERS: 'LP_PA_CBND_BUBUN',
+                        STYLES: '',
+                        CRS: 'EPSG:3857',
+                        FORMAT: 'image/png',
+                        TRANSPARENT: true,
+                        key: API_CONFIG.VWORLD_API_KEY,
+                        domain: 'onnrru.com'
+                    }
+                });
+
+                cadastralSource.on('tileloaderror', () => {
+                    console.error('[WMS tileloaderror] LP_PA_CBND_BUBUN');
+                });
+
                 const cadastralLayer = new OL.layer.Tile({
-                    source: new OL.source.TileWMS({
-                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
-                        params: {
-                            SERVICE: 'WMS',
-                            REQUEST: 'GetMap',
-                            VERSION: '1.3.0',
-                            LAYERS: 'LP_PA_CBND_BUBUN',
-                            STYLES: 'LP_PA_CBND_BUBUN',
-                            CRS: 'EPSG:3857',
-                            FORMAT: 'image/png',
-                            TRANSPARENT: true,
-                            key: API_CONFIG.VWORLD_API_KEY,
-                            domain: 'onnrru.com'
-                        }
-                    }),
-                    zIndex: 35,
+                    source: cadastralSource,
+                    zIndex: 30,
                     visible: false
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
                 cadastralLayerRef.current = cadastralLayer;
+                wmsLayerMapRef.current.set('LP_PA_CBND_BUBUN', cadastralLayer);
 
                 const wmsLayers = ALL_LAYERS
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
+                        const source = new OL.source.TileWMS({
+                            url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                            params: {
+                                SERVICE: 'WMS',
+                                REQUEST: 'GetMap',
+                                VERSION: '1.3.0',
+                                LAYERS: layer.id,
+                                STYLES: '',
+                                CRS: 'EPSG:3857',
+                                FORMAT: 'image/png',
+                                TRANSPARENT: 'TRUE',
+                                key: API_CONFIG.VWORLD_API_KEY,
+                                domain: 'onnrru.com'
+                            }
+                        });
+
+                        source.on('tileloaderror', () => {
+                            console.error(`[WMS tileloaderror] ${layer.id}`);
+                        });
+
                         const olLayer = new OL.layer.Tile({
-                            source: new OL.source.TileWMS({
-                                url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
-                                params: {
-                                    SERVICE: 'WMS',
-                                    REQUEST: 'GetMap',
-                                    VERSION: '1.3.0',
-                                    LAYERS: layer.id,
-                                    STYLES: layer.id,
-                                    CRS: 'EPSG:3857',
-                                    FORMAT: 'image/png',
-                                    TRANSPARENT: 'TRUE',
-                                    key: API_CONFIG.VWORLD_API_KEY,
-                                    domain: 'onnrru.com'
-                                }
-                            }),
+                            source,
                             visible: false,
-                            zIndex: 10,
-                            opacity: 0.8
+                            zIndex: 15,
+                            opacity: 0.9
                         });
                         olLayer.set('name', layer.id);
+                        wmsLayerMapRef.current.set(layer.id, olLayer);
                         return olLayer;
                     });
 
@@ -527,7 +569,7 @@ const MapSection = () => {
             else if (name === 'LP_PA_CBND_BUBUN') {
                 const isActive = activeLayers.includes(name);
                 const currentZoom = mapObj.getView().getZoom();
-                layer.setVisible(isActive && currentZoom >= 12);
+                layer.setVisible(isActive && currentZoom >= 14);
             }
             else if (ALL_LAYERS.some(l => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
@@ -543,7 +585,7 @@ const MapSection = () => {
             if (cadastralLayer) {
                 const isActive = activeLayers.includes('LP_PA_CBND_BUBUN');
                 const z = mapObj.getView().getZoom();
-                cadastralLayer.setVisible(isActive && z >= 12);
+                cadastralLayer.setVisible(isActive && z >= 14);
             }
         };
         mapObj.on('moveend', handleZoomEnd);
