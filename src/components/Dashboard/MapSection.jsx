@@ -245,18 +245,16 @@ const MapSection = () => {
                 hybridLayer.set('name', 'hybrid');
 
                 const cadastralSource = new OL.source.TileWMS({
-                    url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                    url: `${API_CONFIG.VWORLD_MAP_URL}/req/wms`,
                     params: {
                         SERVICE: 'WMS',
                         REQUEST: 'GetMap',
-                        VERSION: '1.3.0',
+                        VERSION: '1.1.1',
                         LAYERS: 'LP_PA_CBND_BUBUN',
                         STYLES: '',
-                        CRS: 'EPSG:3857',
+                        SRS: 'EPSG:3857',
                         FORMAT: 'image/png',
-                        TRANSPARENT: true,
-                        key: API_CONFIG.VWORLD_API_KEY,
-                        domain: 'onnrru.com'
+                        TRANSPARENT: true
                     }
                 });
 
@@ -277,18 +275,16 @@ const MapSection = () => {
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
                         const source = new OL.source.TileWMS({
-                            url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                            url: `${API_CONFIG.VWORLD_MAP_URL}/req/wms`,
                             params: {
                                 SERVICE: 'WMS',
                                 REQUEST: 'GetMap',
-                                VERSION: '1.3.0',
+                                VERSION: '1.1.1',
                                 LAYERS: layer.id,
                                 STYLES: '',
-                                CRS: 'EPSG:3857',
+                                SRS: 'EPSG:3857',
                                 FORMAT: 'image/png',
-                                TRANSPARENT: 'TRUE',
-                                key: API_CONFIG.VWORLD_API_KEY,
-                                domain: 'onnrru.com'
+                                TRANSPARENT: true
                             }
                         });
 
