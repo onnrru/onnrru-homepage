@@ -218,16 +218,13 @@ const MapSection = () => {
 
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: `${proxyMapUrl}/wms`,
-                        params: {
-                            SERVICE: 'WMS',
-                            REQUEST: 'GetMap',
-                            VERSION: '1.3.0',
                             LAYERS: 'LP_PA_CBND_BUBUN',
                             STYLES: 'LP_PA_CBND_BUBUN',
                             CRS: 'EPSG:3857',
                             FORMAT: 'image/png',
-                            TRANSPARENT: true
+                            TRANSPARENT: true,
+                            key: API_CONFIG.VWORLD_API_KEY,
+                            domain: 'onnrru.com'
                         }
                     }),
                     zIndex: 35,
@@ -240,19 +237,21 @@ const MapSection = () => {
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
                         const olLayer = new OL.layer.Tile({
-                            source: new OL.source.TileWMS({
-                                url: `${proxyMapUrl}/wms`,
-                                params: {
-                                    SERVICE: 'WMS',
-                                    REQUEST: 'GetMap',
-                                    VERSION: '1.3.0',
-                                    LAYERS: layer.id,
-                                    STYLES: layer.id,
-                                    CRS: 'EPSG:3857',
-                                    FORMAT: 'image/png',
-                                    TRANSPARENT: 'TRUE'
-                                }
-                            }),
+                                source: new OL.source.TileWMS({
+                                    url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                                    params: {
+                                        SERVICE: 'WMS',
+                                        REQUEST: 'GetMap',
+                                        VERSION: '1.3.0',
+                                        LAYERS: layer.id,
+                                        STYLES: layer.id,
+                                        CRS: 'EPSG:3857',
+                                        FORMAT: 'image/png',
+                                        TRANSPARENT: 'TRUE',
+                                        key: API_CONFIG.VWORLD_API_KEY,
+                                        domain: 'onnrru.com'
+                                    }
+                                }),
                             visible: false,
                             zIndex: 10,
                             opacity: 0.8
