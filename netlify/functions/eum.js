@@ -1,21 +1,20 @@
+// eum.js v1.0.7 - Using native fetch
 const EUM_API_BASE = 'https://eum.go.kr';
 
 function buildQuery(params = {}) {
     const qs = new URLSearchParams();
-
     Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
             qs.append(key, String(value));
         }
     });
-
     return qs;
 }
 
 function withCors(headers = {}) {
     return {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With, Accept, Authorization',
         'Access-Control-Allow-Methods': 'GET,OPTIONS',
         ...headers
     };
@@ -23,45 +22,35 @@ function withCors(headers = {}) {
 
 export async function handler(event) {
     if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: withCors(),
-            body: ''
-        };
+        return { statusCode: 200, headers: withCors(), body: '' };
     }
 
     try {
-        const apiId = process.env.EUM_API_ID;
-        const apiKey = process.env.EUM_API_KEY;
+        const apiId = (process.env.EUM_API_ID || '').trim();
+        const apiKey = (process.env.EUM_API_KEY || '').trim();
 
         if (!apiId || !apiKey) {
             return {
                 statusCode: 500,
-                headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({
-                    error: 'EUM_API_ID or EUM_API_KEY is missing'
-                })
+                headers: withCors({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ error: 'EUM credentials missing', v: '1.0.7' })
             };
         }
 
         const rawPath = event.path
             .replace('/.netlify/functions/eum', '')
-            .replace('/api/eum', '') || '';
-        const q = event.queryStringParameters || {};
-
+            .replace('/api/eum', '') || '/';
+        
         if (!rawPath.startsWith('/Web/Rest/OP/')) {
             return {
                 statusCode: 404,
-                headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
-                body: JSON.stringify({
-                    error: 'Unsupported EUM path',
-                    path: rawPath
-                })
+                headers: withCors({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ error: 'Unsupported EUM path', path: rawPath, v: '1.0.7' })
             };
         }
 
         const query = buildQuery({
-            ...q,
+            ...event.queryStringParameters,
             id: apiId,
             key: apiKey
         });
@@ -75,23 +64,20 @@ export async function handler(event) {
             statusCode: res.status,
             headers: withCors({
                 'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=60'
+                'Cache-Control': 'public, max-age=60',
+                'X-Proxy-Version': '1.0.7'
             }),
             body: text
         };
     } catch (error) {
-        console.error('EUM Proxy Error:', error);
+        console.error('[EUM Proxy Error]:', error.message);
         return {
             statusCode: 500,
-            headers: withCors({ 'Content-Type': 'application/json; charset=utf-8' }),
+            headers: withCors({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({
                 error: 'EUM proxy failed',
                 message: error.message,
-                stack: error.stack,
-                env_check: {
-                    has_key: !!process.env.EUM_API_ID,
-                    node_version: process.version
-                }
+                v: '1.0.7'
             })
         };
     }

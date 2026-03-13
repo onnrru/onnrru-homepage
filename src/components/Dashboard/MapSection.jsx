@@ -18,7 +18,7 @@ const MapSection = () => {
         setParcelPickMode
   } = useDashboard();
 
-  console.log('[MapSection] v1.0.5 - Unified API Version');
+  console.log('[MapSection] v1.0.7 - Unified API Version');
 
   const onAddressSelect = setSelectedAddress;
     const onParcelsChange = setSelectedParcels;
