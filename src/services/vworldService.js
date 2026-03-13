@@ -112,7 +112,7 @@ export const VWorldService = {
       `&format=json` +
       `&errorformat=json`;
 
-    const data = await safeFetchJson(url, 'searchAddress', 1);
+    const data = await safeFetchJson(url, 'searchAddressParcel', 1);
 
     if (data?.response?.status === 'OK' && data?.response?.result?.items?.length > 0) {
       const items = data.response.result.items;
@@ -120,15 +120,14 @@ export const VWorldService = {
       return items;
     }
 
-    // Try again without category=parcel if no results
-    if (normalized.length > 2) {
-        const fallbackUrl = url.replace('&category=parcel', '');
-        const fallbackData = await safeFetchJson(fallbackUrl, 'searchAddressFallback', 0);
-        if (fallbackData?.response?.status === 'OK' && fallbackData?.response?.result?.items?.length > 0) {
-            const items = fallbackData.response.result.items;
-            vworldCache.geocoding.set(cacheKey, items);
-            return items;
-        }
+    // Fallback: Try category=road if parcel failed
+    const roadUrl = url.replace('category=parcel', 'category=road');
+    const roadData = await safeFetchJson(roadUrl, 'searchAddressRoad', 1);
+
+    if (roadData?.response?.status === 'OK' && roadData?.response?.result?.items?.length > 0) {
+      const items = roadData.response.result.items;
+      vworldCache.geocoding.set(cacheKey, items);
+      return items;
     }
 
     return [];
