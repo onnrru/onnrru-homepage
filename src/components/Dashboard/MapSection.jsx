@@ -395,6 +395,9 @@ const MapSection = () => {
                 map.on('singleclick', async (evt) => {
                     if (measureModeRef.current) return;
 
+                    // If not in multi-pick mode, single click does nothing to selection
+                    if (!parcelPickModeRef.current) return;
+
                     const [lon, lat] = OL.proj.transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
 
                     try {
@@ -404,31 +407,14 @@ const MapSection = () => {
                         const pnu = getPnu(fd);
                         if (!pnu) return;
 
-                        const props = fd.properties || {};
+                        const current = selectedParcelsRef.current || [];
+                        const exists = current.some((x) => getPnu(x) === pnu);
+                        const next = exists
+                            ? current.filter((x) => getPnu(x) !== pnu)
+                            : [...current, fd];
 
-                        onAddressSelect?.({
-                            address: props.addr || '',
-                            roadAddr: props.road || props.addr || '',
-                            parcelAddr: props.addr || '',
-                            x: lon,
-                            y: lat,
-                            pnu: props.pnu,
-                            jimok: props.jimok,
-                            area: props.parea,
-                            price: props.jiga,
-                            zone: props.unm
-                        });
-
-                        if (parcelPickModeRef.current) {
-                            const current = selectedParcelsRef.current || [];
-                            const exists = current.some((x) => getPnu(x) === pnu);
-                            const next = exists
-                                ? current.filter((x) => getPnu(x) !== pnu)
-                                : [...current, fd];
-
-                            selectedParcelsRef.current = next;
-                            commitSelectedParcels(next);
-                        }
+                        selectedParcelsRef.current = next;
+                        commitSelectedParcels(next);
                     } catch (e) {
                         console.error('singleclick error:', e);
                     }
@@ -645,10 +631,11 @@ const MapSection = () => {
             if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
             const center = OL.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
+            
+            // Only move center, do not force zoom unless extremely zoomed out
             const currentZoom = mapObj.getView().getZoom();
-
-            if (currentZoom !== 14) {
-                mapObj.getView()?.animate({ center, duration: 500, zoom: 14 });
+            if (currentZoom < 14) {
+                mapObj.getView()?.animate({ center, zoom: 16, duration: 500 });
             } else {
                 mapObj.getView()?.animate({ center, duration: 500 });
             }
