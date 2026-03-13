@@ -211,28 +211,30 @@ const MapSection = () => {
                         url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
-                    zIndex: 10,
+                    zIndex: 20, // Labels above zones
                     visible: true
                 });
                 hybridLayer.set('name', 'hybrid');
 
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: `${proxyMapUrl}/wms`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
                         params: {
                             SERVICE: 'WMS',
                             REQUEST: 'GetMap',
                             VERSION: '1.3.0',
                             LAYERS: 'LP_PA_CBND_BUBUN',
-                            STYLES: '',
+                            STYLES: 'LP_PA_CBND_BUBUN',
                             CRS: 'EPSG:3857',
                             FORMAT: 'image/png',
-                            TRANSPARENT: true
+                            TRANSPARENT: true,
+                            key: API_CONFIG.VWORLD_API_KEY,
+                            domain: 'onnrru.com'
                         }
                     }),
-                    zIndex: 15,
+                    zIndex: 30, // Parcel lines above everything
                     visible: false,
-                    minZoom: 14 // Start showing from zoom 14
+                    minZoom: 14
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
                 cadastralLayerRef.current = cadastralLayer;
@@ -241,23 +243,25 @@ const MapSection = () => {
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
                         const source = new OL.source.TileWMS({
-                            url: `${proxyMapUrl}/wms`,
+                            url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
                             params: {
                                 SERVICE: 'WMS',
                                 REQUEST: 'GetMap',
                                 VERSION: '1.3.0',
                                 LAYERS: layer.id,
-                                STYLES: '',
+                                STYLES: layer.id,
                                 CRS: 'EPSG:3857',
                                 FORMAT: 'image/png',
-                                TRANSPARENT: 'TRUE'
+                                TRANSPARENT: 'TRUE',
+                                key: API_CONFIG.VWORLD_API_KEY,
+                                domain: 'onnrru.com'
                             }
                         });
 
                         const olLayer = new OL.layer.Tile({
                             source,
                             visible: false,
-                            zIndex: 5,
+                            zIndex: 10, // Zones above base, below labels
                             opacity: 0.8
                         });
                         olLayer.set('name', layer.id);
