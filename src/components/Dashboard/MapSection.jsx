@@ -224,7 +224,7 @@ const MapSection = () => {
                             REQUEST: 'GetMap',
                             VERSION: '1.3.0',
                             LAYERS: 'LP_PA_CBND_BUBUN',
-                            STYLES: 'LP_PA_CBND_BUBUN',
+                            STYLES: '',
                             CRS: 'EPSG:3857',
                             FORMAT: 'image/png',
                             TRANSPARENT: true,
@@ -232,7 +232,7 @@ const MapSection = () => {
                             domain: 'onnrru.com'
                         }
                     }),
-                    zIndex: 30, // Parcel lines above everything
+                    zIndex: 40, // Top-most layer
                     visible: false,
                     minZoom: 14
                 });
@@ -249,7 +249,7 @@ const MapSection = () => {
                                 REQUEST: 'GetMap',
                                 VERSION: '1.3.0',
                                 LAYERS: layer.id,
-                                STYLES: layer.id,
+                                STYLES: '',
                                 CRS: 'EPSG:3857',
                                 FORMAT: 'image/png',
                                 TRANSPARENT: 'TRUE',
@@ -582,7 +582,7 @@ const MapSection = () => {
             if (name === 'midnight') layer.setVisible(mapType === 'midnight');
             if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
-            if (ALL_LAYERS.some((l) => l.id === name && l.id !== 'LP_PA_CBND_BUBUN')) {
+            if (ALL_LAYERS.some((l) => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
