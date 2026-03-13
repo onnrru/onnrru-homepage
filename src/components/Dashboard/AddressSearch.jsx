@@ -67,14 +67,16 @@ const AddressSearch = ({ onSelect }) => {
                     if (level4AC) code = level4AC;
                 }
 
-                if (item.category === 'parcel' && item.id) {
-                    pnu = item.id;
+                if (item.id && (item.category === 'parcel' || item.category === 'road')) {
+                    // VWorld often provides a representative PNU as the ID for address searches
+                    if (item.id.length >= 10) pnu = item.id;
                 }
 
                 return {
-                    address: item.address.road || item.address.parcel,
-                    roadAddr: item.address.road,
-                    parcelAddr: item.address.parcel,
+                    address: item.address.parcel || item.address.road || item.title,
+                    roadAddr: item.address.road || '',
+                    parcelAddr: item.address.parcel || '',
+                    title: item.title,
                     x: item.point.x,
                     y: item.point.y,
                     pnu: pnu,
