@@ -168,7 +168,7 @@ const MapSection = () => {
 
                 const baseLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/wmts/Base/{z}/{y}/{x}.png`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/Base/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -178,7 +178,7 @@ const MapSection = () => {
 
                 const grayLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/wmts/white/{z}/{y}/{x}.png`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/white/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -188,7 +188,7 @@ const MapSection = () => {
 
                 const midnightLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/wmts/midnight/{z}/{y}/{x}.png`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/midnight/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -198,7 +198,7 @@ const MapSection = () => {
 
                 const satelliteLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/wmts/Satellite/{z}/{y}/{x}.jpeg`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/Satellite/{z}/{y}/{x}.jpeg`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 0,
@@ -208,7 +208,7 @@ const MapSection = () => {
 
                 const hybridLayer = new OL.layer.Tile({
                     source: new OL.source.XYZ({
-                        url: `${proxyMapUrl}/wmts/Hybrid/{z}/{y}/{x}.png`,
+                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wmts/1.0.0/${API_CONFIG.VWORLD_API_KEY}/Hybrid/{z}/{y}/{x}.png`,
                         attributions: 'VWorld'
                     }),
                     zIndex: 10,
