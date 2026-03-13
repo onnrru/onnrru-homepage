@@ -35,7 +35,7 @@ const MapControls = ({
         <div className="absolute top-4 right-4 left-4 z-20 pointer-events-none flex flex-col items-end gap-2">
             {/* Top Row: Search and Options Toggle */}
             <div className="w-full flex items-center justify-end gap-2 pointer-events-auto">
-                <div className="flex-1 max-w-[600px] shadow-lg rounded-full overflow-hidden">
+                <div className="flex-1 max-w-[600px] shadow-lg rounded-full">
                     <AddressSearch onSelect={setSelectedAddress} />
                 </div>
                 
