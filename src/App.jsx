@@ -112,7 +112,7 @@ function AppContent() {
 }
 
 function App() {
-  console.log('[App] v1.0.5 - Deployment Sync Check');
+  console.log('[App] v1.0.7 - Deployment Sync Check');
   return (
     <Router>
       <AppContent />
