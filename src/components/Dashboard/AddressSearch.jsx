@@ -24,22 +24,24 @@ const AddressSearch = ({ onSelect }) => {
 
     const handleSearch = async () => {
         if (!searchTerm) return;
+        console.log('[Search] Initiating search for:', searchTerm);
         setLoading(true);
         setIsOpen(true);
         setResults([]);
 
         try {
-            // Using the Proxy Service (VWorldService) instead of legacy JSONP
             const items = await VWorldService.searchAddress(searchTerm, 10);
+            console.log('[Search] Raw results count:', items?.length || 0);
 
             if (items && items.length > 0) {
                 const formattedItems = processItems(items);
+                console.log('[Search] Formatted results count:', formattedItems.length);
                 setResults(formattedItems);
             } else {
                 setResults([]);
             }
         } catch (e) {
-            console.error('Search failed:', e);
+            console.error('[Search] Failed:', e);
             setResults([{ type: 'error', message: "검색 중 오류가 발생했습니다." }]);
         } finally {
             setLoading(false);

@@ -222,15 +222,15 @@ const MapSection = () => {
                         params: {
                             SERVICE: 'WMS',
                             REQUEST: 'GetMap',
-                            VERSION: '1.1.1',
+                            VERSION: '1.3.0',
                             LAYERS: 'LP_PA_CBND_BUBUN',
-                            STYLES: '',
-                            SRS: 'EPSG:3857',
+                            STYLES: 'LP_PA_CBND_BUBUN',
+                            CRS: 'EPSG:3857',
                             FORMAT: 'image/png',
                             TRANSPARENT: true
                         }
                     }),
-                    zIndex: 30,
+                    zIndex: 35,
                     visible: false
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
@@ -245,10 +245,10 @@ const MapSection = () => {
                                 params: {
                                     SERVICE: 'WMS',
                                     REQUEST: 'GetMap',
-                                    VERSION: '1.1.1',
+                                    VERSION: '1.3.0',
                                     LAYERS: layer.id,
-                                    STYLES: '',
-                                    SRS: 'EPSG:3857',
+                                    STYLES: layer.id,
+                                    CRS: 'EPSG:3857',
                                     FORMAT: 'image/png',
                                     TRANSPARENT: 'TRUE'
                                 }
@@ -523,8 +523,7 @@ const MapSection = () => {
             else if (name === 'LP_PA_CBND_BUBUN') {
                 const isActive = activeLayers.includes(name);
                 const currentZoom = mapObj.getView().getZoom();
-                // We keep a simple minZoom check here
-                layer.setVisible(isActive && currentZoom >= 14);
+                layer.setVisible(isActive && currentZoom >= 12);
             }
             else if (ALL_LAYERS.some(l => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
@@ -540,7 +539,7 @@ const MapSection = () => {
             if (cadastralLayer) {
                 const isActive = activeLayers.includes('LP_PA_CBND_BUBUN');
                 const z = mapObj.getView().getZoom();
-                cadastralLayer.setVisible(isActive && z >= 14);
+                cadastralLayer.setVisible(isActive && z >= 12);
             }
         };
         mapObj.on('moveend', handleZoomEnd);
