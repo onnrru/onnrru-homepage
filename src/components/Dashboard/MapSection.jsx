@@ -218,23 +218,20 @@ const MapSection = () => {
 
                 const cadastralLayer = new OL.layer.Tile({
                     source: new OL.source.TileWMS({
-                        url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
+                        url: `${proxyMapUrl}/wms`,
                         params: {
                             SERVICE: 'WMS',
                             REQUEST: 'GetMap',
-                            VERSION: '1.3.0',
+                            VERSION: '1.1.1',
                             LAYERS: 'LP_PA_CBND_BUBUN',
                             STYLES: '',
-                            CRS: 'EPSG:3857',
+                            SRS: 'EPSG:3857',
                             FORMAT: 'image/png',
-                            TRANSPARENT: true,
-                            key: API_CONFIG.VWORLD_API_KEY,
-                            domain: 'onnrru.com'
+                            TRANSPARENT: true
                         }
                     }),
-                    zIndex: 40, // Top-most layer
-                    visible: false,
-                    minZoom: 14
+                    zIndex: 30,
+                    visible: false
                 });
                 cadastralLayer.set('name', 'LP_PA_CBND_BUBUN');
                 cadastralLayerRef.current = cadastralLayer;
@@ -242,26 +239,22 @@ const MapSection = () => {
                 const wmsLayers = ALL_LAYERS
                     .filter((l) => l.id !== 'LP_PA_CBND_BUBUN')
                     .map((layer) => {
-                        const source = new OL.source.TileWMS({
-                            url: `${API_CONFIG.VWORLD_DIRECT_URL}/req/wms`,
-                            params: {
-                                SERVICE: 'WMS',
-                                REQUEST: 'GetMap',
-                                VERSION: '1.3.0',
-                                LAYERS: layer.id,
-                                STYLES: '',
-                                CRS: 'EPSG:3857',
-                                FORMAT: 'image/png',
-                                TRANSPARENT: 'TRUE',
-                                key: API_CONFIG.VWORLD_API_KEY,
-                                domain: 'onnrru.com'
-                            }
-                        });
-
                         const olLayer = new OL.layer.Tile({
-                            source,
+                            source: new OL.source.TileWMS({
+                                url: `${proxyMapUrl}/wms`,
+                                params: {
+                                    SERVICE: 'WMS',
+                                    REQUEST: 'GetMap',
+                                    VERSION: '1.1.1',
+                                    LAYERS: layer.id,
+                                    STYLES: '',
+                                    SRS: 'EPSG:3857',
+                                    FORMAT: 'image/png',
+                                    TRANSPARENT: 'TRUE'
+                                }
+                            }),
                             visible: false,
-                            zIndex: 10, // Zones above base, below labels
+                            zIndex: 10,
                             opacity: 0.8
                         });
                         olLayer.set('name', layer.id);
@@ -270,11 +263,11 @@ const MapSection = () => {
 
                 const markerSrc = new OL.source.Vector();
                 markerSourceRef.current = markerSrc;
-                const markerLayer = new OL.layer.Vector({ source: markerSrc, zIndex: 20 });
+                const markerLayer = new OL.layer.Vector({ source: markerSrc, zIndex: 40 });
 
                 const selectionSrc = new OL.source.Vector();
                 selectionSourceRef.current = selectionSrc;
-                const selectionLayer = new OL.layer.Vector({ source: selectionSrc, zIndex: 21 });
+                const selectionLayer = new OL.layer.Vector({ source: selectionSrc, zIndex: 41 });
 
                 const aptMarkerSrc = new OL.source.Vector();
                 aptMarkerSourceRef.current = aptMarkerSrc;
@@ -508,85 +501,51 @@ const MapSection = () => {
         };
     }, [analyzedApartments, mapObj]);
 
+    // Unified Visibility Logic
     useEffect(() => {
         if (!mapObj) return;
 
-        const cadastralLayer = cadastralLayerRef.current;
-        if (!cadastralLayer) return;
-
-        const view = mapObj.getView();
-        if (!view) return;
-
-        const cadastralOn = activeLayers.includes('LP_PA_CBND_BUBUN');
-        const MIN_Z = 14;
-        const MAX_Z = 19;
-
-        const refresh = () => {
-            const src = cadastralLayer.getSource?.();
-            if (!src) return;
-            if (typeof src.updateParams === 'function') src.updateParams({ _t: Date.now() });
-            else if (typeof src.refresh === 'function') src.refresh();
-            else if (typeof src.changed === 'function') src.changed();
-        };
-
-        if (!cadastralOn) {
-            cadastralPendingRef.current = false;
-            cadastralLayer.setVisible(false);
-            return;
-        }
-
-        if (cadastralPendingRef.current) return;
-
-        const zRaw = view.getZoom();
-        const z = Number.isFinite(zRaw) ? zRaw : MIN_Z;
-        const targetZoom = Math.max(MIN_Z, Math.min(MAX_Z, z));
-        const needZoomMove = z < MIN_Z || z > MAX_Z;
-
-        cadastralLayer.setVisible(false);
-
-        const turnOn = () => {
-            cadastralPendingRef.current = false;
-            refresh();
-            cadastralLayer.setVisible(true);
-        };
-
-        if (!needZoomMove) {
-            refresh();
-            cadastralLayer.setVisible(true);
-            return;
-        }
-
-        cadastralPendingRef.current = true;
-        mapObj.once('moveend', () => {
-            const stillOn = activeLayersRef.current.includes('LP_PA_CBND_BUBUN');
-            if (!stillOn) {
-                cadastralPendingRef.current = false;
-                cadastralLayer.setVisible(false);
-                return;
-            }
-            turnOn();
-        });
-
-        view.animate({ zoom: targetZoom, duration: 350 });
-    }, [mapObj, activeLayers]);
-
-    useEffect(() => {
-        if (!mapObj) return;
-
-        mapObj.getLayers().forEach((layer) => {
+        const allMapLayers = mapObj.getLayers().getArray();
+        allMapLayers.forEach((layer) => {
             const name = layer.get('name');
+            if (!name) return;
 
+            // 1) Base Maps
             if (name === 'satellite') layer.setVisible(mapType === 'satellite');
-            if (name === 'base') layer.setVisible(mapType === 'base');
-            if (name === 'gray') layer.setVisible(mapType === 'gray');
-            if (name === 'midnight') layer.setVisible(mapType === 'midnight');
-            if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
+            else if (name === 'base') layer.setVisible(mapType === 'base');
+            else if (name === 'gray') layer.setVisible(mapType === 'gray');
+            else if (name === 'midnight') layer.setVisible(mapType === 'midnight');
+            
+            // 2) Hybrid Labels
+            else if (name === 'hybrid') layer.setVisible(mapType === 'satellite' && showHybrid);
 
-            if (ALL_LAYERS.some((l) => l.id === name)) {
+            // 3) Cadastral & Other WMS Layers
+            else if (name === 'LP_PA_CBND_BUBUN') {
+                const isActive = activeLayers.includes(name);
+                const currentZoom = mapObj.getView().getZoom();
+                // We keep a simple minZoom check here
+                layer.setVisible(isActive && currentZoom >= 14);
+            }
+            else if (ALL_LAYERS.some(l => l.id === name)) {
                 layer.setVisible(activeLayers.includes(name));
             }
         });
     }, [mapObj, mapType, showHybrid, activeLayers]);
+    
+    // Zoom Listener for Cadastral visibility update
+    useEffect(() => {
+        if (!mapObj) return;
+        const handleZoomEnd = () => {
+            const cadastralLayer = cadastralLayerRef.current;
+            if (cadastralLayer) {
+                const isActive = activeLayers.includes('LP_PA_CBND_BUBUN');
+                const z = mapObj.getView().getZoom();
+                cadastralLayer.setVisible(isActive && z >= 14);
+            }
+        };
+        mapObj.on('moveend', handleZoomEnd);
+        return () => mapObj.un('moveend', handleZoomEnd);
+    }, [mapObj, activeLayers]);
 
     useEffect(() => {
         if (!mapObj) return;
