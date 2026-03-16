@@ -92,7 +92,8 @@ function AppContent() {
   return (
     <div className={`font-sans text-ink bg-paper h-screen overflow-hidden flex flex-col`}>
       {!isLanding && <Navbar />}
-      <div className="flex-1 overflow-auto relative">
+      {/* Container must let consulting map take full remaining height without adding an extra scroll area */}
+      <div className="flex-1 w-full relative">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<LandingPageView />} />
