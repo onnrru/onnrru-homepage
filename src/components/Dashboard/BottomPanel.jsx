@@ -342,7 +342,7 @@ const BottomPanel = () => {
     }
 
     return (
-        <div className="h-72 bg-white border-t border-gray-200 flex flex-col overflow-hidden">
+        <div className="flex flex-col w-full bg-white border-t border-gray-200 h-auto md:h-72 min-h-[400px] md:min-h-0">
             {/* Area Category Tabs */}
             <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex flex-wrap items-center gap-3">
                 <span className="text-xs font-bold text-gray-700 whitespace-nowrap">전용면적 구분</span>
@@ -365,18 +365,20 @@ const BottomPanel = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
                 {/* Chart 1: Apartment Prices */}
-                <div className="flex-1 p-3 border-r border-gray-100 flex flex-col">
-                    <div className="flex flex-wrap justify-between items-center mb-2 px-3 gap-2">
-                        <h3 className="font-bold text-gray-800 text-sm flex flex-wrap items-center gap-2">
-                            <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            아파트별 평균 실거래가
-                            <span className="text-xs font-normal text-gray-500">
+                <div className="w-full md:w-1/2 p-4 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col min-h-[300px] md:min-h-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
+                        <h3 className="font-bold text-gray-800 text-sm flex flex-col sm:flex-row sm:items-center items-start gap-1 sm:gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-1 h-3 bg-ink rounded-full"></span>
+                                <span>아파트별 평균 실거래가</span>
+                            </div>
+                            <span className="text-xs font-normal text-gray-500 sm:ml-0 ml-3">
                                 ({selectedPeriod === 12 ? '1년' : selectedPeriod === 36 ? '3년' : '5년'})
                             </span>
                         </h3>
-                        <div className="flex bg-gray-100 rounded-md p-0.5">
+                        <div className="flex bg-gray-100 rounded-md p-1 self-start sm:self-auto mt-1 sm:mt-0">
                             <button onClick={() => setSelectedPeriod(6)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 6 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>6개월</button>
                             <button onClick={() => setSelectedPeriod(12)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 12 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>1년</button>
                             <button onClick={() => setSelectedPeriod(36)} className={`px-2 py-1 text-[10px] rounded ${selectedPeriod === 36 ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>3년</button>
@@ -441,13 +443,16 @@ const BottomPanel = () => {
                 </div>
 
                 {/* Chart 2: Trends */}
-                <div className="flex-1 p-3 flex flex-col">
-                    <div className="flex flex-wrap justify-between items-center mb-2 px-3 gap-2">
-                        <h3 className="font-bold text-gray-800 text-sm flex flex-wrap items-center gap-2">
-                            <span className="w-1 h-3 bg-ink rounded-full"></span>
-                            추이 비교 <span className="text-xs font-normal text-gray-500">(3개월 단위, 5년 고정)</span>
+                <div className="w-full md:w-1/2 p-4 flex flex-col min-h-[300px] md:min-h-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
+                        <h3 className="font-bold text-gray-800 text-sm flex flex-col sm:flex-row sm:items-center items-start gap-1 sm:gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="w-1 h-3 bg-ink rounded-full"></span>
+                                <span>추이 비교</span>
+                            </div>
+                            <span className="text-xs font-normal text-gray-500 sm:ml-0 ml-3">(3개월 단위, 5년 고정)</span>
                         </h3>
-                        <div className="flex bg-gray-100 rounded-md p-0.5">
+                        <div className="flex bg-gray-100 rounded-md p-1 self-start sm:self-auto mt-1 sm:mt-0">
                             <button onClick={() => setTrendDataType('avg')} className={`px-2 py-1 text-[10px] rounded ${trendDataType === 'avg' ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>평균매매가</button>
                             <button onClick={() => setTrendDataType('count')} className={`px-2 py-1 text-[10px] rounded ${trendDataType === 'count' ? 'bg-white shadow-sm font-bold text-primary' : 'text-gray-500 hover:text-gray-700'}`}>거래수</button>
                         </div>
