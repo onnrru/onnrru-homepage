@@ -29,7 +29,7 @@ const DashboardContent = () => {
             <div className="flex-1 relative flex flex-col md:flex-row overflow-hidden">
                 {/* Sidebar - Property Info (Conditional Visibility) */}
                 {isSidebarOpen && (
-                    <div className="w-full md:w-[400px] h-[50vh] md:h-full order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white z-20 shadow-xl md:shadow-none overflow-y-auto">
+                    <div className="w-full md:w-[30%] md:min-w-[320px] md:max-w-[450px] h-[50vh] md:h-full order-2 md:order-2 border-t md:border-t-0 md:border-l border-gray-200 bg-white z-20 shadow-xl md:shadow-none overflow-y-auto flex-shrink-0">
                         <Sidebar
                             isOpen={isSidebarOpen}
                             onClose={() => setIsSidebarOpen(false)}
@@ -38,7 +38,7 @@ const DashboardContent = () => {
                 )}
 
                 {/* Main Content (Map) */}
-                <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-full">
+                <div className="flex-1 relative order-1 md:order-1 h-[50vh] md:h-full">
                     <MapSection />
                     {/* Bottom Analysis Panel Overlay */}
                     <motion.div

@@ -351,7 +351,7 @@ const Sidebar = ({ onClose }) => {
                                 <span className="w-1.5 h-3.5 bg-ink rounded-full"></span>
                                 국토계획법 및 타법령 지역·지구 등
                             </h4>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
                                 {finalCombinedUses.length > 0 ? (
                                     finalCombinedUses.map((use, i) => (
                                         <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg border border-blue-100">{use}</span>

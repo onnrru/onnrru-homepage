@@ -344,9 +344,9 @@ const BottomPanel = () => {
     return (
         <div className="h-72 bg-white border-t border-gray-200 flex flex-col overflow-hidden">
             {/* Area Category Tabs */}
-            <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex items-center gap-3">
+            <div className="px-6 pt-3 pb-2 border-b border-gray-100 flex flex-wrap items-center gap-3">
                 <span className="text-xs font-bold text-gray-700 whitespace-nowrap">전용면적 구분</span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     {AREA_CATEGORIES.map(cat => (
                         <button
                             key={cat}
@@ -368,8 +368,8 @@ const BottomPanel = () => {
             <div className="flex-1 flex overflow-hidden">
                 {/* Chart 1: Apartment Prices */}
                 <div className="flex-1 p-3 border-r border-gray-100 flex flex-col">
-                    <div className="flex justify-between items-center mb-2 px-3">
-                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                    <div className="flex flex-wrap justify-between items-center mb-2 px-3 gap-2">
+                        <h3 className="font-bold text-gray-800 text-sm flex flex-wrap items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
                             아파트별 평균 실거래가
                             <span className="text-xs font-normal text-gray-500">
@@ -442,8 +442,8 @@ const BottomPanel = () => {
 
                 {/* Chart 2: Trends */}
                 <div className="flex-1 p-3 flex flex-col">
-                    <div className="flex justify-between items-center mb-2 px-3">
-                        <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                    <div className="flex flex-wrap justify-between items-center mb-2 px-3 gap-2">
+                        <h3 className="font-bold text-gray-800 text-sm flex flex-wrap items-center gap-2">
                             <span className="w-1 h-3 bg-ink rounded-full"></span>
                             추이 비교 <span className="text-xs font-normal text-gray-500">(3개월 단위, 5년 고정)</span>
                         </h3>

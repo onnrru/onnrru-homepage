@@ -68,8 +68,8 @@ const MapControls = ({
                         className="w-full flex flex-col items-end gap-2 pointer-events-auto"
                     >
                         {/* Row 1: Dashboard and Basic Controls */}
-                        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
-                            <div className="flex items-center gap-1 px-1">
+                        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 p-1.5 flex flex-wrap items-center justify-end gap-1.5 max-w-full">
+                            <div className="flex flex-wrap justify-end items-center gap-1 px-1">
                                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`px-4 py-2 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap ${isSidebarOpen ? 'bg-gray-100 text-ink' : 'text-gray-500 hover:bg-gray-50'}`}>
                                     대상지 정보
                                 </button>
@@ -106,14 +106,14 @@ const MapControls = ({
 
                             <div className="flex items-center gap-1.5 p-1 bg-gray-50/50 rounded-xl">
                                 <button
-                                    onClick={() => { setShowMapTypes(!showMapTypes); if(!showMapTypes) setShowZones(false); }}
+                                    onClick={() => { setShowMapTypes(!showMapTypes); }}
                                     className={`px-4 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap
                                         ${showMapTypes ? 'bg-white text-ink shadow-md border border-gray-100' : 'text-gray-500 hover:bg-white/50'}`}
                                 >
                                     지도종류
                                 </button>
                                 <button
-                                    onClick={() => { setShowZones(!showZones); if(!showZones) setShowMapTypes(false); }}
+                                    onClick={() => { setShowZones(!showZones); }}
                                     className={`px-4 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap
                                         ${showZones ? 'bg-white text-ink shadow-md border border-gray-100' : 'text-gray-500 hover:bg-white/50'}`}
                                 >
@@ -127,9 +127,9 @@ const MapControls = ({
                             {showMapTypes && (
                                 <motion.div
                                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                                    className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full"
+                                    className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-1.5 flex flex-wrap items-center justify-end gap-1.5 max-w-full"
                                 >
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex flex-wrap justify-end items-center gap-1">
                                         {[
                                             { id: 'base', label: '일반' },
                                             { id: 'gray', label: '백지도' },
@@ -175,15 +175,15 @@ const MapControls = ({
                                     initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
                                     className="flex flex-col items-end gap-1.5 w-full"
                                 >
-                                    <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+                                    <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-1.5 flex flex-wrap items-center justify-end gap-1.5 max-w-full">
                                         <button
                                             onClick={() => setShowLayerMenu(true)}
                                             className="px-4 py-1.5 rounded-lg text-[11px] font-bold bg-gray-900 text-white hover:bg-black transition-colors whitespace-nowrap shadow-md"
                                         >
                                             전체보기
                                         </button>
-                                        <div className="w-px h-3 bg-gray-200 mx-1"></div>
-                                        <div className="flex items-center gap-1">
+                                        <div className="hidden md:block w-px h-3 bg-gray-200 mx-1"></div>
+                                        <div className="flex flex-wrap justify-end items-center gap-1">
                                             {BASIC_LAYERS.map((id) => {
                                                 const layer = ALL_LAYERS.find((l) => l.id === id);
                                                 if (!layer) return null;
