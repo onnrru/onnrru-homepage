@@ -45,7 +45,7 @@ const PageWrapper = ({ children, transitionType = "default" }) => {
       animate={selected.animate}
       exit={selected.exit}
       transition={selected.transition}
-      className="min-h-screen w-full origin-center"
+      className="min-h-screen h-full w-full origin-center flex flex-col"
     >
       {children}
     </motion.div>
