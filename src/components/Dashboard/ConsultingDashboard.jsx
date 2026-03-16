@@ -22,7 +22,8 @@ const DashboardContent = () => {
     } = useDashboard();
 
     return (
-        <div className="h-screen w-screen bg-gray-50 flex flex-col font-sans pt-16">
+        // Changed h-screen to h-[calc(100vh-64px)] to account for the 16 unit (64px) Navbar padding without causing a scrollbar
+        <div className="h-[calc(100vh-64px)] w-screen bg-gray-50 flex flex-col font-sans">
             {/* Dashboard Layout Container */}
             {/* On mobile: overflow-y-auto to allow scrolling the stacked items. On desktop: flex-row, overflow-hidden */}
             <div className="flex-1 w-full bg-gray-100 flex flex-col md:flex-row md:overflow-hidden overflow-y-auto pb-safe">

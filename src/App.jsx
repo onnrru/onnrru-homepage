@@ -90,23 +90,26 @@ function AppContent() {
   const isLanding = location.pathname === '/';
 
   return (
-    <div className={`font-sans text-ink bg-paper min-h-screen overflow-x-hidden`}>
+    <div className={`font-sans text-ink bg-paper h-screen overflow-hidden flex flex-col`}>
       {!isLanding && <Navbar />}
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<LandingPageView />} />
-          <Route path="/pizza" element={<PizzaPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/consulting" element={<ConsultingPage />} />
-          <Route path="/test" element={<TestPageView />} />
-          <Route path="/game" element={
-            <GameProvider>
-              <MainGameLayout />
-            </GameProvider>
-          } />
-        </Routes>
-      </AnimatePresence>
-      {!isLanding && <Footer />}
+      <div className="flex-1 overflow-auto relative">
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<LandingPageView />} />
+            <Route path="/pizza" element={<PizzaPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/consulting" element={<ConsultingPage />} />
+            <Route path="/test" element={<TestPageView />} />
+            <Route path="/game" element={
+              <GameProvider>
+                <MainGameLayout />
+              </GameProvider>
+            } />
+          </Routes>
+        </AnimatePresence>
+      </div>
+      {/* We conditionally hide footer on consulting page to maximize map area, or keep it short */}
+      {(!isLanding && location.pathname !== '/consulting') && <Footer />}
     </div>
   );
 }
