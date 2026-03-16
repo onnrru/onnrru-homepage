@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import TopBar from './TopBar';
 import Sidebar from './Sidebar';
 import MapSection from './MapSection';
